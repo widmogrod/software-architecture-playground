@@ -1,30 +1,37 @@
 package usecase
 
-import "../algebra/dispatch"
-
-func init() {
-	dispatch.When(CreateUserIdentity{}, HandleCreateUserIdentity)
-}
-
 type CreateUserIdentity struct {
 	UUID         string
 	EmailAddress EmailAddress
 }
 
 type ResultOfCreateUserIdentity struct {
-	ValidationError struct {
-		EmailAddressAlreadyExists bool
-	}
+	ValidationError  *ValidationError
 	SuccessfulResult *struct {
 		UUID string
 	}
 }
 
-func (r ResultOfCreateUserIdentity) IsSuccess() bool {
-	return r.SuccessfulResult != nil
+type ValidationError struct {
+	EmailAddressAlreadyExists bool
 }
 
-func HandleCreateUserIdentity(c CreateUserIdentity) ResultOfCreateUserIdentity {
-	// TODO implement
-	return ResultOfCreateUserIdentity{}
+func (r *ResultOfCreateUserIdentity) IsSuccess() bool {
+	return r.SuccessfulResult != nil && r.ValidationError == nil
+}
+
+func (r *ResultOfCreateUserIdentity) ConflictEmailExists() {
+	if r.ValidationError == nil {
+		r.ValidationError = &ValidationError{true}
+	}
+
+	r.ValidationError.EmailAddressAlreadyExists = true
+}
+
+func (r *ResultOfCreateUserIdentity) SuccedWithUUID(uuid string) {
+	r.SuccessfulResult = &struct {
+		UUID string
+	}{
+		uuid,
+	}
 }

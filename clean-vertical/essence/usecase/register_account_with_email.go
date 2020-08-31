@@ -17,11 +17,16 @@ type ResultOfRegisteringWithEmail struct {
 	ValidationError struct {
 		EmailAddress struct {
 			InvalidPattern bool
+			InUse          bool
 		}
 	}
 	SuccessfulResult struct {
 		PleaseConfirmEmailLink bool
 	}
+}
+
+func (r *ResultOfRegisteringWithEmail) IsSuccessful() bool {
+	return r.SuccessfulResult.PleaseConfirmEmailLink == true
 }
 
 type EmailAddress string
@@ -38,15 +43,17 @@ func HandleRegisterAccountWithEmail(input RegisterAccountWithEmail) ResultOfRegi
 		return output
 	}
 
-	res := dispatch.Dispatch(CreateUserIdentity{
+	res := dispatch.Invoke(CreateUserIdentity{
 		UUID:         "todo-generate-uuid",
 		EmailAddress: input.EmailAddress,
 	})
 
-	if rocui, ok := res.(ResultOfCreateUserIdentity); ok && rocui.IsSuccess() {
-		output.SuccessfulResult.PleaseConfirmEmailLink = true
+	rocui := res.(ResultOfCreateUserIdentity)
+	if !rocui.IsSuccess() && rocui.ValidationError.EmailAddressAlreadyExists {
+		output.ValidationError.EmailAddress.InUse = true
 		return output
 	}
 
-	panic("Never reach this path")
+	output.SuccessfulResult.PleaseConfirmEmailLink = true
+	return output
 }
