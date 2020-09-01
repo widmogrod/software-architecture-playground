@@ -28,7 +28,7 @@ func (r *ResultOfCreateUserIdentity) ConflictEmailExists() {
 	r.ValidationError.EmailAddressAlreadyExists = true
 }
 
-func (r *ResultOfCreateUserIdentity) SuccedWithUUID(uuid string) {
+func (r *ResultOfCreateUserIdentity) SucceedWithUUID(uuid string) {
 	r.SuccessfulResult = &struct {
 		UUID string
 	}{

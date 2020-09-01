@@ -41,7 +41,7 @@ func (i *InMemoryInterpretation) HandleCreateUserIdentity(input CreateUserIdenti
 		EmailAddress: input.EmailAddress,
 	}
 
-	output.SuccedWithUUID(uuid)
+	output.SucceedWithUUID(uuid)
 
 	return *output
 }
