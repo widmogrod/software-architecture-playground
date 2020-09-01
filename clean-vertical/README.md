@@ -14,6 +14,9 @@ Way of witting in this architecture should follow iterative process where
 6. `Make it ____` -
 
 
+// Raw thoughts
+// - When you defer implementation, write specification what behaviour/properties you expect from someone implementation
+
 ```
 .
 ├── distraction
