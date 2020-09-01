@@ -1,12 +1,15 @@
 package inmemory
 
 import (
+	"../../interpretation"
 	. "../../usecase"
 	"time"
 )
 
-func New() *InMemoryInterpretation {
-	return &InMemoryInterpretation{
+var _ interpretation.Interpretation = &InMemory{}
+
+func New() *InMemory {
+	return &InMemory{
 		identityStore: make(map[string]struct {
 			UUID         string
 			EmailAddress EmailAddress
@@ -14,14 +17,14 @@ func New() *InMemoryInterpretation {
 	}
 }
 
-type InMemoryInterpretation struct {
+type InMemory struct {
 	identityStore map[string]struct {
 		UUID         string
 		EmailAddress EmailAddress
 	}
 }
 
-func (i *InMemoryInterpretation) HandleCreateUserIdentity(input CreateUserIdentity) ResultOfCreateUserIdentity {
+func (i *InMemory) HandleCreateUserIdentity(input CreateUserIdentity) ResultOfCreateUserIdentity {
 	output := &ResultOfCreateUserIdentity{}
 	idx := string(input.EmailAddress)
 
@@ -44,4 +47,12 @@ func (i *InMemoryInterpretation) HandleCreateUserIdentity(input CreateUserIdenti
 	output.SucceedWithUUID(uuid)
 
 	return *output
+}
+
+func (i *InMemory) HandleGenerateSessionToken(input GenerateSessionToken) ResultOfGeneratingSessionToken {
+	panic("implement me")
+}
+
+func (i *InMemory) HandleMarkAccountActivationTokenAsUse(input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
+	panic("implement me")
 }
