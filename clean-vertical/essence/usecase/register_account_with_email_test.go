@@ -1,8 +1,8 @@
 package usecase
 
 import (
-	"../algebra/dispatch"
 	"context"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
 )
 

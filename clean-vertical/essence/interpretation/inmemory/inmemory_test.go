@@ -1,7 +1,7 @@
 package inmemory
 
 import (
-	"../../algebra/dispatch"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
 )
 

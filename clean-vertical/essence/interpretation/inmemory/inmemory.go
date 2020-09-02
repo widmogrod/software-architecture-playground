@@ -1,9 +1,9 @@
 package inmemory
 
 import (
-	"../../interpretation"
-	. "../../usecase"
 	"context"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation"
+	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
 	"time"
 )
 

@@ -1,9 +1,9 @@
 package inmemory
 
 import (
-	"../../algebra/dispatch"
-	. "../../usecase"
 	"context"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
+	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
 	"testing"
 )
 

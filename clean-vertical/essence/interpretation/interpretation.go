@@ -1,8 +1,8 @@
 package interpretation
 
 import (
-	. "../usecase"
 	"context"
+	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
 )
 
 type Interpretation interface {
