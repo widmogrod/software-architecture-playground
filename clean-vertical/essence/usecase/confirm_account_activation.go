@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"../algebra/dispatch"
+	"context"
 )
 
 type ConfirmAccountActivation struct {
@@ -27,10 +28,10 @@ func NewInvalidActivationTokenError() *struct{ InvalidActivationToken bool } {
 	}
 }
 
-func HandleConfirmAccountActivation(input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
+func HandleConfirmAccountActivation(ctx context.Context, input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
 	output := ResultOfConfirmationOfAccountActivation{}
 
-	res := dispatch.Invoke(MarkAccountActivationTokenAsUse{
+	res := dispatch.Invoke(ctx, MarkAccountActivationTokenAsUse{
 		ActivationToken: input.ActivationToken,
 	})
 	atu := res.(ResultOfMarkingAccountActivationTokenAsUsed)
@@ -39,7 +40,7 @@ func HandleConfirmAccountActivation(input ConfirmAccountActivation) ResultOfConf
 		return output
 	}
 
-	res = dispatch.Invoke(GenerateSessionToken{
+	res = dispatch.Invoke(ctx, GenerateSessionToken{
 		UserUUID: atu.SuccessfulResult.UserUUID,
 	})
 	st := res.(ResultOfGeneratingSessionToken)

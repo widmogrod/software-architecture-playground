@@ -1,20 +1,23 @@
-package usecase
+package inmemory
 
 import (
-	"../algebra/dispatch"
+	"../../algebra/dispatch"
+	. "../../usecase"
+	"context"
 	"testing"
 )
 
-func SpecCreateUserIdentity(t *testing.T) {
+func SpecRegisterAccountWithEmail(t *testing.T) {
 	email := EmailAddress("user-eamil@example.com")
 
-	result := dispatch.Invoke(RegisterAccountWithEmail{EmailAddress: email})
+	ctx := context.Background()
+	result := dispatch.Invoke(ctx, RegisterAccountWithEmail{EmailAddress: email})
 	rorwe := result.(ResultOfRegisteringWithEmail)
 	if !rorwe.IsSuccessful() {
 		t.Fatal("fresh registration didn't succeed")
 	}
 
-	result = dispatch.Invoke(RegisterAccountWithEmail{EmailAddress: email})
+	result = dispatch.Invoke(ctx, RegisterAccountWithEmail{EmailAddress: email})
 	rorwe = result.(ResultOfRegisteringWithEmail)
 	if rorwe.IsSuccessful() {
 		t.Fatal("reuse of an email must not be allowed!")

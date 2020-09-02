@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"../algebra/dispatch"
+	"context"
 	"github.com/badoux/checkmail"
 )
 
@@ -35,7 +36,7 @@ func (e EmailAddress) IsValid() bool {
 	return checkmail.ValidateFormat(string(e)) == nil
 }
 
-func HandleRegisterAccountWithEmail(input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
+func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
 	output := ResultOfRegisteringWithEmail{}
 
 	if !input.EmailAddress.IsValid() {
@@ -43,11 +44,10 @@ func HandleRegisterAccountWithEmail(input RegisterAccountWithEmail) ResultOfRegi
 		return output
 	}
 
-	res := dispatch.Invoke(CreateUserIdentity{
+	res := dispatch.Invoke(ctx, CreateUserIdentity{
 		UUID:         "todo-generate-uuid",
 		EmailAddress: input.EmailAddress,
 	})
-
 	rocui := res.(ResultOfCreateUserIdentity)
 	if !rocui.IsSuccess() && rocui.ValidationError.EmailAddressAlreadyExists {
 		output.ValidationError.EmailAddress.InUse = true

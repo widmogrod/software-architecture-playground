@@ -3,6 +3,7 @@ package inmemory
 import (
 	"../../interpretation"
 	. "../../usecase"
+	"context"
 	"time"
 )
 
@@ -24,7 +25,7 @@ type InMemory struct {
 	}
 }
 
-func (i *InMemory) HandleCreateUserIdentity(input CreateUserIdentity) ResultOfCreateUserIdentity {
+func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUserIdentity) ResultOfCreateUserIdentity {
 	output := &ResultOfCreateUserIdentity{}
 	idx := string(input.EmailAddress)
 
@@ -49,10 +50,10 @@ func (i *InMemory) HandleCreateUserIdentity(input CreateUserIdentity) ResultOfCr
 	return *output
 }
 
-func (i *InMemory) HandleGenerateSessionToken(input GenerateSessionToken) ResultOfGeneratingSessionToken {
+func (i *InMemory) HandleGenerateSessionToken(ctx context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
 	panic("implement me")
 }
 
-func (i *InMemory) HandleMarkAccountActivationTokenAsUse(input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
+func (i *InMemory) HandleMarkAccountActivationTokenAsUse(ctx context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 	panic("implement me")
 }
