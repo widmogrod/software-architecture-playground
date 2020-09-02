@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	dispatch.When(RegisterAccountWithEmail{}, HandleRegisterAccountWithEmail)
+	dispatch.Register(HandleRegisterAccountWithEmail)
 }
 
 type RegisterAccountWithEmail struct {

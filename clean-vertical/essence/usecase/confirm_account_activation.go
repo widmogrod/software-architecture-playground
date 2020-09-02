@@ -5,6 +5,10 @@ import (
 	"context"
 )
 
+func init() {
+	dispatch.Register(HandleConfirmAccountActivation)
+}
+
 type ConfirmAccountActivation struct {
 	ActivationToken string
 }

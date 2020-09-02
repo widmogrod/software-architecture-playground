@@ -13,8 +13,8 @@ func init() {
 }
 
 func Invoke(ctx context.Context, cmd interface{}) interface{} {
-	r := reflect.TypeOf(cmd)
-	if h, ok := handlers[r.Name()]; ok {
+	name := reflect.TypeOf(cmd).Name()
+	if h, ok := handlers[name]; ok {
 		return reflect.ValueOf(h).Call([]reflect.Value{
 			reflect.ValueOf(ctx),
 			reflect.ValueOf(cmd),
@@ -23,14 +23,14 @@ func Invoke(ctx context.Context, cmd interface{}) interface{} {
 	return nil
 }
 
-func When(cmd interface{}, fn interface{}) {
-	r := reflect.TypeOf(cmd)
-	handlers[r.Name()] = fn
+func Register(handler interface{}) {
+	name := reflect.TypeOf(handler).In(1).Name()
+	handlers[name] = handler
 }
 
 func ShouldInvokeAndReturn(t *testing.T, v interface{}) {
-	cmd := reflect.TypeOf(v).In(2).Name()
-	handlers[cmd] = func(ctx context.Context, input interface{}) interface{} {
+	name := reflect.TypeOf(v).In(2).Name()
+	handlers[name] = func(ctx context.Context, input interface{}) interface{} {
 		res := reflect.ValueOf(v).Call([]reflect.Value{
 			reflect.ValueOf(t),
 			reflect.ValueOf(ctx),
@@ -49,8 +49,8 @@ func Interpret(class interface{}) {
 	r := reflect.TypeOf(class)
 	for i := 0; i < r.NumMethod(); i++ {
 		met := r.Method(i)
-		cmd := met.Type.In(2)
-		handlers[cmd.Name()] = func(ctx context.Context, input interface{}) interface{} {
+		name := met.Type.In(2).Name()
+		handlers[name] = func(ctx context.Context, input interface{}) interface{} {
 			return met.Func.Call([]reflect.Value{
 				reflect.ValueOf(class),
 				reflect.ValueOf(ctx),
