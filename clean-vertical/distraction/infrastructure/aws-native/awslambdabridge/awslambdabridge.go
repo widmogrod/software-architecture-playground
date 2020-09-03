@@ -19,7 +19,7 @@ type Bridge struct {
 	then   interface{}
 }
 
-type Middleware = func(ctx context.Context, request events.APIGatewayProxyRequest) *events.APIGatewayProxyResponse
+type Middleware = func(ctx context.Context, request events.APIGatewayProxyRequest) (context.Context, *events.APIGatewayProxyResponse)
 
 func (b *Bridge) Use(m ...Middleware) *Bridge {
 	b.before = append(b.before, m...)
@@ -42,8 +42,10 @@ func (b *Bridge) Then(f interface{}) *Bridge {
 
 func (b *Bridge) Build() interface{} {
 	return func(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+		response := &events.APIGatewayProxyResponse{}
+
 		for _, m := range b.before {
-			response := m(ctx, request)
+			ctx, response = m(ctx, request)
 			if response != nil {
 				return *response, nil
 			}
