@@ -61,13 +61,13 @@ func (b *Bridge) Build() interface{} {
 	}
 }
 
-func callWhen(f interface{}, ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func callWhen(f interface{}, ctx context.Context, request events.APIGatewayProxyRequest) (interface{}, error) {
 	res := reflect.ValueOf(f).Call([]reflect.Value{
 		reflect.ValueOf(ctx),
 		reflect.ValueOf(request),
 	})
 
-	return res[0].Interface().(events.APIGatewayProxyResponse), res[1].Interface().(error)
+	return res[0].Interface(), res[1].Interface().(error)
 }
 
 func callThen(f interface{}, ctx context.Context, output interface{}) (events.APIGatewayProxyResponse, error) {
