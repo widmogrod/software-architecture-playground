@@ -1,0 +1,74 @@
+openapi: 3.0.0
+info:
+  title: Clean-Vertical API specification
+  description: "Demonstration how to use OpenAPI"
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+paths:
+  /register_with_email:
+    post:
+      security:
+        - BearerAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/RegisterAccountWithEmail'
+      responses:
+        200:
+          $ref: '#/components/schemas/ResultOfRegisteringWithEmail'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/UnauthorizedError'
+        403:
+          $ref: '#/components/responses/Forbidden'
+
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Fix error in request body
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ValidationError:
+                type: object
+                properties:
+                  EmailAddress:
+                    type: object
+                    properties:
+                      InUse:
+                        type: boolean
+                      InvalidPattern:
+                        type: boolean
+
+    UnauthorizedError:
+      description: Access token is missing or invalid
+    Forbidden:
+      description: Access token don't grand access
+
+  requestBodies:
+    RegisterAccountWithEmail:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              EmailAddress:
+                type: string
+  schemas:
+    ResultOfRegisteringWithEmail:
+      type: object
+      properties:
+        SuccessfulResult:
+          type: object
+          properties:
+            PleaseConfirmEmailLink:
+              type: boolean
