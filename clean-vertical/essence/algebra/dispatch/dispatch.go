@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -20,7 +21,8 @@ func Invoke(ctx context.Context, cmd interface{}) interface{} {
 			reflect.ValueOf(cmd),
 		})[0].Interface()
 	}
-	return nil
+
+	return errors.New("No handler for a cmd of a type = " + name)
 }
 
 func Register(handler interface{}) {

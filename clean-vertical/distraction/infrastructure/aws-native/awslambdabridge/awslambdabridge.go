@@ -2,6 +2,7 @@ package awslambdabridge
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"reflect"
@@ -56,7 +57,13 @@ func (b *Bridge) Build() interface{} {
 			return events.APIGatewayProxyResponse{}, err
 		}
 
+		fmt.Println("input ->", input)
 		output := dispatch.Invoke(ctx, input)
+
+		fmt.Println("ctx ->", ctx)
+		fmt.Println("then ->", b.then)
+		fmt.Println("output ->", output)
+
 		return callThen(b.then, ctx, output)
 	}
 }
@@ -67,6 +74,10 @@ func callWhen(f interface{}, ctx context.Context, request events.APIGatewayProxy
 		reflect.ValueOf(request),
 	})
 
+	if res[1].IsNil() {
+		return res[0].Interface(), nil
+	}
+
 	return res[0].Interface(), res[1].Interface().(error)
 }
 
@@ -75,6 +86,10 @@ func callThen(f interface{}, ctx context.Context, output interface{}) (events.AP
 		reflect.ValueOf(ctx),
 		reflect.ValueOf(output),
 	})
+
+	if res[1].IsNil() {
+		return res[0].Interface().(events.APIGatewayProxyResponse), nil
+	}
 
 	return res[0].Interface().(events.APIGatewayProxyResponse), res[1].Interface().(error)
 }

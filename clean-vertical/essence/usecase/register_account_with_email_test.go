@@ -31,7 +31,7 @@ func Test_RegisterAccountWithEmail_EverythingFine(t *testing.T) {
 
 	ctx := context.Background()
 	res := HandleRegisterAccountWithEmail(ctx, RegisterAccountWithEmail{"email-isvalid@example.com"})
-	if res.ValidationError.EmailAddress.InvalidPattern != false {
+	if res.ValidationError != nil && res.ValidationError.EmailAddress.InvalidPattern != false {
 		t.Error("email should be valid")
 	}
 }
