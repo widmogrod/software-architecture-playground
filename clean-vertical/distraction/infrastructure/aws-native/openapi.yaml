@@ -3,8 +3,10 @@ info:
   title: Clean-Vertical API specification
   description: "Demonstration how to use OpenAPI"
   version: 1.0.0
+
 servers:
   - url: 'http://localhost:3000'
+
 paths:
   /register_with_email:
     post:
