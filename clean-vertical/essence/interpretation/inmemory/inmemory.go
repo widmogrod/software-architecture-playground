@@ -25,6 +25,12 @@ type InMemory struct {
 	}
 }
 
+func (i *InMemory) HandleHelloWorld(ctx context.Context, world HelloWorld) ResultOfHelloWorld {
+	return ResultOfHelloWorld{
+		SuccessfulResult: "Hello, " + world.Name,
+	}
+}
+
 func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUserIdentity) ResultOfCreateUserIdentity {
 	output := &ResultOfCreateUserIdentity{}
 	idx := string(input.EmailAddress)
