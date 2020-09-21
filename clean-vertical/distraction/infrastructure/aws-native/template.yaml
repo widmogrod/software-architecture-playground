@@ -19,10 +19,49 @@ Resources:
             Path: /register_with_email
             Method: POST
 
+  HelloWorld:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/hello/
+      Handler: hello
+      Runtime: go1.x
+      Events:
+        CatchAll:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: GET
+#            RestApiId: !Ref MyApi
+#            Auth:
+#              Authorizers: MyLambdaRequestAuthorizer
+#
+#  MyApi:
+#    Type: AWS::Serverless::Api
+#    Properties:
+#      StageName: Prod
+#      Auth:
+#        DefaultAuthorizer: MyLambdaRequestAuthorizer
+#        Authorizers:
+#          MyLambdaRequestAuthorizer:
+#            FunctionPayloadType: REQUEST
+#            FunctionArn: !GetAtt lambdaauthorizerbasicauth.Outputs.LambdaAuthorizerBasicAuthFunction
+#            Identity:
+#              Headers:
+#                - Authorization
+#
+#  lambdaauthorizerbasicauth:
+#    Type: AWS::Serverless::Application
+#    Properties:
+#      Location:
+#        ApplicationId: arn:aws:serverlessrepo:us-east-1:560348900601:applications/lambda-authorizer-basic-auth
+#        SemanticVersion: 0.2.0
+
+
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   HelloWorldAPI:
     Description: "API Gateway endpoint URL for Prod environment API"
+#    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1"

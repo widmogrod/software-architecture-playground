@@ -25,9 +25,9 @@ type InMemory struct {
 	}
 }
 
-func (i *InMemory) HandleHelloWorld(ctx context.Context, world HelloWorld) ResultOfHelloWorld {
+func (i *InMemory) HandleHelloWorld(ctx context.Context, input HelloWorld) ResultOfHelloWorld {
 	return ResultOfHelloWorld{
-		SuccessfulResult: "Hello, " + world.Name,
+		SuccessfulResult: "Hello, " + input.Name,
 	}
 }
 

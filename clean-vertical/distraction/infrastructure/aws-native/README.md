@@ -3,6 +3,10 @@
 - OpenAPI component with type [schemas to document events](https://swagger.io/specification/#schema-object) - [example inspiration](https://github.com/aws-samples/aws-serverless-ecommerce-platform/blob/master/products/resources/events.yaml)
 - OpenAPI as a way to document API generate models for lambda conversion + SDK!
 
+- Introduce database migrations
+- Chaos engineering as a way of testing hypothesis
+- Integration tests
+
 ### How to start local development?
 
 Make sure everything is build and is up to date
