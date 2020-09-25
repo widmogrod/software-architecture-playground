@@ -26,35 +26,35 @@ Resources:
       Handler: hello
       Runtime: go1.x
       Events:
-        CatchAll:
+        HelloWorld:
           Type: Api
           Properties:
             Path: /hello
             Method: GET
-#            RestApiId: !Ref MyApi
-#            Auth:
-#              Authorizers: MyLambdaRequestAuthorizer
-#
-#  MyApi:
-#    Type: AWS::Serverless::Api
-#    Properties:
-#      StageName: Prod
-#      Auth:
-#        DefaultAuthorizer: MyLambdaRequestAuthorizer
-#        Authorizers:
-#          MyLambdaRequestAuthorizer:
-#            FunctionPayloadType: REQUEST
-#            FunctionArn: !GetAtt lambdaauthorizerbasicauth.Outputs.LambdaAuthorizerBasicAuthFunction
-#            Identity:
-#              Headers:
-#                - Authorization
-#
-#  lambdaauthorizerbasicauth:
-#    Type: AWS::Serverless::Application
-#    Properties:
-#      Location:
-#        ApplicationId: arn:aws:serverlessrepo:us-east-1:560348900601:applications/lambda-authorizer-basic-auth
-#        SemanticVersion: 0.2.0
+            RestApiId: !Ref MyApi
+            Auth:
+              Authorizers: MyLambdaRequestAuthorizer
+
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: MyLambdaRequestAuthorizer
+        Authorizers:
+          MyLambdaRequestAuthorizer:
+            FunctionPayloadType: REQUEST
+            FunctionArn: !GetAtt lambdaauthorizerbasicauth.Outputs.LambdaAuthorizerBasicAuthFunction
+            Identity:
+              Headers:
+                - Authorization
+
+  lambdaauthorizerbasicauth:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:560348900601:applications/lambda-authorizer-basic-auth
+        SemanticVersion: 0.2.0
 
 
 Outputs:
@@ -63,5 +63,7 @@ Outputs:
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   HelloWorldAPI:
     Description: "API Gateway endpoint URL for Prod environment API"
-#    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello"
+  AppdAPI:
+    Description: "API Gateway endpoint URL for Prod environment API"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/register_with_email"

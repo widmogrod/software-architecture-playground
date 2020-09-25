@@ -26,3 +26,10 @@ there is no need to restart server when you don't introduce new endpoints
 ```
 sam build
 ```
+
+
+When you deploy this project on AWS, then endpoints like `/hello` require username and password in DynamoDB table.
+When you have this then you can just
+```
+curl -u <username>:<password>  https://______/Prod/hello  
+```
