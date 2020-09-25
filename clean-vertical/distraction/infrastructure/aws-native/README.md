@@ -17,7 +17,8 @@ sam local start-api
 
 Execute sample requests
 ```
-http post http://127.0.0.1:3000/register_with_email Authorization:"Bearer jwt" EmailAddress=a@a.com
+http localhost:3000/hello\?name=guest 
+http post localhost:3000/register_with_email Authorization:"Bearer jwt" EmailAddress=a@a.com
 ```
 
 When you do changes, you need only to rebuild application, 
