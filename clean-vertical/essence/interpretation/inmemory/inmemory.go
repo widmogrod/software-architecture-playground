@@ -18,10 +18,6 @@ func New() *InMemory {
 	}
 }
 
-func String(s string) *string {
-	return &s
-}
-
 type InMemory struct {
 	identityStore    map[string]*identity
 	activationTokens []activationToken
