@@ -7,6 +7,6 @@ import (
 
 func Specification(t *testing.T) {
 	usecase.SpecHelloWorld(t)
-	SpecRegisterAccountWithEmail(t)
+	usecase.SpecRegisterAccountWithEmail(t)
 	SpecConfirmAccountActivation(t)
 }

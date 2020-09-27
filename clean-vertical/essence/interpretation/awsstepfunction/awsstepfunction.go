@@ -24,9 +24,8 @@ func (a AWSStepFunction) HandleMarkAccountActivationTokenAsUse(ctx context.Conte
 }
 
 func (a AWSStepFunction) HandleHelloWorld(ctx context.Context, input HelloWorld) ResultOfHelloWorld {
-	ctx.PauseActivity().ResumeActivityWithResultURL()
-
-	activity.CallbackFromURL().Put(ResultOfHelloWorld{})
+	//ctx.PauseActivity().ResumeActivityWithResultURL()
+	//activity.CallbackFromURL().Put(ResultOfHelloWorld{})
 
 	panic("implement me")
 }
