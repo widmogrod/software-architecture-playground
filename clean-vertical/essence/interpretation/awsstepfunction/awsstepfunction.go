@@ -9,7 +9,6 @@ import (
 var _ interpretation.Interpretation = &AWSStepFunction{}
 
 type AWSStepFunction struct {
-
 }
 
 func (a AWSStepFunction) HandleCreateUserIdentity(ctx context.Context, input CreateUserIdentity) ResultOfCreateUserIdentity {
@@ -28,8 +27,6 @@ func (a AWSStepFunction) HandleHelloWorld(ctx context.Context, input HelloWorld)
 	ctx.PauseActivity().ResumeActivityWithResultURL()
 
 	activity.CallbackFromURL().Put(ResultOfHelloWorld{})
-
-
 
 	panic("implement me")
 }
