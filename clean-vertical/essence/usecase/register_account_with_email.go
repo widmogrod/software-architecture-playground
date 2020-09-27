@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/badoux/checkmail"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
+	"time"
 )
 
 func init() {
@@ -100,7 +101,7 @@ func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWi
 	}
 
 	res := dispatch.Invoke(ctx, CreateUserIdentity{
-		UUID:         "todo-generate-uuid",
+		UUID:         time.Now().String(),
 		EmailAddress: input.EmailAddress,
 	})
 	rocui := res.(ResultOfCreateUserIdentity)

@@ -51,14 +51,12 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 		return *output
 	}
 
-	uuid := time.Now().String()
-
 	i.identityStore[idx] = &identity{
-		UUID:         uuid,
+		UUID:         input.UUID,
 		EmailAddress: input.EmailAddress,
 	}
 
-	output.SuccessfulResult = NewCreateUserIdentityWithUUID(uuid)
+	output.SuccessfulResult = NewCreateUserIdentityWithUUID(input.UUID)
 
 	return *output
 }
