@@ -9,4 +9,5 @@ func Specification(t *testing.T) {
 	usecase.SpecHelloWorld(t)
 	usecase.SpecRegisterAccountWithEmail(t)
 	usecase.SpecConfirmAccountActivation(t)
+	usecase.SpecCreateUserIdentity(t)
 }
