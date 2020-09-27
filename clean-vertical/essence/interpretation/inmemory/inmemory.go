@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation"
 	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
+	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -62,11 +64,10 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 }
 
 func (i *InMemory) HandleGenerateSessionToken(ctx context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
-	// TODO implement
 	return ResultOfGeneratingSessionToken{
 		SuccessfulResult: SessionToken{
-			AccessToken:  "",
-			RefreshToken: "",
+			AccessToken:  strconv.Itoa(rand.Int()),
+			RefreshToken: strconv.Itoa(rand.Int()),
 		},
 	}
 }
