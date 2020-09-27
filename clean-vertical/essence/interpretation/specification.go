@@ -11,4 +11,5 @@ func Specification(t *testing.T) {
 	usecase.SpecConfirmAccountActivation(t)
 	usecase.SpecCreateUserIdentity(t)
 	usecase.SpecGenerateSessionToken(t)
+	usecase.SpecCreateAccountActivationToken(t)
 }
