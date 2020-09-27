@@ -25,12 +25,14 @@ func SpecCreateUserIdentity(t *testing.T) {
 		assert.NotNil(t, resui.SuccessfulResult)
 		assert.Equal(t, resui.SuccessfulResult.UUID, uuid)
 
-		t.Run("CreateUserIdentity: should prevent from creation of duplicates", func(t *testing.T) {
+		t.Run("CreateUserIdentity: should prevent from creation of duplicates of emails", func(t *testing.T) {
 			res := dispatch.Invoke(ctx, cmd)
 			resui := res.(ResultOfCreateUserIdentity)
 			assert.Nil(t, resui.SuccessfulResult)
 			assert.NotNil(t, resui.ValidationError)
 			assert.True(t, resui.ValidationError.EmailAddressAlreadyExists)
 		})
+
+		// TODO What about UUID duplication?
 	})
 }
