@@ -79,6 +79,10 @@ func NewEmailInUserError() *struct {
 	}
 }
 
+func NewConfirmEmailLinkSuccess() *struct{ PleaseConfirmEmailLink bool } {
+	return &struct{ PleaseConfirmEmailLink bool }{PleaseConfirmEmailLink: true}
+}
+
 func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
 	output := ResultOfRegisteringWithEmail{}
 
@@ -97,6 +101,6 @@ func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWi
 		return output
 	}
 
-	output.SuccessfulResult = &struct{ PleaseConfirmEmailLink bool }{PleaseConfirmEmailLink: true}
+	output.SuccessfulResult = NewConfirmEmailLinkSuccess()
 	return output
 }
