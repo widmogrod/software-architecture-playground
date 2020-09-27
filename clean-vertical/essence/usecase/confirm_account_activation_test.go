@@ -21,7 +21,7 @@ func Test_HandleConfirmAccountActivation_token_is_invalid(t *testing.T) {
 		ActivationToken: token,
 	})
 	if !res.ValidationError.InvalidActivationToken {
-		t.Fatal("invalid activation token must return ValidationError")
+		t.Fatal("invalid activation token must return CreateUserIdentityValidationError")
 	}
 }
 

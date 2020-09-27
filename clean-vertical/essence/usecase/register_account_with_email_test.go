@@ -25,7 +25,7 @@ func Test_RegisterAccountWithEmail_EverythingFine(t *testing.T) {
 		}
 
 		res := ResultOfCreateUserIdentity{}
-		res.SucceedWithUUID(uuid)
+		res.SuccessfulResult = NewCreateUserIdentityWithUUID(uuid)
 		return res
 	})
 

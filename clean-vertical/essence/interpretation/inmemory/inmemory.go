@@ -47,7 +47,7 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 
 	// is persisted
 	if _, ok := i.identityStore[idx]; ok {
-		output.ConflictEmailExists()
+		output.ValidationError = NewConflictEmailExistsError()
 		return *output
 	}
 
@@ -58,7 +58,7 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 		EmailAddress: input.EmailAddress,
 	}
 
-	output.SucceedWithUUID(uuid)
+	output.SuccessfulResult = NewCreateUserIdentityWithUUID(uuid)
 
 	return *output
 }
