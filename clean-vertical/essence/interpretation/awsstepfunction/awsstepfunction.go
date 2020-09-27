@@ -29,3 +29,7 @@ func (a AWSStepFunction) HandleHelloWorld(ctx context.Context, input HelloWorld)
 
 	panic("implement me")
 }
+
+func (a AWSStepFunction) HandleCreateAccountActivationToken(ctx context.Context, input CreateAccountActivationToken) ResultOfCreateAccountActivationToken {
+	panic("implement me")
+}

@@ -21,9 +21,14 @@ type ResultOfRegisteringWithEmail struct {
 			InUse          bool
 		}
 	}
-	SuccessfulResult *struct {
-		PleaseConfirmEmailLink bool
-	}
+	// TODO private property?
+	SuccessfulResult *RegisterAccountWithEmailSuccessfulResult
+}
+
+type RegisterAccountWithEmailSuccessfulResult struct {
+	PleaseConfirmEmailLink bool
+	// *TestOnly - is for convenience of spec tests, this value MUST never be expose
+	ActivationTokenTestOnly string
 }
 
 func (r *ResultOfRegisteringWithEmail) IsSuccessful() bool {
@@ -79,8 +84,11 @@ func NewEmailInUserError() *struct {
 	}
 }
 
-func NewConfirmEmailLinkSuccess() *struct{ PleaseConfirmEmailLink bool } {
-	return &struct{ PleaseConfirmEmailLink bool }{PleaseConfirmEmailLink: true}
+func NewConfirmEmailLinkSuccess(token string) *RegisterAccountWithEmailSuccessfulResult {
+	return &RegisterAccountWithEmailSuccessfulResult{
+		PleaseConfirmEmailLink:  true,
+		ActivationTokenTestOnly: token,
+	}
 }
 
 func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
@@ -101,6 +109,10 @@ func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWi
 		return output
 	}
 
-	output.SuccessfulResult = NewConfirmEmailLinkSuccess()
+	tok := dispatch.Invoke(ctx, CreateAccountActivationToken{
+		UUID: rocui.SuccessfulResult.UUID,
+	})
+	tokres := tok.(ResultOfCreateAccountActivationToken)
+	output.SuccessfulResult = NewConfirmEmailLinkSuccess(tokres.SuccessfulResult)
 	return output
 }

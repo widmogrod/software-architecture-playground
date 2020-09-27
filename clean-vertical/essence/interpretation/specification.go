@@ -1,4 +1,4 @@
-package inmemory
+package interpretation
 
 import (
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
@@ -8,5 +8,5 @@ import (
 func Specification(t *testing.T) {
 	usecase.SpecHelloWorld(t)
 	usecase.SpecRegisterAccountWithEmail(t)
-	SpecConfirmAccountActivation(t)
+	usecase.SpecConfirmAccountActivation(t)
 }
