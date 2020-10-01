@@ -16,7 +16,8 @@ Way of witting in this architecture should follow iterative process where
 
 // Raw thoughts
 // - When you defer implementation, write specification what behaviour/properties you expect from someone implementation
-
+// - Spec tests should not contain testing/check since they may be used as integration tests and to big cardinality of inputs will increase integration tests
+// - Spec tests can be parametrised
 ```
 .
 ├── distraction

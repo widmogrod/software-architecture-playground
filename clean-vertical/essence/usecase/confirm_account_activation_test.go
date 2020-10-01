@@ -12,11 +12,7 @@ func Test_HandleConfirmAccountActivation_token_is_invalid(t *testing.T) {
 	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 		assert.Equal(t, token, input.ActivationToken)
 		return ResultOfMarkingAccountActivationTokenAsUsed{
-			ValidationError: &struct {
-				InvalidToken bool
-			}{
-				InvalidToken: true,
-			},
+			ValidationError: NewAccountActivationInvalidTokenError(),
 		}
 	})
 
@@ -25,7 +21,7 @@ func Test_HandleConfirmAccountActivation_token_is_invalid(t *testing.T) {
 		ActivationToken: token,
 	})
 	if !res.ValidationError.InvalidActivationToken {
-		t.Fatal("invalid activation token must return ValidationError")
+		t.Fatal("invalid activation token must return CreateUserIdentityValidationError")
 	}
 }
 
@@ -37,11 +33,7 @@ func Test_HandleConfirmAccountActivation_successful(t *testing.T) {
 	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 		assert.Equal(t, token, input.ActivationToken)
 		return ResultOfMarkingAccountActivationTokenAsUsed{
-			SuccessfulResult: &struct {
-				UserUUID string
-			}{
-				UserUUID: userUUID,
-			},
+			SuccessfulResult: NewAccountActivatedViaTokenSuccess(userUUID),
 		}
 	})
 	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {

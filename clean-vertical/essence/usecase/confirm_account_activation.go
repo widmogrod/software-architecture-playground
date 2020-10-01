@@ -14,20 +14,16 @@ type ConfirmAccountActivation struct {
 }
 
 type ResultOfConfirmationOfAccountActivation struct {
-	ValidationError *struct {
-		InvalidActivationToken bool
-	}
+	ValidationError  *ConfirmAccountActivationValidationError
 	SuccessfulResult *SessionToken
 }
 
-func (r *ResultOfConfirmationOfAccountActivation) SessionToken(token *SessionToken) {
-	r.SuccessfulResult = token
+type ConfirmAccountActivationValidationError struct {
+	InvalidActivationToken bool
 }
 
-func NewInvalidActivationTokenError() *struct{ InvalidActivationToken bool } {
-	return &struct {
-		InvalidActivationToken bool
-	}{
+func NewInvalidActivationTokenError() *ConfirmAccountActivationValidationError {
+	return &ConfirmAccountActivationValidationError{
 		InvalidActivationToken: true,
 	}
 }
@@ -49,7 +45,6 @@ func HandleConfirmAccountActivation(ctx context.Context, input ConfirmAccountAct
 	})
 	st := res.(ResultOfGeneratingSessionToken)
 
-	output.SessionToken(&st.SuccessfulResult)
-
+	output.SuccessfulResult = &st.SuccessfulResult
 	return output
 }

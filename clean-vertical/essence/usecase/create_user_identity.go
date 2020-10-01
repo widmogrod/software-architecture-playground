@@ -6,32 +6,30 @@ type CreateUserIdentity struct {
 }
 
 type ResultOfCreateUserIdentity struct {
-	ValidationError  *ValidationError
-	SuccessfulResult *struct {
-		UUID string
+	ValidationError  *CreateUserIdentityValidationError
+	SuccessfulResult *CreateUserIdentitySuccessfulResult
+}
+
+type CreateUserIdentityValidationError struct {
+	EmailAddressAlreadyExists bool
+}
+
+type CreateUserIdentitySuccessfulResult struct {
+	UUID string
+}
+
+func NewConflictEmailExistsError() *CreateUserIdentityValidationError {
+	return &CreateUserIdentityValidationError{
+		EmailAddressAlreadyExists: true,
 	}
 }
 
-type ValidationError struct {
-	EmailAddressAlreadyExists bool
+func NewCreateUserIdentityWithUUID(uuid string) *CreateUserIdentitySuccessfulResult {
+	return &CreateUserIdentitySuccessfulResult{
+		UUID: uuid,
+	}
 }
 
 func (r *ResultOfCreateUserIdentity) IsSuccess() bool {
 	return r.SuccessfulResult != nil && r.ValidationError == nil
-}
-
-func (r *ResultOfCreateUserIdentity) ConflictEmailExists() {
-	if r.ValidationError == nil {
-		r.ValidationError = &ValidationError{true}
-	}
-
-	r.ValidationError.EmailAddressAlreadyExists = true
-}
-
-func (r *ResultOfCreateUserIdentity) SucceedWithUUID(uuid string) {
-	r.SuccessfulResult = &struct {
-		UUID string
-	}{
-		uuid,
-	}
 }

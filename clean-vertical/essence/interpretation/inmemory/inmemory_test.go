@@ -2,11 +2,12 @@ package inmemory
 
 import (
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation"
 	"testing"
 )
 
 func TestInMemoryImplementationConformsToSpecification(t *testing.T) {
 	inMemory := New()
 	dispatch.Interpret(inMemory)
-	Specification(t)
+	interpretation.Specification(t)
 }

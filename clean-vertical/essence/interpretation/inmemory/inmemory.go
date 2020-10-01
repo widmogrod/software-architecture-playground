@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation"
 	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
+	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -11,23 +13,29 @@ var _ interpretation.Interpretation = &InMemory{}
 
 func New() *InMemory {
 	return &InMemory{
-		identityStore: make(map[string]struct {
-			UUID         string
-			EmailAddress EmailAddress
-		}),
+		identityStore:    make(map[string]*identity),
+		activationTokens: make([]activationToken, 0),
 	}
 }
 
 type InMemory struct {
-	identityStore map[string]struct {
-		UUID         string
-		EmailAddress EmailAddress
-	}
+	identityStore    map[string]*identity
+	activationTokens []activationToken
 }
 
-func (i *InMemory) HandleHelloWorld(ctx context.Context, world HelloWorld) ResultOfHelloWorld {
+type activationToken struct {
+	UUID                 string
+	EmailActivationToken string
+}
+
+type identity struct {
+	UUID         string
+	EmailAddress EmailAddress
+}
+
+func (i *InMemory) HandleHelloWorld(ctx context.Context, input HelloWorld) ResultOfHelloWorld {
 	return ResultOfHelloWorld{
-		SuccessfulResult: "Hello, " + world.Name,
+		SuccessfulResult: "Hello, " + input.Name,
 	}
 }
 
@@ -37,29 +45,56 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 
 	// is persisted
 	if _, ok := i.identityStore[idx]; ok {
-		output.ConflictEmailExists()
+		output.ValidationError = NewConflictEmailExistsError()
 		return *output
 	}
 
-	uuid := time.Now().String()
-
-	i.identityStore[idx] = struct {
-		UUID         string
-		EmailAddress EmailAddress
-	}{
-		UUID:         uuid,
+	i.identityStore[idx] = &identity{
+		UUID:         input.UUID,
 		EmailAddress: input.EmailAddress,
 	}
 
-	output.SucceedWithUUID(uuid)
+	output.SuccessfulResult = NewCreateUserIdentityWithUUID(input.UUID)
 
 	return *output
 }
 
 func (i *InMemory) HandleGenerateSessionToken(ctx context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
-	panic("implement me")
+	return ResultOfGeneratingSessionToken{
+		SuccessfulResult: SessionToken{
+			AccessToken:  strconv.Itoa(rand.Int()),
+			RefreshToken: strconv.Itoa(rand.Int()),
+		},
+	}
+}
+
+func (i *InMemory) HandleCreateAccountActivationToken(ctx context.Context, input CreateAccountActivationToken) ResultOfCreateAccountActivationToken {
+	token := time.Now().String()
+	i.activationTokens = append(i.activationTokens, activationToken{
+		UUID:                 input.UUID,
+		EmailActivationToken: token,
+	})
+
+	return ResultOfCreateAccountActivationToken{
+		SuccessfulResult: token,
+	}
 }
 
 func (i *InMemory) HandleMarkAccountActivationTokenAsUse(ctx context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
-	panic("implement me")
+	// TODO: Naive implementation ahead! O(n) don't do it at home!
+	for idx, token := range i.activationTokens {
+		if token.EmailActivationToken == input.ActivationToken {
+			// remove token from list
+			i.activationTokens[idx] = i.activationTokens[len(i.activationTokens)-1]
+			i.activationTokens = i.activationTokens[:len(i.activationTokens)-1]
+
+			return ResultOfMarkingAccountActivationTokenAsUsed{
+				SuccessfulResult: NewAccountActivatedViaTokenSuccess(token.UUID),
+			}
+		}
+	}
+
+	return ResultOfMarkingAccountActivationTokenAsUsed{
+		ValidationError: NewAccountActivationInvalidTokenError(),
+	}
 }

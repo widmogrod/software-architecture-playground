@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/badoux/checkmail"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
+	"time"
 )
 
 func init() {
@@ -21,9 +22,14 @@ type ResultOfRegisteringWithEmail struct {
 			InUse          bool
 		}
 	}
-	SuccessfulResult *struct {
-		PleaseConfirmEmailLink bool
-	}
+	// TODO private property?
+	SuccessfulResult *RegisterAccountWithEmailSuccessfulResult
+}
+
+type RegisterAccountWithEmailSuccessfulResult struct {
+	PleaseConfirmEmailLink bool
+	// *TestOnly - is for convenience of spec tests, this value MUST never be expose
+	ActivationTokenTestOnly string
 }
 
 func (r *ResultOfRegisteringWithEmail) IsSuccessful() bool {
@@ -79,6 +85,13 @@ func NewEmailInUserError() *struct {
 	}
 }
 
+func NewConfirmEmailLinkSuccess(token string) *RegisterAccountWithEmailSuccessfulResult {
+	return &RegisterAccountWithEmailSuccessfulResult{
+		PleaseConfirmEmailLink:  true,
+		ActivationTokenTestOnly: token,
+	}
+}
+
 func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
 	output := ResultOfRegisteringWithEmail{}
 
@@ -88,7 +101,7 @@ func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWi
 	}
 
 	res := dispatch.Invoke(ctx, CreateUserIdentity{
-		UUID:         "todo-generate-uuid",
+		UUID:         time.Now().String(),
 		EmailAddress: input.EmailAddress,
 	})
 	rocui := res.(ResultOfCreateUserIdentity)
@@ -97,6 +110,10 @@ func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWi
 		return output
 	}
 
-	output.SuccessfulResult = &struct{ PleaseConfirmEmailLink bool }{PleaseConfirmEmailLink: true}
+	tok := dispatch.Invoke(ctx, CreateAccountActivationToken{
+		UUID: rocui.SuccessfulResult.UUID,
+	})
+	tokres := tok.(ResultOfCreateAccountActivationToken)
+	output.SuccessfulResult = NewConfirmEmailLinkSuccess(tokres.SuccessfulResult)
 	return output
 }
