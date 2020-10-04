@@ -13,8 +13,8 @@
   },
   "devDependencies": {
     "@aws-cdk/assert": "1.66.0",
-    "@aws-cdk/aws-codecommit": "^1.66.0",
-    "@aws-cdk/pipelines": "^1.66.0",
+    "@aws-cdk/aws-codecommit": "1.66.0",
+    "@aws-cdk/pipelines": "1.66.0",
     "@types/aws-lambda": "^8.10.63",
     "@types/jest": "^26.0.10",
     "@types/node": "10.17.27",
@@ -25,12 +25,12 @@
     "typescript": "~3.9.7"
   },
   "dependencies": {
-    "@aws-cdk/aws-codebuild": "^1.66.0",
-    "@aws-cdk/aws-codepipeline": "^1.66.0",
-    "@aws-cdk/aws-codepipeline-actions": "^1.66.0",
-    "@aws-cdk/aws-lambda": "^1.66.0",
+    "@aws-cdk/aws-codebuild": "1.66.0",
+    "@aws-cdk/aws-codepipeline": "1.66.0",
+    "@aws-cdk/aws-codepipeline-actions": "1.66.0",
+    "@aws-cdk/aws-lambda": "1.66.0",
     "@aws-cdk/core": "1.66.0",
-    "aws-lambda": "^1.0.6",
+    "aws-lambda": "1.0.6",
     "aws-lambda-golang": "^0.1.1",
     "source-map-support": "^0.5.16"
   }
