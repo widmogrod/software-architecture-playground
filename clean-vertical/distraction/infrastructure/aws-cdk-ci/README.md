@@ -5,6 +5,7 @@ https://aws.amazon.com/blogs/developer/cdk-pipelines-continuous-delivery-for-aws
 Notes:
 - Hard-coding AWS accounts IDs for stages like pre-prod, production makes sence
 - Using account ID make sense for developer context 
+- Dev deployment requires attachments of direct stacks to the app `npx cdk synth && npx cdk deploy DevCleanVerticalHttpAPI`
 
 Pros
 - Definition is unified, transparent, consistent and easy to change

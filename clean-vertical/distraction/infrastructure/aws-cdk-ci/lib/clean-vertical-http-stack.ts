@@ -2,7 +2,7 @@ import * as golang from 'aws-lambda-golang';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
-export class CleanVerticalStack extends Stack {
+export class CleanVerticalHttpStack extends Stack {
     public readonly apiUrl: CfnOutput
 
     constructor(scope: Construct, id: string, props: StackProps) {

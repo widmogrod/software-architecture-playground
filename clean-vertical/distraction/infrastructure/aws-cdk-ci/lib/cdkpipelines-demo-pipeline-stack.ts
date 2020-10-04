@@ -4,7 +4,6 @@ import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
 import { CdkPipeline, SimpleSynthAction } from "@aws-cdk/pipelines";
 import { CdkpipelinesDemoStage } from './cdkpipelines-demo-stage';
 import { ShellScriptAction } from '@aws-cdk/pipelines';
-import {CleanVerticalStack} from "./clean-vertical-stack";
 import {CleanVerticalStage} from "./clean-vertical-stage";
 
 /**
