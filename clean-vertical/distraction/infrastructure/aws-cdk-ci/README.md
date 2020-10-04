@@ -16,3 +16,4 @@ Pros
 Cons-ish
 - Pipeline takes some time, compared to what I'm used to (1min CD) - but benefits are overwhelming to what I used to
 - Remember about `cdk bootstrap with --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess` - soon it should be standard
+- Remove construct, and it will be removed from AWS - that means that Database can be drop! Linter that could detect breaking changes would be beneficial.
