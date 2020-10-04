@@ -10,7 +10,7 @@ export class CleanVerticalStack extends Stack {
 
         const helloLambda = new golang.GolangFunction(this, '../../aws-native/functions/hello', {});
 
-        const httpApi = new apigatewayv2.HttpApi(this, 'clean-vertical-gateway');
+        const httpApi = new apigatewayv2.HttpApi(this, 'clean-vertical-gateway-2');
         httpApi.addRoutes({
             path: '/hello',
             methods: [apigatewayv2.HttpMethod.GET],
