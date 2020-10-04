@@ -4,6 +4,8 @@ import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
 import { CdkPipeline, SimpleSynthAction } from "@aws-cdk/pipelines";
 import { CdkpipelinesDemoStage } from './cdkpipelines-demo-stage';
 import { ShellScriptAction } from '@aws-cdk/pipelines';
+import {CleanVerticalStack} from "./clean-vertical-stack";
+import {CleanVerticalStage} from "./clean-vertical-stage";
 
 /**
  * The stack that defines the application pipeline
@@ -61,5 +63,9 @@ export class CdkpipelinesDemoPipelineStack extends Stack {
         pipeline.addApplicationStage(new CdkpipelinesDemoStage(this, 'Prod', {
             // env: { account: 'ACCOUNT2', region: 'us-west-2' }
         }));
+
+        pipeline.addApplicationStage(new CleanVerticalStage(this, 'Clean-Vertical', {
+
+        }))
     }
 }
