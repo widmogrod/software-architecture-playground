@@ -1,5 +1,5 @@
 import * as golang from 'aws-lambda-golang';
-import * as apigateway from '@aws-cdk/aws-apigateway';
+import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
 export class CleanVerticalStack extends Stack {
@@ -8,18 +8,19 @@ export class CleanVerticalStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const backend = new golang.GolangFunction(this, '../../aws-native/functions/hello', {});
-        const api = new apigateway.LambdaRestApi(this, 'clean-vertical-gateway', {
-            description: 'Clean Vertical Gateway',
-            handler: backend,
-            proxy: false,
+        const helloLambda = new golang.GolangFunction(this, '../../aws-native/functions/hello', {});
+
+        const httpApi = new apigatewayv2.HttpApi(this, 'clean-vertical-gateway');
+        httpApi.addRoutes({
+            path: '/hello',
+            methods: [apigatewayv2.HttpMethod.GET],
+            integration: new apigatewayv2.LambdaProxyIntegration({
+                handler: helloLambda,
+            }),
         });
 
-        const items = api.root.addResource('hello');
-        items.addMethod('GET');
-
-        this.apiUrl = new CfnOutput(this, 'Url', {
-            value: api.url,
+        this.apiUrl = new CfnOutput(this, 'CleanVerticalAPIUrl', {
+            value: httpApi.url || '',
         });
     }
 }
