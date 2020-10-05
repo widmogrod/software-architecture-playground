@@ -36,7 +36,7 @@ export class CleanVerticalPipeline extends Stack {
 
                 // We need a build step to compile the TypeScript Lambda
                 buildCommand: 'npm run build',
-                subdirectory: 'clean-vertical/distraction/infrastructure/aws-cdk-ci'
+                subdirectory: 'clean-vertical/distraction/infrastructure/aws-native'
             }),
         });
 
