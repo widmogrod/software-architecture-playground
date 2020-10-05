@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/widmogrod/software-architecture-playground/clean-vertical/distraction/infrastructure/aws-native/awslambdabridge"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/awslambdabridge"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation/inmemory"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
@@ -101,8 +101,7 @@ func main() {
 	interpretation := inmemory.New()
 	dispatch.Interpret(interpretation)
 
-	handler := awslambdabridge.
-		NewAPIGatewayProxy().
+	handler := awslambdabridge.NewAPIGatewayProxy().
 		Use(authjwt).
 		Use(allowAccess(perm, "can_register")).
 		When(func(ctx context.Context, request events.APIGatewayProxyRequest) (usecase.RegisterAccountWithEmail, error) {
