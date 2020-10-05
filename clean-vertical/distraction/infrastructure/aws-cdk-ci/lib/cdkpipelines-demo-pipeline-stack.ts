@@ -41,6 +41,10 @@ export class CdkpipelinesDemoPipelineStack extends Stack {
             }),
         });
 
+        pipeline.addApplicationStage(new CleanVerticalStage(this, 'Clean-Vertical', {
+            // env: { account: 'ACCOUNT1', region: 'us-east-2' }
+        }))
+
         // This is where we add the application stages
         const preprod = new CdkpipelinesDemoStage(this, 'PreProd', {
             // env: { account: 'ACCOUNT1', region: 'us-east-2' }
@@ -63,8 +67,6 @@ export class CdkpipelinesDemoPipelineStack extends Stack {
             // env: { account: 'ACCOUNT2', region: 'us-west-2' }
         }));
 
-        pipeline.addApplicationStage(new CleanVerticalStage(this, 'Clean-Vertical', {
 
-        }))
     }
 }
