@@ -25,6 +25,7 @@
     "typescript": "~3.9.7"
   },
   "dependencies": {
+    "@apidevtools/swagger-parser": "^10.0.2",
     "@aws-cdk/aws-apigatewayv2": "^1.66.0",
     "@aws-cdk/aws-codebuild": "1.66.0",
     "@aws-cdk/aws-codepipeline": "1.66.0",
@@ -33,6 +34,7 @@
     "@aws-cdk/core": "1.66.0",
     "aws-lambda": "1.0.6",
     "aws-lambda-golang": "^0.1.1",
+    "openapi-types": "^7.0.1",
     "source-map-support": "^0.5.16"
   }
 }

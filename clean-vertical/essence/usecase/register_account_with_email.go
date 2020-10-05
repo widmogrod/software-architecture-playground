@@ -22,12 +22,12 @@ type ResultOfRegisteringWithEmail struct {
 			InUse          bool
 		}
 	}
-	// TODO private property?
 	SuccessfulResult *RegisterAccountWithEmailSuccessfulResult
 }
 
 type RegisterAccountWithEmailSuccessfulResult struct {
 	PleaseConfirmEmailLink bool
+	// TODO private property?
 	// *TestOnly - is for convenience of spec tests, this value MUST never be expose
 	ActivationTokenTestOnly string
 }
