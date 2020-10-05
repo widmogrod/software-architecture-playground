@@ -8,7 +8,7 @@ export class CleanVerticalHttpStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const helloLambda = new golang.GolangFunction(this, '../../aws-native/functions/hello', {});
+        const helloLambda = new golang.GolangFunction(this, 'functions/hello', {});
 
         const httpApi = new apigatewayv2.HttpApi(this, 'clean-vertical-gateway-2');
         httpApi.addRoutes({
