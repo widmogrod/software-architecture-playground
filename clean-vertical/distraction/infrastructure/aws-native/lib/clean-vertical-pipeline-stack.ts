@@ -8,7 +8,7 @@ import {CleanVerticalStage} from "./clean-vertical-stage";
 /**
  * The stack that defines the application pipeline
  */
-export class CleanVerticalPipeline extends Stack {
+export class CleanVerticalPipelineStack extends Stack {
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
 
@@ -40,7 +40,7 @@ export class CleanVerticalPipeline extends Stack {
             }),
         });
 
-        const preprod = new CleanVerticalStage(this, 'Clean-Vertical-PreProd', {
+        const preprod = new CleanVerticalStage(this, 'PreProd', {
             // env: { account: 'ACCOUNT1', region: 'us-east-2' }
         })
 
