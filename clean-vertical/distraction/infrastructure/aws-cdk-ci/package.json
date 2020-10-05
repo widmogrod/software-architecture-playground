@@ -2,7 +2,7 @@
   "name": "aws-cdk-ci",
   "version": "0.1.0",
   "bin": {
-    "aws-cdk-ci": "bin/cdkpipelines-demo.js"
+    "aws-cdk-ci": "bin/clean-vertical.js"
   },
   "scripts": {
     "build": "tsc",

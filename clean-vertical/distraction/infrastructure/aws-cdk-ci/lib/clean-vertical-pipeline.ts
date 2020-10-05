@@ -1,15 +1,14 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
-import { Construct, SecretValue, Stack, StackProps } from '@aws-cdk/core';
-import { CdkPipeline, SimpleSynthAction } from "@aws-cdk/pipelines";
-import { CdkpipelinesDemoStage } from './cdkpipelines-demo-stage';
-import { ShellScriptAction } from '@aws-cdk/pipelines';
+import {Construct, SecretValue, Stack, StackProps} from '@aws-cdk/core';
+import {CdkPipeline, SimpleSynthAction} from "@aws-cdk/pipelines";
+import {ShellScriptAction} from '@aws-cdk/pipelines';
 import {CleanVerticalStage} from "./clean-vertical-stage";
 
 /**
  * The stack that defines the application pipeline
  */
-export class CdkpipelinesDemoPipelineStack extends Stack {
+export class CleanVerticalPipeline extends Stack {
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
 
@@ -18,7 +17,7 @@ export class CdkpipelinesDemoPipelineStack extends Stack {
 
         const pipeline = new CdkPipeline(this, 'Pipeline', {
             // The pipeline name
-            pipelineName: 'MyServicePipeline',
+            pipelineName: 'CleanVerticalPipeline',
             cloudAssemblyArtifact,
 
             // Where the source can be found
@@ -41,32 +40,26 @@ export class CdkpipelinesDemoPipelineStack extends Stack {
             }),
         });
 
-        pipeline.addApplicationStage(new CleanVerticalStage(this, 'Clean-Vertical', {
+        const preprod = new CleanVerticalStage(this, 'Clean-Vertical-PreProd', {
             // env: { account: 'ACCOUNT1', region: 'us-east-2' }
-        }))
+        })
 
-        // This is where we add the application stages
-        const preprod = new CdkpipelinesDemoStage(this, 'PreProd', {
-            // env: { account: 'ACCOUNT1', region: 'us-east-2' }
-        });
         const preprodStage = pipeline.addApplicationStage(preprod);
         preprodStage.addActions(new ShellScriptAction({
             actionName: 'TestService',
             useOutputs: {
                 // Get the stack Output from the Stage and make it available in
                 // the shell script as $ENDPOINT_URL.
-                ENDPOINT_URL: pipeline.stackOutput(preprod.urlOutput),
+                ENDPOINT_URL: pipeline.stackOutput(preprod.restApiUrl),
             },
             commands: [
                 // Use 'curl' to GET the given URL and fail if it returns an error
-                'curl -Ssf $ENDPOINT_URL',
+                'curl -Ssf $ENDPOINT_URL/hello?name=PreProd-test',
             ],
         }));
 
-        pipeline.addApplicationStage(new CdkpipelinesDemoStage(this, 'Prod', {
+        pipeline.addApplicationStage(new CleanVerticalStage(this, 'Prod', {
             // env: { account: 'ACCOUNT2', region: 'us-west-2' }
         }));
-
-
     }
 }
