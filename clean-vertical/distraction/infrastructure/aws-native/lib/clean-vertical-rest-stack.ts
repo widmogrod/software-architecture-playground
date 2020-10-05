@@ -8,7 +8,7 @@ export class CleanVerticalRestStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const helloLambda = new golang.GolangFunction(this, 'functions/hello', {});
+        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {});
 
         const restApi = new apigateway.RestApi(this, 'clean-vertical-rest-api');
 
