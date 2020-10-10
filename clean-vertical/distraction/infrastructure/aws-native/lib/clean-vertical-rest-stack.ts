@@ -17,10 +17,10 @@ export class CleanVerticalRestStack extends Stack {
             version: helloLambda.latestVersion,
         });
 
-        const application = new codedeploy.LambdaApplication(this, 'clean-vertical-rest-lambda-application', {
-            applicationName: 'CleanVertical REST', // optional property
+        const application = new codedeploy.LambdaApplication(this, 'cv-rest-lambda-app', {
+            applicationName: 'CleanVerticalRESTApp', // optional property
         });
-        const deploymentGroup = new codedeploy.LambdaDeploymentGroup(this, 'BlueGreenDeployment', {
+        const deploymentGroup = new codedeploy.LambdaDeploymentGroup(this, 'BlueGreenDeployment2', {
             application: application, // optional property: one will be created for you if not provided
             alias: version1Alias,
             deploymentConfig: codedeploy.LambdaDeploymentConfig.LINEAR_10PERCENT_EVERY_1MINUTE,
