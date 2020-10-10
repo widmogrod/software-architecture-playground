@@ -1,18 +1,11 @@
 name: Go
-
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [pull_request]
 
 jobs:
-
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
@@ -30,8 +23,16 @@ jobs:
             dep ensure
         fi
 
-#    - name: Build
-#      run: go build -v ./...
-
     - name: Test
       run: go test -v ./...
+
+    - uses: actions/github-script@v3
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '👌 Test are passing!'
+          })
