@@ -18,7 +18,7 @@ export class CleanVerticalRestStack extends Stack {
         });
 
         const application = new codedeploy.LambdaApplication(this, 'cv-rest-lambda-app', {
-            applicationName: 'CleanVerticalRESTApp', // optional property
+            // applicationName: 'CleanVerticalRESTApp', // optional property
         });
         const deploymentGroup = new codedeploy.LambdaDeploymentGroup(this, 'BlueGreenDeployment2', {
             application: application, // optional property: one will be created for you if not provided
