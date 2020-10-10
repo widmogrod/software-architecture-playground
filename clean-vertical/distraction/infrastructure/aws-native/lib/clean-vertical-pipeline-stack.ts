@@ -1,9 +1,10 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
-import {Construct, SecretValue, Stack, StackProps} from '@aws-cdk/core';
-import {CdkPipeline, SimpleSynthAction} from "@aws-cdk/pipelines";
-import {ShellScriptAction} from '@aws-cdk/pipelines';
+import {Construct, Duration, SecretValue, Stack, StackProps} from '@aws-cdk/core';
+import {CdkPipeline, ShellScriptAction, SimpleSynthAction} from "@aws-cdk/pipelines";
 import {CleanVerticalStage} from "./clean-vertical-stage";
+import * as targets from '@aws-cdk/aws-events-targets';
+import * as events from '@aws-cdk/aws-events';
 
 /**
  * The stack that defines the application pipeline
@@ -61,5 +62,11 @@ export class CleanVerticalPipelineStack extends Stack {
         pipeline.addApplicationStage(new CleanVerticalStage(this, 'Prod', {
             // env: { account: 'ACCOUNT2', region: 'us-west-2' }
         }));
+
+        // kick off the pipeline every day
+        const rule = new events.Rule(this, 'Daily', {
+            schedule: events.Schedule.rate(Duration.days(1)),
+        });
+        rule.addTarget(new targets.CodePipeline(pipeline.codePipeline));
     }
 }
