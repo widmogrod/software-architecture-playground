@@ -8,8 +8,21 @@ servers:
   - url: 'http://localhost:3000'
 
 paths:
+#  /question:
+#    post:
+#      x-lambda: function/question/create
+#    put:
+#      x-lambda: function/question/update
+#    delete:
+#      x-dynamo-db:
+#        sql: DELETE id FROM question WHERE id={id}
+#        map:
+#          ok: 200
+#          not-found: 200
+
   /register_with_email:
     post:
+#      x-lambda: function/register_with_email
       security:
         - BearerAuth: []
       requestBody:
