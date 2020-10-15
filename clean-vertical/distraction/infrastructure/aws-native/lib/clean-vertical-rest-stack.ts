@@ -3,6 +3,8 @@ import * as apigateway from '@aws-cdk/aws-apigateway';
 import * as codedeploy from '@aws-cdk/aws-codedeploy';
 import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
 import * as lambda from '@aws-cdk/aws-lambda';
+import {Tracing} from '@aws-cdk/aws-lambda';
+import * as iam from "@aws-cdk/aws-iam"
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
 export class CleanVerticalRestStack extends Stack {
@@ -11,9 +13,18 @@ export class CleanVerticalRestStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {});
+        const region = 'eu-west-1'
+        const layerArn = `arn:aws:lambda:${region}:580247275435:layer:LambdaInsightsExtension:2`;
+        const layer = lambda.LayerVersion.fromLayerVersionArn(this, `LayerFromArn`, layerArn);
+
+        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
+            tracing: Tracing.ACTIVE,
+            profiling: true,
+            layers: [layer],
+        });
+
         const version1Alias = new lambda.Alias(this, 'hello-lambda-alias', {
-            aliasName: 'prod',
+            aliasName: 'live',
             version: helloLambda.latestVersion,
         });
 
