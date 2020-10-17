@@ -1,27 +1,20 @@
-name: Go
+name: CI
 on: [pull_request]
 
 jobs:
-  build:
-    name: Build
+  test-go:
+    name: Test implementation in Golang
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
         go-version: ^1.13
       id: go
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
-
     - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
-        if [ -f Gopkg.toml ]; then
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep ensure
-        fi
+      run: go get -v -t -d ./...
 
     - name: Test
       run: go test -v ./...
@@ -34,5 +27,29 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: '👌 Test are passing!'
+            body: '👌 Tests of essencial part in Golang are passing!'
           })
+
+  test-cdk:
+    name: Test infrastructure in CDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '12'
+          check-latest: true
+
+      - run: cd clean-vertical/distraction/infrastructure/aws-native; npm install
+      - run: cd clean-vertical/distraction/infrastructure/aws-native; npx cdk synth
+
+      - uses: actions/github-script@v3
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '👌 Tests of infrastructure in CDK are passing!'
+            })

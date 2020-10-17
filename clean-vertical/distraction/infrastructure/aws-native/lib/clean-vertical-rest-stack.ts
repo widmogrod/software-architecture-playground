@@ -3,6 +3,7 @@ import * as apigateway from '@aws-cdk/aws-apigateway';
 import * as codedeploy from '@aws-cdk/aws-codedeploy';
 import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
 import * as lambda from '@aws-cdk/aws-lambda';
+import {Tracing} from '@aws-cdk/aws-lambda';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
 export class CleanVerticalRestStack extends Stack {
@@ -11,26 +12,29 @@ export class CleanVerticalRestStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {});
-        const version1Alias = new lambda.Alias(this, 'hello-lambda-alias', {
-            aliasName: 'prod',
-            version: helloLambda.latestVersion,
+        const region = 'eu-west-1'
+        const layerArn = `arn:aws:lambda:${region}:580247275435:layer:LambdaInsightsExtension:2`;
+        const layer = lambda.LayerVersion.fromLayerVersionArn(this, `LayerFromArn`, layerArn);
+
+        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
+            tracing: Tracing.ACTIVE,
+            profiling: true,
+            layers: [layer],
+            deadLetterQueueEnabled: true,
         });
 
-        const application = new codedeploy.LambdaApplication(this, 'cv-rest-lambda-app', {
-            // applicationName: 'CleanVerticalRESTApp', // optional property
-        });
-        const deploymentGroup = new codedeploy.LambdaDeploymentGroup(this, 'BlueGreenDeployment2', {
-            application: application, // optional property: one will be created for you if not provided
-            alias: version1Alias,
-            deploymentConfig: codedeploy.LambdaDeploymentConfig.LINEAR_10PERCENT_EVERY_1MINUTE,
+        const helloLambdaLiveVersion = helloLambda.currentVersion.addAlias('live2')
+
+        new codedeploy.LambdaDeploymentGroup(this, 'rest-api-deployment-group', {
+            alias: helloLambdaLiveVersion,
+            deploymentConfig: codedeploy.LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES,
             alarms: [
                 // pass some alarms when constructing the deployment group
                 new cloudwatch.Alarm(this, 'CleanVerticalHelloErrors', {
                     comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
                     threshold: 1,
                     evaluationPeriods: 1,
-                    metric: version1Alias.metricErrors()
+                    metric: helloLambdaLiveVersion.metricErrors()
                 })
             ]
         });
