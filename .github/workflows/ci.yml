@@ -3,7 +3,7 @@ on: [pull_request]
 
 jobs:
   test-go:
-    name: Test essencial part of project written in golang
+    name: Test implementation in Golang
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -39,10 +39,9 @@ jobs:
         with:
           node-version: '12'
           check-latest: true
-      - run: cd clean-vertical/distraction/infrastructure/aws-native
-      - run: npm install
-      - run: npx cdk synth
-#      - run: npm test
+
+      - run: cd clean-vertical/distraction/infrastructure/aws-native; npm install
+      - run: cd clean-vertical/distraction/infrastructure/aws-native; npx cdk synth
 
       - uses: actions/github-script@v3
         with:
