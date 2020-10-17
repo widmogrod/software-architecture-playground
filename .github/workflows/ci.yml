@@ -27,7 +27,7 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: '👌 Tests of essencial part in Golang are passing!'
+            body: '✅ Golang tests are passing!'
           })
 
   test-cdk:
@@ -51,5 +51,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '👌 Tests of infrastructure in CDK are passing!'
+              body: '✅ CDK tests are passing!'
             })

@@ -1,0 +1,40 @@
+name: SDK
+on: [pull_request]
+
+jobs:
+  generate-go:
+    name: Generate SDKs from OpenAPI
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
+        with:
+          node-version: '12'
+          check-latest: true
+
+    - name: Generate SDK in Golang
+      run: |
+        npx @openapitools/openapi-generator-cli generate  \
+        -i clean-vertical/distraction/infrastructure/aws-native/openapi.yaml \
+        -o clean-vertical/distraction/artifacts/gorestsdk \
+        -g go \
+        --package-name gorestsdk
+
+    - name: Commit generated SDKs
+      run: |
+        echo ${{ github.ref }}
+        git add clean-vertical/distraction/artifacts/
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m "CI: Automated SDK generation push" -a | exit 0
+
+    - uses: actions/github-script@v3
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '📦 SDKs were generated, but not PUSH!'
+          })
