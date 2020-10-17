@@ -1,4 +1,4 @@
-name: Generate SDK
+name: SDK
 on: [pull_request]
 
 jobs:
