@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Clean-Vertical API specification
-  description: "Demonstration how to use OpenAPI"
+  description: "Demonstration how to use OpenAPI to generate SDK"
   version: 1.0.0
 
 servers:
