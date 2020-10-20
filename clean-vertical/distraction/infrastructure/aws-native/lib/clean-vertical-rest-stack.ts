@@ -13,12 +13,14 @@ export class CleanVerticalRestStack extends Stack {
         super(scope, id, props);
 
         const insightsExtensionLayer = this.createLambdaInsightsExtensionLayer();
+        const insightsAppConfigLayer = this.createLambdaAppConfigExtensionLayer();
 
         const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
             tracing: Tracing.ACTIVE,
             profiling: true,
             layers: [
                 insightsExtensionLayer,
+                insightsAppConfigLayer
             ],
             deadLetterQueueEnabled: true,
         });
@@ -66,6 +68,11 @@ export class CleanVerticalRestStack extends Stack {
     private createLambdaInsightsExtensionLayer() {
         const region = 'eu-west-1'
         const layerArn = `arn:aws:lambda:${region}:580247275435:layer:LambdaInsightsExtension:2`;
-        return lambda.LayerVersion.fromLayerVersionArn(this, `LayerFromArn`, layerArn);
+        return lambda.LayerVersion.fromLayerVersionArn(this, `LambdaInsightsExtensionLayerFromArn`, layerArn);
+    }
+
+    private createLambdaAppConfigExtensionLayer() {
+        const layerArn = `arn:aws:lambda:eu-west-1:434848589818:layer:AWS-AppConfig-Extension:1`;
+        return lambda.LayerVersion.fromLayerVersionArn(this, `AWS-AppConfig-ExtensionLayerFromArn`, layerArn);
     }
 }
