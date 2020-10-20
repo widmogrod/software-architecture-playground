@@ -45,3 +45,10 @@ Way of witting in this architecture should follow iterative process where
     └── usecase
 
 ```
+
+
+TODO
+- [_] Single source of truth for artifacts. Github workflow actions should invoke either bash or Makefiles to generate artifacts like golang & js sdk. 
+This going to separate invocation from implementation, and enable developers to generate artifacts locally.
+- [_] Introduce AWS AppConfig and see what role it can play with canary deployments, chaos engineering, etc.
+- [_] Play with AWS StepFunctions as a validation of concept of independent implementation from interpretation.
