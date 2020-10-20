@@ -6,6 +6,10 @@ import * as lambda from '@aws-cdk/aws-lambda';
 import {Tracing} from '@aws-cdk/aws-lambda';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
+import * as appconfig from '@aws-cdk/aws-appconfig';
+import * as iam from '@aws-cdk/aws-iam';
+import * as path from "path";
+
 export class CleanVerticalRestStack extends Stack {
     public readonly apiUrl: CfnOutput
 
@@ -48,6 +52,26 @@ export class CleanVerticalRestStack extends Stack {
             {}
         ))
 
+        const testConfigLamnda = new lambda.Function(this, 'test-config-lambda-id', {
+            runtime: lambda.Runtime.PYTHON_3_8,
+            handler: 'index.handler',
+            code: lambda.Code.fromAsset('functions/appconfig'),
+            layers: [insightsAppConfigLayer],
+        });
+        // testConfigLamnda.grantInvoke()
+        testConfigLamnda.addToRolePolicy(new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            resources: ["*"],
+            actions: [
+                "appconfig:GetConfiguration",
+            ]
+        }))
+
+        restApi.root.addResource('config').addMethod('GET', new apigateway.LambdaIntegration(
+            testConfigLamnda,
+            {}
+        ))
+
         restApi.root.addResource('demo').addMethod('GET', new apigateway.MockIntegration({
             integrationResponses: [{
                 statusCode: '200',
@@ -75,4 +99,43 @@ export class CleanVerticalRestStack extends Stack {
         const layerArn = `arn:aws:lambda:eu-west-1:434848589818:layer:AWS-AppConfig-Extension:1`;
         return lambda.LayerVersion.fromLayerVersionArn(this, `AWS-AppConfig-ExtensionLayerFromArn`, layerArn);
     }
+
+    // private config() {
+    //     const app = new appconfig.CfnApplication(this, "cv-test-app-id", {
+    //         name: "clean-vertical-config-application",
+    //     })
+    //
+    //     const profile = new appconfig.CfnConfigurationProfile(this, "cv-test-config-profile-id", {
+    //         applicationId: app.logicalId,
+    //         name: "clean-vertical-config-profile",
+    //         locationUri: "hosted",
+    //     })
+    //
+    //     const devEnv = new appconfig.CfnEnvironment(this, 'cv-test-environment-id', {
+    //         applicationId: app.logicalId,
+    //         name: "cv-dev-env"
+    //     })
+    //
+    //     const confVersion = new appconfig.CfnHostedConfigurationVersion(this, 'cv-test-conf-version-id', {
+    //         applicationId: app.logicalId,
+    //         configurationProfileId: profile.logicalId,
+    //         content: JSON.stringify({
+    //             stage: 'dev',
+    //             chaos: false,
+    //         }),
+    //         contentType: "application/json",
+    //     })
+    //
+    //     const deployStrategy = new appconfig.CfnDeploymentStrategy(this, 'cv-test-deplpoy-strategy', {
+    //
+    //     })
+    //
+    //     new appconfig.CfnDeployment(this, 'cv-test-deployment-id', {
+    //         applicationId: app.logicalId,
+    //         configurationProfileId: profile.logicalId,
+    //         environmentId: devEnv.logicalId,
+    //         configurationVersion: `${confVersion.latestVersionNumber}`,
+    //         deploymentStrategyId: deployStrategy.logicalId,
+    //     })
+    // }
 }
