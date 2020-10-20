@@ -12,14 +12,14 @@ export class CleanVerticalRestStack extends Stack {
     constructor(scope: Construct, id: string, props: StackProps) {
         super(scope, id, props);
 
-        const region = 'eu-west-1'
-        const layerArn = `arn:aws:lambda:${region}:580247275435:layer:LambdaInsightsExtension:2`;
-        const layer = lambda.LayerVersion.fromLayerVersionArn(this, `LayerFromArn`, layerArn);
+        const insightsExtensionLayer = this.createLambdaInsightsExtensionLayer();
 
         const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
             tracing: Tracing.ACTIVE,
             profiling: true,
-            layers: [layer],
+            layers: [
+                insightsExtensionLayer,
+            ],
             deadLetterQueueEnabled: true,
         });
 
@@ -43,9 +43,7 @@ export class CleanVerticalRestStack extends Stack {
 
         restApi.root.addResource('hello').addMethod('GET', new apigateway.LambdaIntegration(
             helloLambda,
-            {
-
-            }
+            {}
         ))
 
         restApi.root.addResource('demo').addMethod('GET', new apigateway.MockIntegration({
@@ -63,5 +61,11 @@ export class CleanVerticalRestStack extends Stack {
         this.apiUrl = new CfnOutput(this, 'CleanVerticalRestAPIUrl', {
             value: restApi.url || '',
         });
+    }
+
+    private createLambdaInsightsExtensionLayer() {
+        const region = 'eu-west-1'
+        const layerArn = `arn:aws:lambda:${region}:580247275435:layer:LambdaInsightsExtension:2`;
+        return lambda.LayerVersion.fromLayerVersionArn(this, `LayerFromArn`, layerArn);
     }
 }
