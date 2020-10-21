@@ -55,7 +55,6 @@ export class CleanVerticalRestStack extends Stack {
             layers: [insightsAppConfigLayer],
             tracing: Tracing.ACTIVE,
         });
-        // testConfigLamnda.grantInvoke()
         testConfigLamnda.addToRolePolicy(new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             resources: ["*"],
@@ -75,7 +74,6 @@ export class CleanVerticalRestStack extends Stack {
             code: lambda.Code.fromAsset('functions/appconfig'),
             layers: [insightsAppConfigLayer],
         });
-        // testConfigLamnda.grantInvoke()
         testConfigLamnda2.addToRolePolicy(new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             resources: ["*"],
