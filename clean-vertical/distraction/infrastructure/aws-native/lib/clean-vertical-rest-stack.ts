@@ -5,10 +5,7 @@ import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
 import * as lambda from '@aws-cdk/aws-lambda';
 import {Tracing} from '@aws-cdk/aws-lambda';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
-
-import * as appconfig from '@aws-cdk/aws-appconfig';
 import * as iam from '@aws-cdk/aws-iam';
-import * as path from "path";
 
 export class CleanVerticalRestStack extends Stack {
     public readonly apiUrl: CfnOutput
@@ -21,7 +18,6 @@ export class CleanVerticalRestStack extends Stack {
 
         const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
             tracing: Tracing.ACTIVE,
-            profiling: true,
             layers: [
                 insightsExtensionLayer,
                 insightsAppConfigLayer
@@ -57,6 +53,7 @@ export class CleanVerticalRestStack extends Stack {
             handler: 'index.handler',
             code: lambda.Code.fromAsset('functions/appconfig'),
             layers: [insightsAppConfigLayer],
+            tracing: Tracing.ACTIVE,
         });
         // testConfigLamnda.grantInvoke()
         testConfigLamnda.addToRolePolicy(new iam.PolicyStatement({
@@ -69,6 +66,26 @@ export class CleanVerticalRestStack extends Stack {
 
         restApi.root.addResource('config').addMethod('GET', new apigateway.LambdaIntegration(
             testConfigLamnda,
+            {}
+        ))
+
+        const testConfigLamnda2 = new lambda.Function(this, 'test-config2-lambda-id', {
+            runtime: lambda.Runtime.NODEJS_12_X,
+            handler: 'index.handler',
+            code: lambda.Code.fromAsset('functions/appconfig'),
+            layers: [insightsAppConfigLayer],
+        });
+        // testConfigLamnda.grantInvoke()
+        testConfigLamnda2.addToRolePolicy(new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            resources: ["*"],
+            actions: [
+                "appconfig:GetConfiguration",
+            ]
+        }))
+
+        restApi.root.addResource('config2').addMethod('GET', new apigateway.LambdaIntegration(
+            testConfigLamnda2,
             {}
         ))
 
