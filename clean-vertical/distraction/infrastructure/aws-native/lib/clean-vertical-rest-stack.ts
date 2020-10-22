@@ -69,6 +69,7 @@ export class CleanVerticalRestStack extends Stack {
             {}
         ))
 
+        // I don't know how to make this to run npm install!?
         const testConfigLamnda2 = new lambdajs.NodejsFunction(this, 'test-config2-lambda-id2b', {
             handler: 'handler',
             entry: __dirname + '/../functions/appconfig/index.js',
@@ -76,13 +77,7 @@ export class CleanVerticalRestStack extends Stack {
                 NODE_ENV: 'production',
             },
             layers: [insightsAppConfigLayer],
-            externalModules: [
-                'aws-sdk',
-                // 'aws-xray-sdk-core'
-            ],
-            nodeModules: [
-                'aws-xray-sdk-core'
-            ],
+            forceDockerBundling: true,
         });
 
         // const testConfigLamnda2 = new lambda.Function(this, 'test-config2-lambda-id', {

@@ -12,15 +12,11 @@
     "aws-sdk": "^2.775.0",
     "aws-xray-sdk-core": "^3.2.0"
   },
-  "devDependencies": {
-    "parcel": "2.0.0-beta.1"
-  },
   "targets": {
     "cdk-lambda": {
       "context": "node",
       "includeNodeModules": {
-        "aws-sdk": false,
-        "aws-xray-sdk-core": false
+        "aws-sdk": false
       },
       "sourceMap": false,
       "minify": false,
