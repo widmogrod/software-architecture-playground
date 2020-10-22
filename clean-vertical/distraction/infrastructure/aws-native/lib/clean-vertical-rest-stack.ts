@@ -76,10 +76,10 @@ export class CleanVerticalRestStack extends Stack {
                     image: lambda.Runtime.NODEJS_12_X.bundlingDockerImage,
                     command: [
                         'bash', '-c', [
-                            'ls -la /asset-input',
-                            'cd /asset-input && npm install',
-                            'cp /asset-input /asset-output',
-                        ].join(),
+                            'ls -la .',
+                            'npm install',
+                            'cp -r /asset-input/* /asset-output/',
+                        ].join('&&'),
                     ],
                     user: 'root',
                 },
