@@ -31,6 +31,7 @@
     "@aws-cdk/aws-codepipeline": "^1.69.0",
     "@aws-cdk/aws-codepipeline-actions": "^1.69.0",
     "@aws-cdk/aws-lambda": "^1.69.0",
+    "@aws-cdk/aws-lambda-nodejs": "^1.69.0",
     "@aws-cdk/core": "^1.69.0",
     "aws-lambda": "1.0.6",
     "aws-lambda-golang": "^0.1.1",
