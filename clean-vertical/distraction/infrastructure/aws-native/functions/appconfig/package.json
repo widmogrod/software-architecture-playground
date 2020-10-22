@@ -19,7 +19,8 @@
     "cdk-lambda": {
       "context": "node",
       "includeNodeModules": {
-        "aws-sdk": false
+        "aws-sdk": false,
+        "aws-xray-sdk-core": false
       },
       "sourceMap": false,
       "minify": false,

@@ -76,6 +76,13 @@ export class CleanVerticalRestStack extends Stack {
                 NODE_ENV: 'production',
             },
             layers: [insightsAppConfigLayer],
+            externalModules: [
+                'aws-sdk',
+                // 'aws-xray-sdk-core'
+            ],
+            nodeModules: [
+                'aws-xray-sdk-core'
+            ],
         });
 
         // const testConfigLamnda2 = new lambda.Function(this, 'test-config2-lambda-id', {
