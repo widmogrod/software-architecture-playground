@@ -3,7 +3,6 @@ import * as apigateway from '@aws-cdk/aws-apigateway';
 import * as codedeploy from '@aws-cdk/aws-codedeploy';
 import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
 import * as lambda from '@aws-cdk/aws-lambda';
-import * as lambdajs from '@aws-cdk/aws-lambda-nodejs';
 import {Tracing} from '@aws-cdk/aws-lambda';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 import * as iam from '@aws-cdk/aws-iam';
@@ -69,24 +68,18 @@ export class CleanVerticalRestStack extends Stack {
             {}
         ))
 
-        // I don't know how to make this to run npm install!?
-        const testConfigLamnda2 = new lambdajs.NodejsFunction(this, 'test-config2-lambda-id2b', {
-            handler: 'handler',
-            entry: __dirname + '/../functions/appconfig/index.js',
-            parcelEnvironment: {
-                NODE_ENV: 'production',
-            },
+        const testConfigLamnda2 = new lambda.Function(this, 'test-config2-lambda-id', {
+            runtime: lambda.Runtime.NODEJS_12_X,
+            handler: 'index.handler',
+            code: lambda.Code.fromAsset('functions/appconfig', {
+                bundling: {
+                    image: lambda.Runtime.NODEJS_12_X.bundlingDockerImage,
+                    command: ['npm', 'install'],
+                    user: 'root',
+                },
+            }),
             layers: [insightsAppConfigLayer],
-            forceDockerBundling: true,
         });
-
-        // const testConfigLamnda2 = new lambda.Function(this, 'test-config2-lambda-id', {
-        //     runtime: lambda.Runtime.NODEJS_12_X,
-        //     handler: 'index.handler',
-        //     code: lambda.Code.
-        //     // code: lambda.Code.fromAsset('functions/appconfig'),
-        //     layers: [insightsAppConfigLayer],
-        // });
         testConfigLamnda2.addToRolePolicy(new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             resources: ["*"],
