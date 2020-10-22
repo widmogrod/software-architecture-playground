@@ -52,7 +52,7 @@ export class CleanVerticalRestStack extends Stack {
         const testConfigLamnda = new lambda.Function(this, 'test-config-lambda-id', {
             runtime: lambda.Runtime.PYTHON_3_8,
             handler: 'index.handler',
-            code: lambda.Code.fromAsset('functions/appconfig'),
+            code: lambda.Code.fromAsset(__dirname + '/../functions/appconfig'),
             layers: [insightsAppConfigLayer],
             tracing: Tracing.ACTIVE,
         });
@@ -71,7 +71,7 @@ export class CleanVerticalRestStack extends Stack {
 
         const testConfigLamnda2 = new lambdajs.NodejsFunction(this, 'test-config2-lambda-id2b', {
             handler: 'handler',
-            entry: 'functions/appconfig/index.js',
+            entry: __dirname + '/../functions/appconfig/index.js',
             parcelEnvironment: {
                 NODE_ENV: 'production',
             },
