@@ -36,7 +36,7 @@ jobs:
       - test-cdk
     steps:
       - uses: actions/github-script@v3
-        if: ${{ success() }}
+#        if: ${{ success() }}
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
@@ -47,14 +47,15 @@ jobs:
               body: '✅ tests are passing'
             })
 
-      - uses: actions/github-script@v3
-        if: ${{ failure() }}
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            github.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⛔️ tests are failing'
-            })
+# Not working, because success depends on previous stage form this job.
+#      - uses: actions/github-script@v3
+#        if: ${{ failure() }}
+#        with:
+#          github-token: ${{secrets.GITHUB_TOKEN}}
+#          script: |
+#            github.issues.createComment({
+#              issue_number: context.issue.number,
+#              owner: context.repo.owner,
+#              repo: context.repo.repo,
+#              body: '⛔️ tests are failing'
+#            })
