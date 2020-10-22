@@ -1,7 +1,7 @@
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import {Construct, Duration, SecretValue, Stack, StackProps} from '@aws-cdk/core';
-import {CdkPipeline, ShellScriptAction, SimpleSynthAction} from "@aws-cdk/pipelines";
+import {CdkPipeline, ShellScriptAction, SimpleSynthAction} from '@aws-cdk/pipelines';
 import {CleanVerticalStage} from "./clean-vertical-stage";
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as events from '@aws-cdk/aws-events';

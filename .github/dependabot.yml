@@ -12,17 +12,17 @@ updates:
       interval: daily
 
   - package-ecosystem: gomod
-      directory: /
-      labels:
-        - "gomod"
-        - "dependencies"
-      schedule:
-        interval: daily
+    directory: /
+    labels:
+      - "gomod"
+      - "dependencies"
+    schedule:
+      interval: daily
 
   - package-ecosystem: github-actions
-      directory: /
-      labels:
-        - "github-actions"
-        - "dependencies"
-      schedule:
-        interval: daily
+    directory: /
+    labels:
+      - "github-actions"
+      - "dependencies"
+    schedule:
+      interval: daily
