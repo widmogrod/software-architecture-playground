@@ -74,7 +74,13 @@ export class CleanVerticalRestStack extends Stack {
             code: lambda.Code.fromAsset('functions/appconfig', {
                 bundling: {
                     image: lambda.Runtime.NODEJS_12_X.bundlingDockerImage,
-                    command: ['npm', 'install'],
+                    command: [
+                        'bash', '-c', [
+                            'ls -la /asset-input',
+                            'cd /asset-input && npm install',
+                            'cp /asset-input /asset-output',
+                        ].join(),
+                    ],
                     user: 'root',
                 },
             }),
