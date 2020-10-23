@@ -5,6 +5,7 @@ import {CdkPipeline, ShellScriptAction, SimpleSynthAction} from '@aws-cdk/pipeli
 import {CleanVerticalStage} from "./clean-vertical-stage";
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as events from '@aws-cdk/aws-events';
+import * as codebuild from "@aws-cdk/aws-codebuild";
 
 /**
  * The stack that defines the application pipeline
@@ -37,7 +38,11 @@ export class CleanVerticalPipelineStack extends Stack {
 
                 // We need a build step to compile the TypeScript Lambda
                 buildCommand: 'npm run build',
-                subdirectory: 'clean-vertical/distraction/infrastructure/aws-native'
+                subdirectory: 'clean-vertical/distraction/infrastructure/aws-native',
+                environment: {
+                    buildImage: codebuild.LinuxBuildImage.STANDARD_4_0,
+                    privileged: true, // Indicates how the project builds Docker images.
+                },
             }),
         });
 
