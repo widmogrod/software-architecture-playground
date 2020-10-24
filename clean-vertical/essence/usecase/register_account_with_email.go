@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/badoux/checkmail"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"time"
@@ -92,7 +91,7 @@ func NewConfirmEmailLinkSuccess(token string) *RegisterAccountWithEmailSuccessfu
 	}
 }
 
-func HandleRegisterAccountWithEmail(ctx context.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
+func HandleRegisterAccountWithEmail(ctx dispatch.Context, input RegisterAccountWithEmail) ResultOfRegisteringWithEmail {
 	output := ResultOfRegisteringWithEmail{}
 
 	if !input.EmailAddress.IsValid() {

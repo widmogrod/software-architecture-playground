@@ -1,0 +1,20 @@
+version: '1'
+resources:
+  redis: {}
+  postgresql: {}
+  my-custom:
+    type: Custom
+    spec: "path-to-yaml/or/binary-that-return.yaml"
+
+entrypoints:
+  restapi:
+    type: RestAPI
+    fromOpenAPI: "path/to/openapi.yaml"
+
+  cron:
+    type: Cron
+    schedgule: "* * * * *"
+    entry: "invoke --name=CollectUsers"
+
+  pipeline:
+    type: Pipeline

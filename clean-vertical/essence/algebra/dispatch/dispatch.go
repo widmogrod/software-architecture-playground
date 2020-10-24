@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -13,7 +12,7 @@ func init() {
 	handlers = make(map[string]interface{})
 }
 
-func Invoke(ctx context.Context, cmd interface{}) interface{} {
+func Invoke(ctx Context, cmd interface{}) interface{} {
 	name := reflect.TypeOf(cmd).Name()
 	if h, ok := handlers[name]; ok {
 		return reflect.ValueOf(h).Call([]reflect.Value{
@@ -32,7 +31,7 @@ func Register(handler interface{}) {
 
 func ShouldInvokeAndReturn(t *testing.T, v interface{}) {
 	name := reflect.TypeOf(v).In(2).Name()
-	handlers[name] = func(ctx context.Context, input interface{}) interface{} {
+	handlers[name] = func(ctx Context, input interface{}) interface{} {
 		res := reflect.ValueOf(v).Call([]reflect.Value{
 			reflect.ValueOf(t),
 			reflect.ValueOf(ctx),
@@ -52,7 +51,7 @@ func Interpret(class interface{}) {
 	for i := 0; i < r.NumMethod(); i++ {
 		met := r.Method(i)
 		name := met.Type.In(2).Name()
-		handlers[name] = func(ctx context.Context, input interface{}) interface{} {
+		handlers[name] = func(ctx Context, input interface{}) interface{} {
 			return met.Func.Call([]reflect.Value{
 				reflect.ValueOf(class),
 				reflect.ValueOf(ctx),

@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -12,7 +11,7 @@ func SpecCreateUserIdentity(t *testing.T) {
 	uuid := time.Now().String()
 	email := EmailAddress("some-email-address@email.com")
 
-	ctx := context.Background()
+	ctx := dispatch.Background()
 	cmd := CreateUserIdentity{
 		UUID:         uuid,
 		EmailAddress: email,

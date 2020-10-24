@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -9,7 +8,7 @@ import (
 )
 
 func SpecCreateAccountActivationToken(t *testing.T) {
-	ctx := context.Background()
+	ctx := dispatch.Background()
 	uuid := time.Now().String()
 
 	t.Run("CreateAccountActivationToken: should always create activation token", func(t *testing.T) {
