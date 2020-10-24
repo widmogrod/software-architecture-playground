@@ -4,10 +4,14 @@ import (
 	"testing"
 )
 
-var defaultProgram *program
+var defaultProgram Program
 
 func init() {
 	defaultProgram = NewProgram()
+}
+
+func SetDefault(p Program) {
+	defaultProgram = p
 }
 
 func Invoke(ctx Context, cmd interface{}) interface{} {

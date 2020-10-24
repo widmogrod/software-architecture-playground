@@ -13,6 +13,13 @@ func NewProgram() *program {
 	}
 }
 
+type Program interface {
+	Invoke(ctx Context, cmd interface{}) interface{}
+	Interpretation(class interface{})
+	RegisterGlobalHandler(handler interface{})
+	ShouldInvokeAndReturn(t *testing.T, v interface{})
+}
+
 type program struct {
 	handlers *sync.Map
 }
@@ -26,7 +33,7 @@ func (p *program) Invoke(ctx Context, cmd interface{}) interface{} {
 		})[0].Interface()
 	}
 
-	return errors.New("dispatch: No handler for a cmd of a type = " + name)
+	return errors.New("dispatch: No handler for a inputPayload of a type = " + name)
 }
 
 func (p *program) Interpretation(class interface{}) {
