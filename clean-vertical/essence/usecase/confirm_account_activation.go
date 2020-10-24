@@ -5,7 +5,7 @@ import (
 )
 
 func init() {
-	dispatch.Register(HandleConfirmAccountActivation)
+	dispatch.RegisterGlobalHandler(HandleConfirmAccountActivation)
 }
 
 type ConfirmAccountActivation struct {
