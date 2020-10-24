@@ -17,6 +17,14 @@ func Background() *activity {
 	return WithContext(context.Background())
 }
 
+func FromActivityID(id string) *activity {
+	return &activity{
+		params:     &sync.Map{},
+		activityID: id,
+		ctx:        context.Background(),
+	}
+}
+
 func WithContext(ctx context.Context) *activity {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
