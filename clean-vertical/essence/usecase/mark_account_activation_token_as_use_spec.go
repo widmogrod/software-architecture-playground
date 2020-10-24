@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -9,7 +8,7 @@ import (
 )
 
 func SpecMarkAccountActivationTokenAsUse(t *testing.T) {
-	ctx := context.Background()
+	ctx := dispatch.Background()
 	token := time.Now().String()
 
 	t.Run("MarkAccountActivationTokenAsUse: For invalid token it should return appropriate error", func(t *testing.T) {

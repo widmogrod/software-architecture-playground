@@ -58,7 +58,7 @@ func (b *Bridge) Build() interface{} {
 		}
 
 		fmt.Println("input ->", input)
-		output := dispatch.Invoke(ctx, input)
+		output := dispatch.Invoke(dispatch.WithContext(ctx), input)
 
 		fmt.Println("ctx ->", ctx)
 		fmt.Println("then ->", b.then)

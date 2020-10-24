@@ -1,7 +1,7 @@
 package inmemory
 
 import (
-	"context"
+	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation"
 	. "github.com/widmogrod/software-architecture-playground/clean-vertical/essence/usecase"
 	"math/rand"
@@ -33,13 +33,13 @@ type identity struct {
 	EmailAddress EmailAddress
 }
 
-func (i *InMemory) HandleHelloWorld(ctx context.Context, input HelloWorld) ResultOfHelloWorld {
+func (i *InMemory) HandleHelloWorld(ctx dispatch.Context, input HelloWorld) ResultOfHelloWorld {
 	return ResultOfHelloWorld{
 		SuccessfulResult: "Hello, " + input.Name,
 	}
 }
 
-func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUserIdentity) ResultOfCreateUserIdentity {
+func (i *InMemory) HandleCreateUserIdentity(ctx dispatch.Context, input CreateUserIdentity) ResultOfCreateUserIdentity {
 	output := &ResultOfCreateUserIdentity{}
 	idx := string(input.EmailAddress)
 
@@ -59,7 +59,7 @@ func (i *InMemory) HandleCreateUserIdentity(ctx context.Context, input CreateUse
 	return *output
 }
 
-func (i *InMemory) HandleGenerateSessionToken(ctx context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
+func (i *InMemory) HandleGenerateSessionToken(ctx dispatch.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
 	return ResultOfGeneratingSessionToken{
 		SuccessfulResult: SessionToken{
 			AccessToken:  strconv.Itoa(rand.Int()),
@@ -68,7 +68,7 @@ func (i *InMemory) HandleGenerateSessionToken(ctx context.Context, input Generat
 	}
 }
 
-func (i *InMemory) HandleCreateAccountActivationToken(ctx context.Context, input CreateAccountActivationToken) ResultOfCreateAccountActivationToken {
+func (i *InMemory) HandleCreateAccountActivationToken(ctx dispatch.Context, input CreateAccountActivationToken) ResultOfCreateAccountActivationToken {
 	token := time.Now().String()
 	i.activationTokens = append(i.activationTokens, activationToken{
 		UUID:                 input.UUID,
@@ -80,7 +80,7 @@ func (i *InMemory) HandleCreateAccountActivationToken(ctx context.Context, input
 	}
 }
 
-func (i *InMemory) HandleMarkAccountActivationTokenAsUse(ctx context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
+func (i *InMemory) HandleMarkAccountActivationTokenAsUse(ctx dispatch.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 	// TODO: Naive implementation ahead! O(n) don't do it at home!
 	for idx, token := range i.activationTokens {
 		if token.EmailActivationToken == input.ActivationToken {

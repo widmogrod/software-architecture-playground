@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -9,14 +8,14 @@ import (
 
 func Test_HandleConfirmAccountActivation_token_is_invalid(t *testing.T) {
 	token := "invalid-token"
-	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
+	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ dispatch.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 		assert.Equal(t, token, input.ActivationToken)
 		return ResultOfMarkingAccountActivationTokenAsUsed{
 			ValidationError: NewAccountActivationInvalidTokenError(),
 		}
 	})
 
-	ctx := context.Background()
+	ctx := dispatch.Background()
 	res := HandleConfirmAccountActivation(ctx, ConfirmAccountActivation{
 		ActivationToken: token,
 	})
@@ -30,13 +29,13 @@ func Test_HandleConfirmAccountActivation_successful(t *testing.T) {
 	token := "valid-token"
 	accessToken := "accessToken"
 	refreshToken := "refreshToken"
-	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
+	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ dispatch.Context, input MarkAccountActivationTokenAsUse) ResultOfMarkingAccountActivationTokenAsUsed {
 		assert.Equal(t, token, input.ActivationToken)
 		return ResultOfMarkingAccountActivationTokenAsUsed{
 			SuccessfulResult: NewAccountActivatedViaTokenSuccess(userUUID),
 		}
 	})
-	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ context.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
+	dispatch.ShouldInvokeAndReturn(t, func(t *testing.T, _ dispatch.Context, input GenerateSessionToken) ResultOfGeneratingSessionToken {
 		assert.Equal(t, userUUID, input.UserUUID)
 		return ResultOfGeneratingSessionToken{
 			SuccessfulResult: SessionToken{
@@ -46,7 +45,7 @@ func Test_HandleConfirmAccountActivation_successful(t *testing.T) {
 		}
 	})
 
-	ctx := context.Background()
+	ctx := dispatch.Background()
 	res := HandleConfirmAccountActivation(ctx, ConfirmAccountActivation{
 		ActivationToken: token,
 	})

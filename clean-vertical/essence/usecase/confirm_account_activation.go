@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 )
 
@@ -28,7 +27,7 @@ func NewInvalidActivationTokenError() *ConfirmAccountActivationValidationError {
 	}
 }
 
-func HandleConfirmAccountActivation(ctx context.Context, input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
+func HandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
 	output := ResultOfConfirmationOfAccountActivation{}
 
 	res := dispatch.Invoke(ctx, MarkAccountActivationTokenAsUse{

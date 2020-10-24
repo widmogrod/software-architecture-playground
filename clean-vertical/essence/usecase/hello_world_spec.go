@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -11,7 +10,7 @@ import (
 func SpecHelloWorld(t *testing.T) {
 	t.Run("HelloWorld: On every string input result should contain it", func(t *testing.T) {
 		err := quick.Check(func(name string) bool {
-			ctx := context.Background()
+			ctx := dispatch.Background()
 			cmd := HelloWorld{
 				Name: name,
 			}
