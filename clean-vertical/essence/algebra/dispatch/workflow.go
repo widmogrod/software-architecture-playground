@@ -173,11 +173,10 @@ func (w *Workflow) Result(activityID string) interface{} {
 
 	go func() {
 		for {
-			time.Sleep(time.Millisecond * 300)
 			for e := activity.Front(); e != nil; e = e.Next() {
 				// do something with e.Value
 				work := e.Value.(*work)
-				w.log(activityID, work)
+				//w.log(activityID, work)
 
 				switch work.state {
 				case Ok:
@@ -200,8 +199,5 @@ func (w *Workflow) Result(activityID string) interface{} {
 		}
 	}()
 
-	out := <-res
-	fmt.Printf("OUT %#v", out)
-
-	return out
+	return <-res
 }
