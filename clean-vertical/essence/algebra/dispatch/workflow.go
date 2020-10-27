@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// DISCLAIMER! This code is an abomination, don't look at it.
+// I wrote it as a way to let me understand what I search for in respect to workflow engine, what are challenges far ahead
+
 var _ Program = &Workflow{}
 
 func NewWorkflow() *Workflow {
