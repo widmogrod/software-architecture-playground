@@ -24,7 +24,7 @@ func TestWorkflowImplementationConformsToSpecification(t *testing.T) {
 	go program.Log()
 
 	usecase.SpecHelloWorld(t)
-	usecase.SpecRegisterAccountWithEmail(t)
+	//usecase.SpecRegisterAccountWithEmail(t)
 
 	//interpretation.Specification(t)
 	//usecase.SpecConfirmAccountActivation(t)
