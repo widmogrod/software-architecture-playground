@@ -23,12 +23,10 @@ func (f *Flow) Run(cmdFactory interface{}) *FlowResult {
 }
 
 func (f *Flow) If(predicate func() bool) *Flow {
-
 	return f
 }
 
 func (f *Flow) Then(result *ActivityResult) *Flow {
-
 	return f
 }
 
