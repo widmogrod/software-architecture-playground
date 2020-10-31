@@ -17,6 +17,16 @@ type ResultOfConfirmationOfAccountActivation struct {
 	SuccessfulResult *SessionToken
 }
 
+type AsyncResult struct {
+	InvocationID string
+}
+
+type AsyncResultOfConfirmationOfAccountActivation struct {
+	InvocationID string
+	Status       string
+	Result       *ResultOfConfirmationOfAccountActivation
+}
+
 type ConfirmAccountActivationValidationError struct {
 	InvalidActivationToken bool
 }
