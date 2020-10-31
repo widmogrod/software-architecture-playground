@@ -5,37 +5,39 @@ func NewFlowAround(aggregate interface{}) *Flow {
 }
 
 type Flow struct {
-	Ok     *ActivityResult
-	Err    *ActivityResult
+	End    *ActivityResult
 	Invoke *ActivityResult
 }
 
-func (f *Flow) OnEffect(handler interface{}) {
-
+func (f *Flow) OnEffect(handler interface{}) *Flow {
+	return f
 }
 
-func (f *Flow) OnFailure(handler interface{}) {
-
+func (f *Flow) OnFailure(handler interface{}) *Flow {
+	return f
 }
 
 func (f *Flow) Run(cmdFactory interface{}) *FlowResult {
 	return &FlowResult{}
 }
 
-func (f *Flow) If(predicate func() bool) *Flow {
-	return f
-}
-
-func (f *Flow) Then(result *ActivityResult) *Flow {
-	return f
-}
-
-func (f *Flow) Else(result *ActivityResult) *Flow {
-	return f
+func (f *Flow) If(predicate func() bool) *Condition {
+	return &Condition{}
 }
 
 func (f *Flow) Log() {
 
+}
+
+type Condition struct {
+}
+
+func (c *Condition) Then(result *ActivityResult) *Condition {
+	return c
+}
+
+func (c *Condition) Else(result *ActivityResult) *ActivityResult {
+	return result
 }
 
 type ActivityResult struct {

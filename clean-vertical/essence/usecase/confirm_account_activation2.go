@@ -6,12 +6,12 @@ import (
 
 func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAccountActivation) AsyncResult {
 	wf := dispatch.NewFlowAround(ResultOfConfirmationOfAccountActivation{})
-	wf.OnEffect(func(atu ResultOfMarkingAccountActivationTokenAsUsed) *dispatch.Flow {
+	wf.OnEffect(func(atu ResultOfMarkingAccountActivationTokenAsUsed) *dispatch.ActivityResult {
 		return wf.
 			If(func() bool {
 				return !atu.IsSuccessful() && atu.ValidationError.InvalidToken
 			}).
-			Then(wf.Ok.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
+			Then(wf.End.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
 				aggregate.ValidationError = NewInvalidActivationTokenError()
 				return aggregate
 			})).
@@ -22,7 +22,7 @@ func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAcco
 			}))
 	})
 	wf.OnEffect(func(st ResultOfGeneratingSessionToken) *dispatch.ActivityResult {
-		return wf.Ok.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
+		return wf.End.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
 			aggregate.SuccessfulResult = &st.SuccessfulResult
 			return aggregate
 		})

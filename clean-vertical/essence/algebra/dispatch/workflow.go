@@ -158,7 +158,7 @@ func (w *Workflow) log(activityID string, work *work) {
 	case Processing:
 		fmt.Printf("[processing] %s: %s(%s) -> ...) \n", activityID, work.name, work.inputPayload)
 	case Ok:
-		fmt.Printf("[ok]         %s: %s(%s) -> Ok(%s(%s)) \n", activityID, work.name, work.inputPayload, work.outputType, work.outputPayload)
+		fmt.Printf("[ok]         %s: %s(%s) -> End(%s(%s)) \n", activityID, work.name, work.inputPayload, work.outputType, work.outputPayload)
 	case Err:
 		fmt.Printf("[err]        %s: %s(%s) -> Err(%s(%s)) \n", activityID, work.name, work.inputPayload, work.outputType, work.outputPayload)
 	}
