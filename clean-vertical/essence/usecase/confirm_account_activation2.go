@@ -6,35 +6,38 @@ import (
 
 func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAccountActivation) AsyncResult {
 	wf := dispatch.NewFlowAround(ResultOfConfirmationOfAccountActivation{})
-	wf.OnEffect(func(atu ResultOfMarkingAccountActivationTokenAsUsed) *dispatch.ActivityResult {
-		return wf.
-			If(func() bool {
+	wf.
+		On(ResultOfMarkingAccountActivationTokenAsUsed{}).
+		With(wf.
+			If(func(atu ResultOfMarkingAccountActivationTokenAsUsed) bool {
 				return !atu.IsSuccessful() && atu.ValidationError.InvalidToken
 			}).
-			Then(wf.End.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
+			Then(wf.End.With(func(ctx, aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
+
 				aggregate.ValidationError = NewInvalidActivationTokenError()
 				return aggregate
 			})).
-			Else(wf.Invoke.With(func() GenerateSessionToken {
+			Else(wf.Invoke.With(func(ctx, atu ResultOfMarkingAccountActivationTokenAsUsed) (GenerateSessionToken, ResultOfGeneratingSessionToken) {
 				return GenerateSessionToken{
 					UserUUID: atu.SuccessfulResult.UserUUID,
-				}
-			}))
-	})
-	wf.OnEffect(func(st ResultOfGeneratingSessionToken) *dispatch.ActivityResult {
-		return wf.End.With(func(aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
-			aggregate.SuccessfulResult = &st.SuccessfulResult
+				}, ResultOfGeneratingSessionToken{}
+			})))
+
+	wf.
+		On(ResultOfGeneratingSessionToken{}).
+		With(wf.End.With(func(ctx ResultOfGeneratingSessionToken, aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
+			aggregate.SuccessfulResult = &ctx.SuccessfulResult
 			return aggregate
-		})
-	})
+		}))
+
 	wf.OnFailure(func() {
 		// all failures
 	})
 
-	result := wf.Run(func() MarkAccountActivationTokenAsUse {
+	result := wf.Run(func() (MarkAccountActivationTokenAsUse, ResultOfMarkingAccountActivationTokenAsUsed) {
 		return MarkAccountActivationTokenAsUse{
 			ActivationToken: input.ActivationToken,
-		}
+		}, ResultOfMarkingAccountActivationTokenAsUsed{}
 	})
 
 	wf.Log()
