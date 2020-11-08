@@ -24,7 +24,7 @@ func NewFlowAround(aggregate interface{}) *Flow {
 	return flow
 }
 
-type VisitorFunc = func(condition interface{}) bool
+type VisitorFunc = func(condition *ActivityResult) bool
 
 type Flow struct {
 	End       *ActivityResult
@@ -87,7 +87,7 @@ func (f *Flow) If(predicate interface{}) *Condition {
 
 func (f *Flow) Count() int {
 	counter := 0
-	f.run.Visit(func(node interface{}) bool {
+	f.run.Visit(func(_ *ActivityResult) bool {
 		counter++
 		return true
 	})
@@ -95,9 +95,8 @@ func (f *Flow) Count() int {
 	return counter
 }
 func (f *Flow) Log() {
-	f.run.Visit(func(node interface{}) bool {
-		typ := reflect.TypeOf(node).String()
-		fmt.Printf("%s{%v}\n", typ, node)
+	f.run.Visit(func(node *ActivityResult) bool {
+		fmt.Printf("%#v\n", node)
 		return true
 	})
 
@@ -110,40 +109,52 @@ func (f *Flow) Log() {
 		hasPrev = true
 	}
 
-	f.run.Visit(func(node interface{}) bool {
-		switch n := node.(type) {
-		case *ActivityResult:
-			switch n.typ {
-			case EffectA:
+	f.run.Visit(func(n *ActivityResult) bool {
+		switch n.typ {
+		case EffectA:
 
-			case InvokeA:
-				typ := reflect.TypeOf(n.handler)
-				cmdTyp := "cmd_" + typ.Out(0).Name()
-				returnTyp := typ.Out(1).Name()
+		case InvokeA:
+			typ := reflect.TypeOf(n.handler)
+			cmdTyp := "cmd_" + typ.Out(0).Name()
+			returnTyp := typ.Out(1).Name()
 
-				//typ  = reflect.TypeOf(n.contextValue)
-				//contextTyp := typ.String()
+			//typ  = reflect.TypeOf(n.contextValue)
+			//contextTyp := typ.String()
 
-				if !hasPrev {
-					fmt.Printf("[*] -> %s \n", cmdTyp)
-				}
+			if !hasPrev {
+				fmt.Printf("[*] -> %s \n", cmdTyp)
+			}
 
-				fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
-				previous(returnTyp)
+			fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
+			previous(returnTyp)
 
-			case CondA:
-				// ASSUMPTION on predicate
-				// - first argument context value
-				if hasPrev {
-					ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
-					fmt.Printf("%s -> %s \n", *prev, ctx)
-					previous(ctx)
-				}
+		case CondA:
+			// ASSUMPTION on predicate
+			// - first argument context value
+			if hasPrev {
+				ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
+				fmt.Printf("%s -> %s \n", *prev, ctx)
+				previous(ctx)
 
-			case EndA:
-				if hasPrev {
-					fmt.Printf("%s -> [*] \n", *prev)
-				}
+				//n.condition.thenBranch.Visit(func(node interface{}) bool {
+				//	switch node.(type) {
+				//	case *ActivityResult:
+				//
+				//
+				//	}
+				//	next := reflect.TypeOf(n.condition.predicate).In(0).Name()
+				//	return false
+				//})
+
+				//n.condition.thenBranch.Visit(func(node interface{}) bool {
+				//	ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
+				//	return false
+				//})
+			}
+
+		case EndA:
+			if hasPrev {
+				fmt.Printf("%s -> [*] \n", *prev)
 			}
 		}
 
