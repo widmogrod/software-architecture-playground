@@ -7,7 +7,6 @@ import (
 
 func NewFlowAround(aggregate interface{}) *Flow {
 	flow := &Flow{
-		//graph:  NewGraph(),
 		effect:    map[string]*Effect{},
 		aggregate: aggregate,
 	}
@@ -25,13 +24,12 @@ func NewFlowAround(aggregate interface{}) *Flow {
 }
 
 type Flow struct {
-	End    *ActivityResult
-	Invoke *ActivityResult
-	effect map[string]*Effect
-	//graph  *Graph
+	End       *ActivityResult
+	Invoke    *ActivityResult
+	effect    map[string]*Effect
 	aggregate interface{}
 
-	run *Run
+	run *ActivityResult
 }
 
 func (f *Flow) On(value interface{}) *Effect {
@@ -47,61 +45,23 @@ func (f *Flow) On(value interface{}) *Effect {
 	return result
 }
 
-//func (f *Flow) OnEffect(handler interface{}) *Flow {
-//	// ASSUMPTION: about effect being function that accepts result of computation a.k.a. event
-//
-//	typ := reflect.TypeOf(handler)
-//	resultTyp := typ.In(0)
-//
-//	// create stub of a event to alo evaluation of activity logic
-//	reflect.ValueOf(resultTyp)
-//
-//	// Assigning effect should also trigger evaluation of it [?]
-//	f.effect[resultTyp.Name()] = handler()
-//
-//	effectOriginType := "usecase.MarkAccountActivationTokenAsUse"
-//	effectType := "usecase.ResultOfMarkingAccountActivationTokenAsUsed"
-//	f.graph.AddEdge("effect", effectOriginType, effectType)
-//
-//	conditionOrigin := "usecase.ResultOfMarkingAccountActivationTokenAsUsed"
-//	conditionThen := "end(usecase.ResultOfConfirmationOfAccountActivation)"
-//	conditionElse := "invoke(usecase.GenerateSessionToken)"
-//	conditionNode := "condition(ResultOfMarkingAccountActivationTokenAsUsed)"
-//
-//	f.graph.AddEdge("condition", conditionOrigin, conditionNode)
-//	f.graph.AddEdge("condition-then", conditionNode, conditionThen)
-//	f.graph.AddEdge("condition-else", conditionNode, conditionElse)
-//
-//	// What alternative way I can see is with constructing AST
-//	//
-//
-//	return f
-//}
-
 func (f *Flow) OnFailure(handler interface{}) *Flow {
 	return f
 }
 
 func (f *Flow) Run(cmdFactory interface{}) *FlowResult {
-	// in theory we have computation graph at this stage, now we need to fill last bits
-	// validate it
+	// validate
 	// - does it terminate?
 	// - does it initiate?
 	// - does it circulate?
-	// and execute
 
-	//// extract cmd type
-	//cmdType := "usecase.MarkAccountActivationTokenAsUse"
-	//// extract result type of cmd
-	//cmdResultType := "usecase.ResultOfMarkingAccountActivationTokenAsUsed"
-	//f.graph.AddEdge("cmd-result", cmdType, cmdResultType)
-	//
-	//f.graph.AddEdge("init", "start", cmdType)
-
-	f.run = &Run{
-		suspend: cmdFactory,
+	f.run = &ActivityResult{
+		typ:     InvokeA,
+		handler: cmdFactory,
 		flow:    f,
 	}
+
+	// TODO execution
 
 	return &FlowResult{}
 }
@@ -112,7 +72,8 @@ func (f *Flow) If(predicate interface{}) *Condition {
 	// out: bool
 
 	return &Condition{
-		flow: f,
+		predicate: predicate,
+		flow:      f,
 	}
 }
 
@@ -143,19 +104,11 @@ func (c *Condition) Visit(visitor func(condition interface{})) {
 	//visitor("[condition ...]")
 	visitor(c)
 	c.left.Visit(visitor)
-	c.right.Visit(visitor)
-}
-func (c *ConditionBranch) Visit(visitor func(condition interface{})) {
-	visitor(c)
-	c.activity.Visit(visitor)
+	if c.right != nil {
+		c.right.Visit(visitor)
+	}
 }
 func (r *ActivityResult) Visit(visitor func(condition interface{})) {
-	//if r == nil {
-	//	visitor("ERR! empty activity!")
-	//	return
-	//}
-
-	//visitor("[activity " + strconv.Itoa(int(r.typ)) + "] ... ")
 	visitor(r)
 
 	switch r.typ {
@@ -163,7 +116,6 @@ func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 		r.condition.Visit(visitor)
 
 	case EndA:
-		//visitor("[end]")
 		// TODO check that end is the same as start aggregate!
 
 	case InvokeA:
@@ -189,12 +141,7 @@ func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 	}
 }
 func (e *Effect) Visit(visitor func(condition interface{})) {
-	//typ := reflect.TypeOf(e.value)
-	//eventTyp := typ.String()
-	//visitor(eventTyp + " -> [activity ...]")
-
 	// TODO activity may be empty! so chack it!!!
-
 	e.activity.Visit(visitor)
 }
 func (r *Run) Visit(visitor func(condition interface{})) {
@@ -204,8 +151,6 @@ func (r *Run) Visit(visitor func(condition interface{})) {
 	typ := reflect.TypeOf(r.suspend)
 	cmdTyp := typ.Out(0).String()
 	returnTyp := typ.Out(1).String()
-
-	//visitor(cmdTyp + " -> " + returnTyp)
 
 	// now travers on effect
 	// find a affect that corresponds to returnType,
@@ -235,39 +180,37 @@ func (e *Effect) With(activity *ActivityResult) {
 	e.activity = activity
 }
 
-type ConditionBranch struct {
-	activity *ActivityResult
-	flow     *Flow
-}
-
 type Condition struct {
-	left  *ConditionBranch
-	right *ConditionBranch
-	flow  *Flow
+	left      *ActivityResult
+	right     *ActivityResult
+	predicate interface{}
+	flow      *Flow
 }
 
 func (c *Condition) Then(result *ActivityResult) *Condition {
-	c.left = &ConditionBranch{
-		activity: result,
-		flow:     c.flow,
-	}
+	c.left = result
+	c.left.flow = c.flow
 
 	return c
 }
 
 func (c *Condition) Else(result *ActivityResult) *ActivityResult {
 	if c.left == nil {
-		panic(fmt.Sprintf("flow: to use Else() you must use Then() before"))
+		c.left = result
+		c.left.flow = c.flow
+	} else {
+		c.right = result
+		c.right.flow = c.flow
 	}
 
-	c.right = &ConditionBranch{
-		activity: result,
-		flow:     c.flow,
-	}
+	return c.Activity()
+}
 
+func (c *Condition) Activity() *ActivityResult {
 	return &ActivityResult{
 		typ:       CondA,
 		condition: c,
+		flow:      c.flow,
 	}
 }
 
