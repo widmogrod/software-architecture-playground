@@ -103,27 +103,47 @@ func (f *Flow) Log() {
 
 	fmt.Println("nodes=" + strconv.Itoa(f.Count()))
 
+	var prev *string
+	hasPrev := false
+	previous := func(v string) {
+		prev = &v
+		hasPrev = true
+	}
+
 	f.run.Visit(func(node interface{}) bool {
 		switch n := node.(type) {
 		case *ActivityResult:
 			switch n.typ {
+			case EffectA:
+
 			case InvokeA:
 				typ := reflect.TypeOf(n.handler)
-				cmdTyp := typ.Out(0).Name()
+				cmdTyp := "cmd_" + typ.Out(0).Name()
 				returnTyp := typ.Out(1).Name()
 
 				//typ  = reflect.TypeOf(n.contextValue)
 				//contextTyp := typ.String()
 
+				if !hasPrev {
+					fmt.Printf("[*] -> %s \n", cmdTyp)
+				}
+
 				fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
+				previous(returnTyp)
 
 			case CondA:
 				// ASSUMPTION on predicate
 				// - first argument context value
-				//ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
-				//fmt.Println(ctx)
+				if hasPrev {
+					ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
+					fmt.Printf("%s -> %s \n", *prev, ctx)
+					previous(ctx)
+				}
 
 			case EndA:
+				if hasPrev {
+					fmt.Printf("%s -> [*] \n", *prev)
+				}
 			}
 		}
 

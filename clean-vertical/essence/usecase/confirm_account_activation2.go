@@ -13,7 +13,6 @@ func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAcco
 				return !atu.IsSuccessful() && atu.ValidationError.InvalidToken
 			}).
 			Then(wf.End.With(func(ctx, aggregate ResultOfConfirmationOfAccountActivation) ResultOfConfirmationOfAccountActivation {
-
 				aggregate.ValidationError = NewInvalidActivationTokenError()
 				return aggregate
 			})).
