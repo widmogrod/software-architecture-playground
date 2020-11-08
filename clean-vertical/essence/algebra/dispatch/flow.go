@@ -24,6 +24,8 @@ func NewFlowAround(aggregate interface{}) *Flow {
 	return flow
 }
 
+type VisitorFunc = func(condition interface{}) bool
+
 type Flow struct {
 	End       *ActivityResult
 	Invoke    *ActivityResult
@@ -36,6 +38,10 @@ type Flow struct {
 func (f *Flow) OnEffect(value interface{}) *Effect {
 	result := &Effect{
 		value: value,
+		activity: &ActivityResult{
+			typ:          EffectA,
+			contextValue: value,
+		},
 	}
 
 	// ASSUMPTION: result is a struct
@@ -57,9 +63,10 @@ func (f *Flow) Run(cmdFactory interface{}) *FlowResult {
 	// - does it circulate?
 
 	f.run = &ActivityResult{
-		typ:     InvokeA,
-		handler: cmdFactory,
-		flow:    f,
+		flow:         f,
+		typ:          InvokeA,
+		handler:      cmdFactory,
+		contextValue: f.aggregate,
 	}
 
 	// TODO execution
@@ -80,51 +87,70 @@ func (f *Flow) If(predicate interface{}) *Condition {
 
 func (f *Flow) Count() int {
 	counter := 0
-	f.run.Visit(func(node interface{}) {
+	f.run.Visit(func(node interface{}) bool {
 		counter++
+		return true
 	})
 
 	return counter
 }
 func (f *Flow) Log() {
-	f.run.Visit(log)
+	f.run.Visit(func(node interface{}) bool {
+		typ := reflect.TypeOf(node).String()
+		fmt.Printf("%s{%v}\n", typ, node)
+		return true
+	})
 
 	fmt.Println("nodes=" + strconv.Itoa(f.Count()))
 
-	f.run.Visit(func(node interface{}) {
+	f.run.Visit(func(node interface{}) bool {
 		switch n := node.(type) {
 		case *ActivityResult:
 			switch n.typ {
 			case InvokeA:
+				typ := reflect.TypeOf(n.handler)
+				cmdTyp := typ.Out(0).Name()
+				returnTyp := typ.Out(1).Name()
+
+				//typ  = reflect.TypeOf(n.contextValue)
+				//contextTyp := typ.String()
+
+				fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
+
 			case CondA:
 				// ASSUMPTION on predicate
 				// - first argument context value
-				ctx := reflect.TypeOf(n.condition.predicate).In(0).String()
-				fmt.Println(ctx)
+				//ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
+				//fmt.Println(ctx)
 
 			case EndA:
 			}
 		}
+
+		return true
 	})
 }
 
-func log(node interface{}) {
-	typ := reflect.TypeOf(node).String()
-	fmt.Printf("%s{%v}\n", typ, node)
-}
-
-func (f *Flow) Visit(visitor func(node interface{})) {
+func (f *Flow) Visit(visitor VisitorFunc) {
 	f.run.Visit(visitor)
 }
 
-func (r *ActivityResult) Visit(visitor func(condition interface{})) {
-	visitor(r)
+func (r *ActivityResult) Visit(visitor VisitorFunc) {
+	continues := visitor(r)
+	if !continues {
+		return
+	}
 
 	switch r.typ {
 	case CondA:
 		r.condition.thenBranch.Visit(visitor)
 		if r.condition.elseBranch != nil {
 			r.condition.elseBranch.Visit(visitor)
+		}
+
+	case EffectA:
+		if r.effectActivity != nil {
+			r.effectActivity.Visit(visitor)
 		}
 
 	case EndA:
@@ -140,7 +166,8 @@ func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 		// find a affect that corresponds to returnType,
 		// when not expecting handling this effect panic()
 		if effect, ok := r.flow.effect[returnTyp]; ok {
-			effect.Visit(visitor)
+			// TODO activity may be null
+			effect.activity.Visit(visitor)
 		} else {
 			panic(fmt.Sprintf(
 				"flow: InvokeA activity could not find effect handler on a return type %s that is bind to command %s",
@@ -150,10 +177,6 @@ func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 		}
 	}
 }
-func (e *Effect) Visit(visitor func(condition interface{})) {
-	// TODO activity may be empty! so chack it!!!
-	e.activity.Visit(visitor)
-}
 
 type Effect struct {
 	activity *ActivityResult
@@ -161,7 +184,7 @@ type Effect struct {
 }
 
 func (e *Effect) Activity(activity *ActivityResult) {
-	e.activity = activity
+	e.activity.effectActivity = activity
 }
 
 type Condition struct {
@@ -204,13 +227,16 @@ const (
 	EndA activityTyp = iota
 	InvokeA
 	CondA
+	EffectA
 )
 
 type ActivityResult struct {
-	typ       activityTyp
-	flow      *Flow
-	condition *Condition
-	handler   interface{}
+	typ            activityTyp
+	flow           *Flow
+	condition      *Condition
+	handler        interface{}
+	contextValue   interface{}
+	effectActivity *ActivityResult
 }
 
 func (r *ActivityResult) With(handler interface{}) *ActivityResult {
