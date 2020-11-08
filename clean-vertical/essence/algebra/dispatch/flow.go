@@ -3,6 +3,7 @@ package dispatch
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 func NewFlowAround(aggregate interface{}) *Flow {
@@ -32,7 +33,7 @@ type Flow struct {
 	run *ActivityResult
 }
 
-func (f *Flow) On(value interface{}) *Effect {
+func (f *Flow) OnEffect(value interface{}) *Effect {
 	result := &Effect{
 		value: value,
 	}
@@ -77,22 +78,37 @@ func (f *Flow) If(predicate interface{}) *Condition {
 	}
 }
 
+func (f *Flow) Count() int {
+	counter := 0
+	f.run.Visit(func(node interface{}) {
+		counter++
+	})
+
+	return counter
+}
 func (f *Flow) Log() {
 	f.run.Visit(log)
+
+	fmt.Println("nodes=" + strconv.Itoa(f.Count()))
+
+	f.run.Visit(func(node interface{}) {
+		switch n := node.(type) {
+		case *ActivityResult:
+			switch n.typ {
+			case InvokeA:
+			case CondA:
+				// ASSUMPTION on predicate
+				// - first argument context value
+				ctx := reflect.TypeOf(n.condition.predicate).In(0).String()
+				fmt.Println(ctx)
+
+			case EndA:
+			}
+		}
+	})
 }
 
 func log(node interface{}) {
-	switch n := node.(type) {
-	case *Condition:
-		fmt.Printf("Condition{%#v}\n", n)
-	case *Run:
-		// TODO: Run & Invoke must be a tuple
-		// then extract return type from factory
-		// then get Command and Result types
-		// from them I have initial tranformation (Command)
-		// and also additional "pending connection" for Return type to be handled!
-		fmt.Printf("Run{%#v}\n", n)
-	}
 	typ := reflect.TypeOf(node).String()
 	fmt.Printf("%s{%v}\n", typ, node)
 }
@@ -100,20 +116,16 @@ func log(node interface{}) {
 func (f *Flow) Visit(visitor func(node interface{})) {
 	f.run.Visit(visitor)
 }
-func (c *Condition) Visit(visitor func(condition interface{})) {
-	//visitor("[condition ...]")
-	visitor(c)
-	c.left.Visit(visitor)
-	if c.right != nil {
-		c.right.Visit(visitor)
-	}
-}
+
 func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 	visitor(r)
 
 	switch r.typ {
 	case CondA:
-		r.condition.Visit(visitor)
+		r.condition.thenBranch.Visit(visitor)
+		if r.condition.elseBranch != nil {
+			r.condition.elseBranch.Visit(visitor)
+		}
 
 	case EndA:
 		// TODO check that end is the same as start aggregate!
@@ -123,8 +135,6 @@ func (r *ActivityResult) Visit(visitor func(condition interface{})) {
 		typ := reflect.TypeOf(r.handler)
 		cmdTyp := typ.Out(0).String()
 		returnTyp := typ.Out(1).String()
-
-		visitor(cmdTyp + " -> " + returnTyp)
 
 		// now travers on effect
 		// find a affect that corresponds to returnType,
@@ -144,69 +154,43 @@ func (e *Effect) Visit(visitor func(condition interface{})) {
 	// TODO activity may be empty! so chack it!!!
 	e.activity.Visit(visitor)
 }
-func (r *Run) Visit(visitor func(condition interface{})) {
-	// ASSUMPTION: about Suspend being factory function building tuple
-	// - command,
-	// - and binding return type
-	typ := reflect.TypeOf(r.suspend)
-	cmdTyp := typ.Out(0).String()
-	returnTyp := typ.Out(1).String()
-
-	// now travers on effect
-	// find a affect that corresponds to returnType,
-	// when not expecting handling this effect panic()
-	if effect, ok := r.flow.effect[returnTyp]; ok {
-		effect.Visit(visitor)
-	} else {
-		panic(fmt.Sprintf(
-			"flow: Run could not find effect handler on a return type %s that is bind to command %s",
-			returnTyp,
-			cmdTyp,
-		))
-	}
-}
-
-type Run struct {
-	suspend interface{}
-	flow    *Flow
-}
 
 type Effect struct {
 	activity *ActivityResult
 	value    interface{}
 }
 
-func (e *Effect) With(activity *ActivityResult) {
+func (e *Effect) Activity(activity *ActivityResult) {
 	e.activity = activity
 }
 
 type Condition struct {
-	left      *ActivityResult
-	right     *ActivityResult
-	predicate interface{}
-	flow      *Flow
+	thenBranch *ActivityResult
+	elseBranch *ActivityResult
+	predicate  interface{}
+	flow       *Flow
 }
 
 func (c *Condition) Then(result *ActivityResult) *Condition {
-	c.left = result
-	c.left.flow = c.flow
+	c.thenBranch = result
+	c.thenBranch.flow = c.flow
 
 	return c
 }
 
 func (c *Condition) Else(result *ActivityResult) *ActivityResult {
-	if c.left == nil {
-		c.left = result
-		c.left.flow = c.flow
+	if c.thenBranch == nil {
+		c.thenBranch = result
+		c.thenBranch.flow = c.flow
 	} else {
-		c.right = result
-		c.right.flow = c.flow
+		c.elseBranch = result
+		c.elseBranch.flow = c.flow
 	}
 
-	return c.Activity()
+	return c.ToActivity()
 }
 
-func (c *Condition) Activity() *ActivityResult {
+func (c *Condition) ToActivity() *ActivityResult {
 	return &ActivityResult{
 		typ:       CondA,
 		condition: c,
