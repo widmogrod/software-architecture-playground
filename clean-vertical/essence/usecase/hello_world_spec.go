@@ -8,7 +8,7 @@ import (
 )
 
 func SpecHelloWorld(t *testing.T) {
-	t.Run("HelloWorld: On every string input result should contain it", func(t *testing.T) {
+	t.Run("HelloWorld: OnEffect every string input result should contain it", func(t *testing.T) {
 		//err := quick.Check(func(name string) bool {
 		name := "World!"
 		ctx := dispatch.Background()
