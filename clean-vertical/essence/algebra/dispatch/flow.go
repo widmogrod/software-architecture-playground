@@ -85,39 +85,6 @@ func (f *Flow) If(predicate interface{}) *Condition {
 	}
 }
 
-func (f *Flow) Count() int {
-	counter := 0
-	f.DepthFirstSearch(func(_ *ActivityResult) {
-		counter++
-	})
-
-	return counter
-}
-
-func (f *Flow) CountBFS() int {
-	counter := 0
-	f.BreadthFirstSearch(func(_ *ActivityResult) {
-		counter++
-	})
-
-	return counter
-}
-
-func (a *ActivityResult) name() string {
-	switch a.typ {
-	case EffectA:
-		return reflect.TypeOf(a.contextValue).Name()
-	case InvokeA:
-		return reflect.TypeOf(a.handler).Out(0).Name()
-	case CondA:
-		return reflect.TypeOf(a.condition.predicate).In(0).Name()
-	case EndA:
-		return "[*]"
-	}
-
-	return "unknown activity name!"
-}
-
 type plantTextState struct {
 	isFirst bool
 	buffer  *bytes.Buffer
@@ -410,6 +377,21 @@ func (r *ActivityResult) With(handler interface{}) *ActivityResult {
 		flow:    r.flow,
 		handler: handler,
 	}
+}
+
+func (a *ActivityResult) name() string {
+	switch a.typ {
+	case EffectA:
+		return reflect.TypeOf(a.contextValue).Name()
+	case InvokeA:
+		return reflect.TypeOf(a.handler).Out(0).Name()
+	case CondA:
+		return reflect.TypeOf(a.condition.predicate).In(0).Name()
+	case EndA:
+		return "[*]"
+	}
+
+	return "unknown activity name!"
 }
 
 type FlowResult struct {
