@@ -24,7 +24,7 @@ func NewFlowAround(aggregate interface{}) *Flow {
 	return flow
 }
 
-type VisitorFunc = func(condition *ActivityResult) bool
+type VisitorFunc = func(condition *ActivityResult)
 
 type Flow struct {
 	End       *ActivityResult
@@ -87,124 +87,204 @@ func (f *Flow) If(predicate interface{}) *Condition {
 
 func (f *Flow) Count() int {
 	counter := 0
-	f.run.Visit(func(_ *ActivityResult) bool {
+	f.DepthFirstSearch(func(_ *ActivityResult) {
 		counter++
-		return true
 	})
 
 	return counter
 }
+
+func (f *Flow) CountBFS() int {
+	counter := 0
+	f.BreadthFirstSearch(func(_ *ActivityResult) {
+		counter++
+	})
+
+	return counter
+}
+
 func (f *Flow) Log() {
-	f.run.Visit(func(node *ActivityResult) bool {
+	f.DepthFirstSearch(func(node *ActivityResult) {
 		fmt.Printf("%#v\n", node)
-		return true
 	})
 
-	fmt.Println("nodes=" + strconv.Itoa(f.Count()))
+	fmt.Println("Count()    = " + strconv.Itoa(f.Count()))
+	fmt.Println("CountBFS() = " + strconv.Itoa(f.CountBFS()))
 
-	var prev *string
-	hasPrev := false
-	previous := func(v string) {
-		prev = &v
-		hasPrev = true
-	}
+	//var prev *string
+	//hasPrev := false
+	//previous := func(v string) {
+	//	prev = &v
+	//	hasPrev = true
+	//}
 
-	f.run.Visit(func(n *ActivityResult) bool {
-		switch n.typ {
-		case EffectA:
+	//a := func(a, b *ActivityResult) {
+	//	switch a.typ {
+	//	//case EndA:
+	//	//case EffectA:
+	//	case InvokeA:
+	//		next := reflect.TypeOf(node.handler).In(0).Name()
+	//		fmt.Printf("%s -> %s: else \n", ctx, next)
+	//		//case CondA:
+	//
+	//	}
+	//}
 
-		case InvokeA:
-			typ := reflect.TypeOf(n.handler)
-			cmdTyp := "cmd_" + typ.Out(0).Name()
-			returnTyp := typ.Out(1).Name()
-
-			//typ  = reflect.TypeOf(n.contextValue)
-			//contextTyp := typ.String()
-
-			if !hasPrev {
-				fmt.Printf("[*] -> %s \n", cmdTyp)
-			}
-
-			fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
-			previous(returnTyp)
-
-		case CondA:
-			// ASSUMPTION on predicate
-			// - first argument context value
-			if hasPrev {
-				ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
-				fmt.Printf("%s -> %s \n", *prev, ctx)
-				previous(ctx)
-
-				//n.condition.thenBranch.Visit(func(node interface{}) bool {
-				//	switch node.(type) {
-				//	case *ActivityResult:
-				//
-				//
-				//	}
-				//	next := reflect.TypeOf(n.condition.predicate).In(0).Name()
-				//	return false
-				//})
-
-				//n.condition.thenBranch.Visit(func(node interface{}) bool {
-				//	ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
-				//	return false
-				//})
-			}
-
-		case EndA:
-			if hasPrev {
-				fmt.Printf("%s -> [*] \n", *prev)
-			}
-		}
-
-		return true
-	})
+	//f.run.DepthFirstSearch(func(n *ActivityResult) bool {
+	//	switch n.typ {
+	//	case EffectA:
+	//
+	//	case InvokeA:
+	//		typ := reflect.TypeOf(n.handler)
+	//		cmdTyp := "cmd_" + typ.Out(0).Name()
+	//		returnTyp := typ.Out(1).Name()
+	//
+	//		//typ  = reflect.TypeOf(n.contextValue)
+	//		//contextTyp := typ.String()
+	//
+	//		if !hasPrev {
+	//			fmt.Printf("[*] -> %s \n", cmdTyp)
+	//		}
+	//
+	//		fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
+	//		previous(returnTyp)
+	//
+	//	case CondA:
+	//		// ASSUMPTION on predicate
+	//		// - first argument context value
+	//		if hasPrev {
+	//			ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
+	//			fmt.Printf("%s -> %s \n", *prev, ctx)
+	//			previous(ctx)
+	//
+	//			nextoo := func(node *ActivityResult) bool {
+	//				switch node.typ {
+	//				//case EndA:
+	//				//case EffectA:
+	//				case InvokeA:
+	//					next := reflect.TypeOf(node.handler).In(0).Name()
+	//					fmt.Printf("%s -> %s: else \n", ctx, next)
+	//					//case CondA:
+	//
+	//				}
+	//				return false
+	//			}
+	//
+	//			n.condition.thenBranch.DepthFirstSearch(nextoo)
+	//			if n.condition.elseBranch != nil {
+	//				n.condition.elseBranch.DepthFirstSearch(nextoo)
+	//			}
+	//		}
+	//
+	//	case EndA:
+	//		if hasPrev {
+	//			fmt.Printf("%s -> [*] \n", *prev)
+	//		}
+	//	}
+	//
+	//	return true
+	//})
 }
 
-func (f *Flow) Visit(visitor VisitorFunc) {
-	f.run.Visit(visitor)
-}
-
-func (r *ActivityResult) Visit(visitor VisitorFunc) {
-	continues := visitor(r)
-	if !continues {
+func (r *ActivityResult) invokeEffectActivity(fn func(result *ActivityResult)) (found bool) {
+	if r.typ != InvokeA {
 		return
 	}
 
+	// Invoke like run must bind command with result type
+	typ := reflect.TypeOf(r.handler)
+	returnTyp := typ.Out(1).String()
+
+	// now travers on effect
+	// find a affect that corresponds to returnType,
+	// when not expecting handling this effect panic()
+	if effect, ok := r.flow.effect[returnTyp]; ok {
+		if effect.activity != nil {
+			found = true
+			fn(effect.activity)
+		}
+	}
+
+	return
+}
+
+func (f *Flow) DepthFirstSearch(visitor VisitorFunc) {
+	DepthFirstSearch(f.run, visitor)
+}
+
+func DepthFirstSearch(r *ActivityResult, visitor func(*ActivityResult)) {
+	visitor(r)
+
 	switch r.typ {
 	case CondA:
-		r.condition.thenBranch.Visit(visitor)
+		DepthFirstSearch(r.condition.thenBranch, visitor)
 		if r.condition.elseBranch != nil {
-			r.condition.elseBranch.Visit(visitor)
+			DepthFirstSearch(r.condition.elseBranch, visitor)
 		}
 
 	case EffectA:
 		if r.effectActivity != nil {
-			r.effectActivity.Visit(visitor)
+			DepthFirstSearch(r.effectActivity, visitor)
 		}
 
 	case EndA:
 		// TODO check that end is the same as start aggregate!
 
 	case InvokeA:
-		// Invoke like run must bind command with result type
-		typ := reflect.TypeOf(r.handler)
-		cmdTyp := typ.Out(0).String()
-		returnTyp := typ.Out(1).String()
+		if !r.invokeEffectActivity(func(a *ActivityResult) {
+			DepthFirstSearch(a, visitor)
+		}) {
+			r.panicNoEffect()
+		}
+	}
+}
 
-		// now travers on effect
-		// find a affect that corresponds to returnType,
-		// when not expecting handling this effect panic()
-		if effect, ok := r.flow.effect[returnTyp]; ok {
-			// TODO activity may be null
-			effect.activity.Visit(visitor)
-		} else {
-			panic(fmt.Sprintf(
-				"flow: InvokeA activity could not find effect handler on a return type %s that is bind to command %s",
-				returnTyp,
-				cmdTyp,
-			))
+func (r *ActivityResult) panicNoEffect() {
+	// Invoke like run must bind command with result type
+	typ := reflect.TypeOf(r.handler)
+	cmdTyp := typ.Out(0).String()
+	returnTyp := typ.Out(1).String()
+
+	panic(fmt.Sprintf(
+		"flow: InvokeA activity could not find effect handler on a return type %s that is bind to command %s",
+		returnTyp,
+		cmdTyp,
+	))
+}
+
+func (f *Flow) BreadthFirstSearch(fn func(result *ActivityResult)) {
+	BreadthFirstSearch(f.run, fn)
+}
+
+func BreadthFirstSearch(start *ActivityResult, fn func(*ActivityResult)) {
+	visited := make(map[*ActivityResult]bool)
+	for queue := []*ActivityResult{start}; len(queue) > 0; {
+		activity := queue[0]
+		queue = queue[1:]
+
+		if _, ok := visited[activity]; ok {
+			continue
+		}
+
+		fn(activity)
+		visited[activity] = true
+
+		switch activity.typ {
+		case CondA:
+			queue = append(queue, activity.condition.thenBranch)
+			if activity.condition.elseBranch != nil {
+				queue = append(queue, activity.condition.elseBranch)
+			}
+		case InvokeA:
+			if !activity.invokeEffectActivity(func(activity *ActivityResult) {
+				queue = append(queue, activity)
+			}) {
+				activity.panicNoEffect()
+			}
+		case EndA:
+
+		case EffectA:
+			queue = append(queue, activity.effectActivity)
 		}
 	}
 }
