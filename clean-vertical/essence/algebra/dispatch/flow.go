@@ -144,47 +144,38 @@ func ToPlantText(f *Flow) string {
 
 		switch start.typ {
 		case EffectA:
-			name := reflect.TypeOf(start.contextValue).Name()
 			switch next.typ {
 			case CondA:
-				to := reflect.TypeOf(next.condition.predicate).In(0).Name()
-				fmt.Fprintf(state.buffer, "%s --> if_%s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> if_%s  \n", start.name(), next.name())
 
 			case InvokeA:
-				to := reflect.TypeOf(start.handler).Out(0).Name()
-				fmt.Fprintf(state.buffer, "%s --> %s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> %s  \n", start.name(), next.name())
 
 			case EndA:
-				fmt.Fprintf(state.buffer, "%s --> [*]  \n", name)
+				fmt.Fprintf(state.buffer, "%s --> [*]  \n", start.name())
 			}
 
 		case InvokeA:
-			name := reflect.TypeOf(start.handler).Out(0).Name()
-
 			switch next.typ {
 			case EffectA:
-				to := reflect.TypeOf(next.contextValue).Name()
-				fmt.Fprintf(state.buffer, "%s --> %s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> %s  \n", start.name(), next.name())
 			}
 
 		case CondA:
-			name := "if_" + reflect.TypeOf(start.condition.predicate).In(0).Name()
 			isThen := start.condition.thenBranch == next
-
 			switch next.typ {
 			case InvokeA:
-				to := reflect.TypeOf(next.handler).Out(0).Name()
 				if isThen {
-					fmt.Fprintf(state.buffer, "%s --> %s: then \n", name, to)
+					fmt.Fprintf(state.buffer, "if_%s --> %s: then \n", start.name(), next.name())
 				} else {
-					fmt.Fprintf(state.buffer, "%s --> %s: else \n", name, to)
+					fmt.Fprintf(state.buffer, "if_%s --> %s: else \n", start.name(), next.name())
 				}
 
 			case EndA:
 				if isThen {
-					fmt.Fprintf(state.buffer, "%s --> [*]: then \n", name)
+					fmt.Fprintf(state.buffer, "if_%s --> [*]: then \n", start.name())
 				} else {
-					fmt.Fprintf(state.buffer, "%s --> [*]: else \n", name)
+					fmt.Fprintf(state.buffer, "if_%s --> [*]: else \n", start.name())
 				}
 			}
 		}
