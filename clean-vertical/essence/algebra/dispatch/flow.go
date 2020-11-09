@@ -208,6 +208,19 @@ func (r *ActivityResult) invokeEffectActivity(fn func(result *ActivityResult)) (
 	return
 }
 
+func (r *ActivityResult) panicNoEffect() {
+	// Invoke like run must bind command with result type
+	typ := reflect.TypeOf(r.handler)
+	cmdTyp := typ.Out(0).String()
+	returnTyp := typ.Out(1).String()
+
+	panic(fmt.Sprintf(
+		"flow: InvokeA activity could not find effect handler on a return type %s that is bind to command %s",
+		returnTyp,
+		cmdTyp,
+	))
+}
+
 func (f *Flow) DepthFirstSearch(visitor VisitorFunc) {
 	DepthFirstSearch(f.run, visitor)
 }
@@ -238,19 +251,6 @@ func DepthFirstSearch(r *ActivityResult, visitor func(*ActivityResult)) {
 			r.panicNoEffect()
 		}
 	}
-}
-
-func (r *ActivityResult) panicNoEffect() {
-	// Invoke like run must bind command with result type
-	typ := reflect.TypeOf(r.handler)
-	cmdTyp := typ.Out(0).String()
-	returnTyp := typ.Out(1).String()
-
-	panic(fmt.Sprintf(
-		"flow: InvokeA activity could not find effect handler on a return type %s that is bind to command %s",
-		returnTyp,
-		cmdTyp,
-	))
 }
 
 func (f *Flow) BreadthFirstSearch(fn func(result *ActivityResult)) {
@@ -290,6 +290,8 @@ func BreadthFirstSearch(start *ActivityResult, fn func(*ActivityResult)) {
 	}
 }
 
+// Effect is a builder that help to build ActivityResult that compose Flow's AST
+// TODO consider refactoring to be the builder, right now part is setup in method OnEffect() in Flow
 type Effect struct {
 	activity *ActivityResult
 	value    interface{}
@@ -299,6 +301,7 @@ func (e *Effect) Activity(activity *ActivityResult) {
 	e.activity.effectActivity = activity
 }
 
+// Condition is a builder that help to build ActivityResult that compose Flow's AST
 type Condition struct {
 	thenBranch *ActivityResult
 	elseBranch *ActivityResult
@@ -351,6 +354,8 @@ type ActivityResult struct {
 	effectActivity *ActivityResult
 }
 
+// With is a builder that help to build ActivityResult that compose Flow's AST
+// TODO refactor to not clutter AST!
 func (r *ActivityResult) With(handler interface{}) *ActivityResult {
 	return &ActivityResult{
 		typ:     r.typ,
