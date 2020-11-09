@@ -1,9 +1,9 @@
 package dispatch
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
-	"strconv"
 )
 
 func NewFlowAround(aggregate interface{}) *Flow {
@@ -118,15 +118,28 @@ func (a *ActivityResult) name() string {
 	return "unknown activity name!"
 }
 
-func (f *Flow) Log() {
-	fmt.Println("Count()    = " + strconv.Itoa(f.Count()))
-	fmt.Println("CountBFS() = " + strconv.Itoa(f.CountBFS()))
+type plantTextState struct {
+	isFirst bool
+	buffer  *bytes.Buffer
+}
 
-	isFirst := true
-	Para(func(start, next *ActivityResult, accumulator interface{}) interface{} {
-		isFirst := accumulator.(bool)
+// ToPlantText travers Flow's AST and generates plant text result
+func ToPlantText(f *Flow) string {
+	state := plantTextState{
+		isFirst: true,
+		buffer:  new(bytes.Buffer),
+	}
+
+	result := Para(func(start, next *ActivityResult, accumulator interface{}) interface{} {
+		result := accumulator.(plantTextState)
+
+		// When is first, it will be true
+		isFirst := result.isFirst
+		// otherwise it will always be false thanks to this line:
+		result.isFirst = false
+
 		if isFirst {
-			fmt.Printf("[*] -> %s: run \n", start.name())
+			fmt.Fprintf(state.buffer, "[*] --> %s: run \n", start.name())
 		}
 
 		switch start.typ {
@@ -135,14 +148,14 @@ func (f *Flow) Log() {
 			switch next.typ {
 			case CondA:
 				to := reflect.TypeOf(next.condition.predicate).In(0).Name()
-				fmt.Printf("%s -> if_%s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> if_%s  \n", name, to)
 
 			case InvokeA:
 				to := reflect.TypeOf(start.handler).Out(0).Name()
-				fmt.Printf("%s -> %s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> %s  \n", name, to)
 
 			case EndA:
-				fmt.Printf("%s -> [*]  \n", name)
+				fmt.Fprintf(state.buffer, "%s --> [*]  \n", name)
 			}
 
 		case InvokeA:
@@ -151,7 +164,7 @@ func (f *Flow) Log() {
 			switch next.typ {
 			case EffectA:
 				to := reflect.TypeOf(next.contextValue).Name()
-				fmt.Printf("%s -> %s  \n", name, to)
+				fmt.Fprintf(state.buffer, "%s --> %s  \n", name, to)
 			}
 
 		case CondA:
@@ -162,22 +175,24 @@ func (f *Flow) Log() {
 			case InvokeA:
 				to := reflect.TypeOf(next.handler).Out(0).Name()
 				if isThen {
-					fmt.Printf("%s -> %s: then \n", name, to)
+					fmt.Fprintf(state.buffer, "%s --> %s: then \n", name, to)
 				} else {
-					fmt.Printf("%s -> %s: else \n", name, to)
+					fmt.Fprintf(state.buffer, "%s --> %s: else \n", name, to)
 				}
 
 			case EndA:
 				if isThen {
-					fmt.Printf("%s -> [*]: then \n", name)
+					fmt.Fprintf(state.buffer, "%s --> [*]: then \n", name)
 				} else {
-					fmt.Printf("%s -> [*]: else \n", name)
+					fmt.Fprintf(state.buffer, "%s --> [*]: else \n", name)
 				}
 			}
 		}
 
-		return false
-	}, isFirst, f.run)
+		return result
+	}, state, f.run)
+
+	return result.(plantTextState).buffer.String()
 }
 
 func (r *ActivityResult) invokeEffectActivity(fn func(result *ActivityResult)) (found bool) {
