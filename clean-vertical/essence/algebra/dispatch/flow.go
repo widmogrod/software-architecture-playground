@@ -213,6 +213,7 @@ func (f *Flow) DepthFirstSearch(visitor VisitorFunc) {
 }
 
 func DepthFirstSearch(r *ActivityResult, visitor func(*ActivityResult)) {
+	// TODO introduce check to visited nodes
 	visitor(r)
 
 	switch r.typ {
