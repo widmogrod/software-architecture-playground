@@ -103,87 +103,81 @@ func (f *Flow) CountBFS() int {
 	return counter
 }
 
-func (f *Flow) Log() {
-	f.DepthFirstSearch(func(node *ActivityResult) {
-		fmt.Printf("%#v\n", node)
-	})
+func (a *ActivityResult) name() string {
+	switch a.typ {
+	case EffectA:
+		return reflect.TypeOf(a.contextValue).Name()
+	case InvokeA:
+		return reflect.TypeOf(a.handler).Out(0).Name()
+	case CondA:
+		return reflect.TypeOf(a.condition.predicate).In(0).Name()
+	case EndA:
+		return "[*]"
+	}
 
+	return "unknown activity name!"
+}
+
+func (f *Flow) Log() {
 	fmt.Println("Count()    = " + strconv.Itoa(f.Count()))
 	fmt.Println("CountBFS() = " + strconv.Itoa(f.CountBFS()))
 
-	//var prev *string
-	//hasPrev := false
-	//previous := func(v string) {
-	//	prev = &v
-	//	hasPrev = true
-	//}
+	isFirst := true
+	Para(func(start, next *ActivityResult, accumulator interface{}) interface{} {
+		isFirst := accumulator.(bool)
+		if isFirst {
+			fmt.Printf("[*] -> %s: run \n", start.name())
+		}
 
-	//a := func(a, b *ActivityResult) {
-	//	switch a.typ {
-	//	//case EndA:
-	//	//case EffectA:
-	//	case InvokeA:
-	//		next := reflect.TypeOf(node.handler).In(0).Name()
-	//		fmt.Printf("%s -> %s: else \n", ctx, next)
-	//		//case CondA:
-	//
-	//	}
-	//}
+		switch start.typ {
+		case EffectA:
+			name := reflect.TypeOf(start.contextValue).Name()
+			switch next.typ {
+			case CondA:
+				to := reflect.TypeOf(next.condition.predicate).In(0).Name()
+				fmt.Printf("%s -> if_%s  \n", name, to)
 
-	//f.run.DepthFirstSearch(func(n *ActivityResult) bool {
-	//	switch n.typ {
-	//	case EffectA:
-	//
-	//	case InvokeA:
-	//		typ := reflect.TypeOf(n.handler)
-	//		cmdTyp := "cmd_" + typ.Out(0).Name()
-	//		returnTyp := typ.Out(1).Name()
-	//
-	//		//typ  = reflect.TypeOf(n.contextValue)
-	//		//contextTyp := typ.String()
-	//
-	//		if !hasPrev {
-	//			fmt.Printf("[*] -> %s \n", cmdTyp)
-	//		}
-	//
-	//		fmt.Printf("%s -> %s \n", cmdTyp, returnTyp)
-	//		previous(returnTyp)
-	//
-	//	case CondA:
-	//		// ASSUMPTION on predicate
-	//		// - first argument context value
-	//		if hasPrev {
-	//			ctx := reflect.TypeOf(n.condition.predicate).In(0).Name()
-	//			fmt.Printf("%s -> %s \n", *prev, ctx)
-	//			previous(ctx)
-	//
-	//			nextoo := func(node *ActivityResult) bool {
-	//				switch node.typ {
-	//				//case EndA:
-	//				//case EffectA:
-	//				case InvokeA:
-	//					next := reflect.TypeOf(node.handler).In(0).Name()
-	//					fmt.Printf("%s -> %s: else \n", ctx, next)
-	//					//case CondA:
-	//
-	//				}
-	//				return false
-	//			}
-	//
-	//			n.condition.thenBranch.DepthFirstSearch(nextoo)
-	//			if n.condition.elseBranch != nil {
-	//				n.condition.elseBranch.DepthFirstSearch(nextoo)
-	//			}
-	//		}
-	//
-	//	case EndA:
-	//		if hasPrev {
-	//			fmt.Printf("%s -> [*] \n", *prev)
-	//		}
-	//	}
-	//
-	//	return true
-	//})
+			case InvokeA:
+				to := reflect.TypeOf(start.handler).Out(0).Name()
+				fmt.Printf("%s -> %s  \n", name, to)
+
+			case EndA:
+				fmt.Printf("%s -> [*]  \n", name)
+			}
+
+		case InvokeA:
+			name := reflect.TypeOf(start.handler).Out(0).Name()
+
+			switch next.typ {
+			case EffectA:
+				to := reflect.TypeOf(next.contextValue).Name()
+				fmt.Printf("%s -> %s  \n", name, to)
+			}
+
+		case CondA:
+			name := "if_" + reflect.TypeOf(start.condition.predicate).In(0).Name()
+			isThen := start.condition.thenBranch == next
+
+			switch next.typ {
+			case InvokeA:
+				to := reflect.TypeOf(next.handler).Out(0).Name()
+				if isThen {
+					fmt.Printf("%s -> %s: then \n", name, to)
+				} else {
+					fmt.Printf("%s -> %s: else \n", name, to)
+				}
+
+			case EndA:
+				if isThen {
+					fmt.Printf("%s -> [*]: then \n", name)
+				} else {
+					fmt.Printf("%s -> [*]: else \n", name)
+				}
+			}
+		}
+
+		return false
+	}, isFirst, f.run)
 }
 
 func (r *ActivityResult) invokeEffectActivity(fn func(result *ActivityResult)) (found bool) {
@@ -290,6 +284,41 @@ func BreadthFirstSearch(start *ActivityResult, fn func(*ActivityResult)) {
 	}
 }
 
+type paramorphism = func(a, b *ActivityResult, accumulator interface{}) interface{}
+
+// Para is a paramorphism that will reduce  Flow AST to new algebra,
+// and during reduction provide context as well with accumulator
+// ```haskell
+// para :: (a -> ([a], b) -> b) -> b -> [a] ->  b
+// ```
+func Para(fn paramorphism, accumulator interface{}, start *ActivityResult) interface{} {
+	res := accumulator
+	switch start.typ {
+	case CondA:
+		res = Para(fn, fn(start, start.condition.thenBranch, accumulator), start.condition.thenBranch)
+		if start.condition.elseBranch != nil {
+			res = Para(fn, fn(start, start.condition.elseBranch, accumulator), start.condition.elseBranch)
+		}
+
+	case EffectA:
+		if start.effectActivity != nil {
+			res = Para(fn, fn(start, start.effectActivity, accumulator), start.effectActivity)
+		}
+
+	case EndA:
+		// noop
+
+	case InvokeA:
+		if !start.invokeEffectActivity(func(a *ActivityResult) {
+			res = Para(fn, fn(start, a, accumulator), a)
+		}) {
+			start.panicNoEffect()
+		}
+	}
+
+	return res
+}
+
 // Effect is a builder that help to build ActivityResult that compose Flow's AST
 // TODO consider refactoring to be the builder, right now part is setup in method OnEffect() in Flow
 type Effect struct {
@@ -302,6 +331,7 @@ func (e *Effect) Activity(activity *ActivityResult) {
 }
 
 // Condition is a builder that help to build ActivityResult that compose Flow's AST
+// TODO make it separate more clearly, now AST knows about Condition!
 type Condition struct {
 	thenBranch *ActivityResult
 	elseBranch *ActivityResult
@@ -337,6 +367,21 @@ func (c *Condition) ToActivity() *ActivityResult {
 }
 
 type activityTyp uint8
+
+func (t activityTyp) String() string {
+	switch t {
+	case EndA:
+		return "EndA"
+	case InvokeA:
+		return "InvokeA"
+	case EffectA:
+		return "EffectA"
+	case CondA:
+		return "CondA"
+	}
+
+	return "unknown activity type!"
+}
 
 const (
 	EndA activityTyp = iota
