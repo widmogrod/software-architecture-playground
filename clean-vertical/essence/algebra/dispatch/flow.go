@@ -241,9 +241,6 @@ func DepthFirstSearch(r *ActivityResult, visitor func(*ActivityResult)) {
 			DepthFirstSearch(r.effectActivity, visitor)
 		}
 
-	case EndA:
-		// TODO check that end is the same as start aggregate!
-
 	case InvokeA:
 		if !r.invokeEffectActivity(func(a *ActivityResult) {
 			DepthFirstSearch(a, visitor)
