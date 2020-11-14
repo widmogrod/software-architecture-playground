@@ -336,22 +336,8 @@ func (c *Condition) ToActivity() *ActivityResult {
 	}
 }
 
+//go:generate go run golang.org/x/tools/cmd/stringer -type=activityTyp
 type activityTyp uint8
-
-func (t activityTyp) String() string {
-	switch t {
-	case EndA:
-		return "EndA"
-	case InvokeA:
-		return "InvokeA"
-	case EffectA:
-		return "EffectA"
-	case CondA:
-		return "CondA"
-	}
-
-	return "unknown activity type!"
-}
 
 const (
 	EndA activityTyp = iota
