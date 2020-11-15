@@ -6,6 +6,19 @@ import (
 	"reflect"
 )
 
+var flows map[string]*Flow
+
+func init() {
+	flows = make(map[string]*Flow)
+}
+
+// RetrieveFlow can rebuild workflow from a invocationID
+// and thanks to that in theory make testing easier?
+// TODO rethink this approach, and consider DI?
+func RetrieveFlow(invocationID string) *Flow {
+	return flows[invocationID]
+}
+
 func NewFlowAround(aggregate interface{}) *Flow {
 	flow := &Flow{
 		effect:    map[string]*Effect{},
@@ -69,9 +82,13 @@ func (f *Flow) Run(cmdFactory interface{}) *FlowResult {
 		contextValue: f.aggregate,
 	}
 
-	// TODO execution
+	// TODO execution, and generation of UUID
+	invocationID := "test"
+	flows[invocationID] = f
 
-	return &FlowResult{}
+	return &FlowResult{
+		invocationID: invocationID,
+	}
 }
 
 func (f *Flow) If(predicate interface{}) *Condition {
@@ -152,6 +169,16 @@ func ToPlantText(f *Flow) string {
 
 	return result.(plantTextState).buffer.String()
 }
+
+//func ToWorkflowLog(f *Flow) []work {
+//	log := make([]work, 2)
+//
+//	return log
+//}
+//
+//func ExecuteWork(work work) work {
+//
+//}
 
 func (r *ActivityResult) invokeEffectActivity(fn func(result *ActivityResult)) (found bool) {
 	if r.typ != InvokeA {
@@ -381,9 +408,14 @@ func (a *ActivityResult) name() string {
 }
 
 type FlowResult struct {
-	id string
+	invocationID string
+	workflowID   string
 }
 
 func (r *FlowResult) InvocationID() string {
-	return r.id
+	return r.invocationID
+}
+
+func (r *FlowResult) WorkflowID() string {
+	return r.workflowID
 }
