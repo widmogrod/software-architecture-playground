@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"fmt"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 )
 
@@ -31,6 +30,7 @@ func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAcco
 		}))
 
 	wf.OnFailure(func() {
+		// TODO implement
 		// all failures
 	})
 
@@ -39,8 +39,6 @@ func AsyncHandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAcco
 			ActivationToken: input.ActivationToken,
 		}, ResultOfMarkingAccountActivationTokenAsUsed{}
 	})
-
-	fmt.Println(dispatch.ToPlantText(wf))
 
 	return AsyncResult{
 		InvocationID: result.InvocationID(),
