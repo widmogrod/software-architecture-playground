@@ -1,5 +1,6 @@
 import * as golang from 'aws-lambda-golang';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2';
+import * as apigatewayv2integrations from '@aws-cdk/aws-apigatewayv2-integrations';
 import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
 
 export class CleanVerticalHttpStack extends Stack {
@@ -14,7 +15,7 @@ export class CleanVerticalHttpStack extends Stack {
         httpApi.addRoutes({
             path: '/hello',
             methods: [apigatewayv2.HttpMethod.GET],
-            integration: new apigatewayv2.LambdaProxyIntegration({
+            integration: new apigatewayv2integrations.LambdaProxyIntegration({
                 handler: helloLambda,
             }),
         });
