@@ -1,12 +1,11 @@
 package usecase
 
 import (
-	"context"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 )
 
 func init() {
-	dispatch.Register(HandleConfirmAccountActivation)
+	dispatch.RegisterGlobalHandler(HandleConfirmAccountActivation)
 }
 
 type ConfirmAccountActivation struct {
@@ -16,6 +15,16 @@ type ConfirmAccountActivation struct {
 type ResultOfConfirmationOfAccountActivation struct {
 	ValidationError  *ConfirmAccountActivationValidationError
 	SuccessfulResult *SessionToken
+}
+
+type AsyncResult struct {
+	InvocationID string
+}
+
+type AsyncResultOfConfirmationOfAccountActivation struct {
+	InvocationID string
+	Status       string
+	Result       *ResultOfConfirmationOfAccountActivation
 }
 
 type ConfirmAccountActivationValidationError struct {
@@ -28,7 +37,7 @@ func NewInvalidActivationTokenError() *ConfirmAccountActivationValidationError {
 	}
 }
 
-func HandleConfirmAccountActivation(ctx context.Context, input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
+func HandleConfirmAccountActivation(ctx dispatch.Context, input ConfirmAccountActivation) ResultOfConfirmationOfAccountActivation {
 	output := ResultOfConfirmationOfAccountActivation{}
 
 	res := dispatch.Invoke(ctx, MarkAccountActivationTokenAsUse{

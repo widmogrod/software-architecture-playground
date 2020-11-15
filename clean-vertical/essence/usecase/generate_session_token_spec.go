@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
 	"testing"
@@ -11,7 +10,7 @@ import (
 func SpecGenerateSessionToken(t *testing.T) {
 	uuid := time.Now().String()
 	t.Run("GenerateSessionToken: should generate session token", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := dispatch.Background()
 		cmd := GenerateSessionToken{
 			UserUUID: uuid,
 		}
