@@ -419,3 +419,101 @@ func (r *FlowResult) InvocationID() string {
 func (r *FlowResult) WorkflowID() string {
 	return r.workflowID
 }
+
+// Transition can be trigger externally, schedule or invoke automatically.
+// Automatic transition is default
+type Transition struct {
+	ID string
+
+	// Schedule | Trigger | Invoke
+	Schedule string
+	Trigger  string
+	Invoke   bool
+
+	TransitionTrigger string
+	FromActivityID    string
+	ToActivityID      string
+}
+
+// Activity process operation, has clearly defined input and output type
+// as well access to an Aggregate which represents state of whole Flow
+type Activity struct {
+	ID string
+
+	// Initial - represent first state
+	// Terminal - represent last state
+	// Transitional - transitional state
+	Initial  bool
+	Terminal bool
+	Regular  bool
+
+	// Represents types, that should be mappable to runtime types
+	InputType  string
+	OutputType string
+}
+
+type ActivityLog struct {
+	ID string
+
+	ActivityID string
+
+	// Pending | Processing | Ok | Err represent status of the activity
+	Pending    bool
+	Processing bool
+	Ok         bool
+	Err        bool
+
+	// Payloads represent values that are pass to activity
+	InputPayload  interface{}
+	OutputPayload interface{}
+}
+
+type WorkflowState struct {
+	transitions []Transition
+	activities  []Activity
+}
+
+// Aggregate represents workflows, log of all transitions, retries
+type Aggregate struct {
+	ID string
+}
+
+func FlowToStorage(f *Flow) *WorkflowState {
+	return &WorkflowState{
+		transitions: []Transition{
+			{
+				Invoke:         true,
+				FromActivityID: "initial",
+				ToActivityID:   "MarkAccountActivationTokenAsUse",
+			},
+			{
+				FromActivityID: "MarkAccountActivationTokenAsUse",
+				ToActivityID:   "if_ResultOfMarkingAccountActivationTokenAsUsed",
+			},
+			{
+				FromActivityID: "if_ResultOfMarkingAccountActivationTokenAsUsed",
+				ToActivityID:   "GenerateSessionToken",
+			},
+			{
+				FromActivityID: "if_ResultOfMarkingAccountActivationTokenAsUsed",
+				ToActivityID:   "[*]",
+			},
+			{
+				FromActivityID: "GenerateSessionToken",
+				ToActivityID:   "[*]",
+			},
+		},
+		activities: []Activity{
+			{
+				ID:       "initial",
+				Initial:  true,
+				Terminal: false,
+				//Handler:  "HandleMarkAccountActivationTokenAsUse",
+			},
+		},
+	}
+}
+
+func ToFlow(s *WorkflowState) *Flow {
+	return &Flow{}
+}

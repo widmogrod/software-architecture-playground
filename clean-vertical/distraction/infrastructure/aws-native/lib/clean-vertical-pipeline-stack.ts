@@ -69,8 +69,8 @@ export class CleanVerticalPipelineStack extends Stack {
         }));
 
         // kick off the pipeline every day
-        const rule = new events.Rule(this, 'Daily', {
-            schedule: events.Schedule.rate(Duration.days(1)),
+        const rule = new events.Rule(this, 'Weekly', {
+            schedule: events.Schedule.rate(Duration.days(7)),
         });
         rule.addTarget(new targets.CodePipeline(pipeline.codePipeline));
     }
