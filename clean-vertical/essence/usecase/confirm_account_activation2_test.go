@@ -15,6 +15,25 @@ func TestAsyncHandleConfirmAccountActivation(t *testing.T) {
 
 	assert.NotEmpty(t, res.InvocationID)
 
+	// TODO Improve registration of workflows
+	//
+	//  flow := dispatch.NewFlowRegistry()
+	//  flow.Register('name', AsyncHandleConfirmAccountActivation)
+	//
+	//  wf := flow.RetrieveFlow('name')
+	//
+	//  assert(dispatch.ToPlantText(wf) === '[*] -->')
+	//
+	//  res := flow.Invoke(ctx, ConfirmAccountActivation{
+	//		ActivationToken: token,
+	//  })
+	//
+	//  runtime := dispatch.NewInMemoryFlowRuntime()
+	//  runtime.Start(flow)
+	//
+	//  assert(runtime.GetStatus(res.InvocationID) == runtime.COMPLETE)
+	//  assert(runtime.GetResult(res.InvocationID) == {})
+
 	wf := dispatch.RetrieveFlow(res.InvocationID)
 
 	assert.Equal(t,
