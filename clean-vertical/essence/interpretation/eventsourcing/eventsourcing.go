@@ -34,6 +34,14 @@ func NewEventStore() *EventStore {
 	}
 }
 
+func WithError(err error, a *EventStore) *EventStore {
+	return &EventStore{
+		log:  a.log,
+		lock: a.lock,
+		err:  err,
+	}
+}
+
 type EventStore struct {
 	lock sync.Locker
 	log  *list.List
