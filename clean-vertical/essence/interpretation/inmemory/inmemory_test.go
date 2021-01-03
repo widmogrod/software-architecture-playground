@@ -7,7 +7,7 @@ import (
 )
 
 func TestInMemoryImplementationConformsToSpecification(t *testing.T) {
-	inMemory := New()
-	dispatch.Interpret(inMemory)
+	implementation := New()
+	dispatch.Interpret(implementation)
 	interpretation.Specification(t)
 }
