@@ -46,11 +46,6 @@ func (e *PostgresSQL) HandleGenerateSessionToken(ctx dispatch.Context, input use
 	return output
 }
 
-type ActivationTokenEntity struct {
-	Token string
-	UUID  string
-}
-
 func (e *PostgresSQL) HandleMarkAccountActivationTokenAsUse(ctx dispatch.Context, input usecase.MarkAccountActivationTokenAsUse) usecase.ResultOfMarkingAccountActivationTokenAsUsed {
 	row := e.db.QueryRowContext(ctx.Ctx(), "DELETE FROM activation_tokens WHERE token=$1 RETURNING uuid", input.ActivationToken)
 
@@ -90,6 +85,6 @@ func (e *PostgresSQL) HandleCreateAccountActivationToken(ctx dispatch.Context, i
 
 func (e *PostgresSQL) HandleHelloWorld(ctx dispatch.Context, input usecase.HelloWorld) usecase.ResultOfHelloWorld {
 	return usecase.ResultOfHelloWorld{
-		SuccessfulResult: fmt.Sprintf("Ola! %s", input),
+		SuccessfulResult: fmt.Sprintf("Ola PostgreSQL! %s", input),
 	}
 }
