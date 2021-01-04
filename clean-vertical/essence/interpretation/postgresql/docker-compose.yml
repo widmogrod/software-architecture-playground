@@ -1,0 +1,19 @@
+version: '3.3'
+services:
+  postgres:
+    image: library/postgres:10-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+
+  migration:
+    image: migrate/migrate
+    volumes:
+      - ./migration:/migration
+    command: -path /migration -database postgres://postgres:password@postgres:5432/postgres?sslmode=disable up
+#    command: -path /migration -database postgres://postgres:password@postgres:5432/postgres?sslmode=disable drop -f
+    depends_on:
+      - postgres
+
