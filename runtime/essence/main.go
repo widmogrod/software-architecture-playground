@@ -96,6 +96,27 @@ func main() {
 		})).
 		Schedule("* * * * *")
 
+	//app.HandleFunc("/order/create2", AggregateChangeHandlerFunc(func(cmd *runtime.AggregateChangeCMD, result *runtime.AggregateChangeResult) {
+	//	input := &OrderCreateCMD{}
+	//	JsonAggregateChange(cmd, result, input, func() {
+	//		// do some business logic, like validate inputs
+	//		//if errors := input.Validate(); errors != nil {
+	//		//	r.Result(errors)
+	//		//	return
+	//		//}
+	//
+	//		change := &OrderCreateResult{
+	//			OrderID:   ksuid.New().String(),
+	//			UserID:    cmd.UserID,
+	//			ProductID: cmd.ProductID,
+	//			Quantity:  cmd.Quantity,
+	//		}
+	//
+	//		r.AggregateID(change.OrderID)
+	//		r.Append(change)
+	//	})
+	//}))
+
 	app.
 		HandleFunc("/order/create", func(w http.ResponseWriter, rq *http.Request) {
 			input := &runtime.AggregateChangeCMD{}
@@ -246,11 +267,16 @@ type Result struct {
 func JsonRequestResponse(w http.ResponseWriter, rq *http.Request, input, output interface{}, do func()) {
 	err := json.NewDecoder(rq.Body).Decode(input)
 	if err != nil && err != io.EOF {
-		result := &Result{}
-		result.Error = err
+		result := &Result{
+			Error: err,
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(result)
 	} else {
 		do()
+
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(output)
 	}
 }
@@ -264,3 +290,13 @@ func ScheduleInvokeHandlerFunc(handle func(*runtime.ScheduleInvokeCMD, *runtime.
 		})
 	}
 }
+
+//func AggregateChangeHandlerFunc(handle func()) http.HandlerFunc {
+//	return func(w http.ResponseWriter, rq *http.Request) {
+//		input := &runtime.AggregateReduceCMD{}
+//		output := &runtime.AggregateReduceResult{}
+//		JsonRequestResponse(w, rq, input, output, func() {
+//			handle(input, output)
+//		})
+//	}
+//}
