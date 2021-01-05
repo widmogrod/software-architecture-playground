@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // ScheduleInvokeCMD is a command payload that is send to invoke handler
@@ -18,10 +19,10 @@ type ScheduleInvokeCMD struct {
 // and when it is possible, take action
 type ScheduleInvokeResult struct {
 	// Logs is a placeholder that collect logs during collected in a API invocation
-	Logs string
+	Logs string `json:"logs,omitempty"`
 }
 
-// ScheduleType runtime type that has all information necessary for runtime and client
+// ScheduleType type has all information necessary for runtime and client
 // to define work on schedule work
 type ScheduleType struct {
 	// CRONInterval follows this specification
@@ -41,23 +42,50 @@ type ScheduleType struct {
 	RetryTimes uint
 }
 
-// EventSourcingRequest represent request
-type EventSourcingRequest struct {
-	AggregateID string
-	Changes     [][]byte
+// AggrageteChangeType  type tha has all information necessary for runtime and client
+// to define work on a aggregate
+type AggrageteChangeType struct {
+	AggregateType  string
+	CommandType    string
+	HTTPEntrypoint string
 }
 
-// EventSourcingResponse contains result user define command handler
-// runtime will take care of persisting result, changes, etc
-//
-// Handler on operation will have change set delivered
-type EventSourcingResponse struct {
+type AggregateReduceCMD struct {
+	AggregateID   string
+	AggregateType string
+	Snapshot      []byte
+	Changes       []*AggregateChange
+}
+
+type AggregateReduceResult struct {
+	Snapshot json.RawMessage
+	//TODO change back to transparent type
+	//Snapshot []byte
+	Logs string
+	Err  error
+}
+
+type AggregateChange struct {
+	Type       string
+	Payload    []byte
+	RecordTime time.Time
+}
+
+type AggregateChangeCMD struct {
+	// TODO decide what to do when there is no aggregate ID?
+	//AggregateID string
+	AggregateType string
+	Payload       []byte
+}
+
+type AggregateChangeResult struct {
 	AggregateType string
 	AggregateID   string
 	// Error or not, it's a result
+	Logs    string
+	Changes []*AggregateChange
+	Err     error
 	Result  []byte
-	Logs    []byte
-	Changes [][]byte
 }
 
 type ComposeProjectionRequest struct {
@@ -89,20 +117,36 @@ type MuxRuntimeClient struct {
 }
 
 type RuntimeDescription struct {
-	Schedule []*ScheduleType
+	Schedule         []*ScheduleType
+	Aggregate        []*AggrageteChangeType
+	AggregateReducer []*AggregateReducerType
 }
 
 func (r *MuxRuntimeClient) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 	r.init.Do(func() {
 		for _, b := range r.builders {
-			// Schedule right now, but will be more
 			r.mux.HandleFunc(
 				b.Pattern,
 				b.Handler,
 			)
 
+			// Just a convention with `continue`
+			// to indicate that those types are unions
+			// on when one is detected, then you don't check other
+
 			if b.TypeSchedule != nil {
 				r.entrypoint.Schedule = append(r.entrypoint.Schedule, b.TypeSchedule)
+				continue
+			}
+
+			if b.TypeAggregateChange != nil {
+				r.entrypoint.Aggregate = append(r.entrypoint.Aggregate, b.TypeAggregateChange)
+				continue
+			}
+
+			if b.TypeAggregateReducer != nil {
+				r.entrypoint.AggregateReducer = append(r.entrypoint.AggregateReducer, b.TypeAggregateReducer)
+				continue
 			}
 		}
 
@@ -115,9 +159,13 @@ func (r *MuxRuntimeClient) ServeHTTP(w http.ResponseWriter, rq *http.Request) {
 }
 
 type RequestTypeBuilder struct {
-	Pattern      string
-	Handler      func(w http.ResponseWriter, rq *http.Request)
-	TypeSchedule *ScheduleType
+	Pattern string
+	Handler func(w http.ResponseWriter, rq *http.Request)
+
+	// union types below:
+	TypeSchedule         *ScheduleType
+	TypeAggregateChange  *AggrageteChangeType
+	TypeAggregateReducer *AggregateReducerType
 }
 
 type RequestTypeSchedule struct {
@@ -127,6 +175,26 @@ type RequestTypeSchedule struct {
 func (b *RequestTypeBuilder) Schedule(interval string) {
 	b.TypeSchedule = &ScheduleType{
 		CRONInterval:   interval,
+		HTTPEntrypoint: b.Pattern,
+	}
+}
+
+func (b *RequestTypeBuilder) AggregateChange(aggregateType, commandType string) {
+	b.TypeAggregateChange = &AggrageteChangeType{
+		AggregateType:  aggregateType,
+		CommandType:    commandType,
+		HTTPEntrypoint: b.Pattern,
+	}
+}
+
+type AggregateReducerType struct {
+	AggregateType  string
+	HTTPEntrypoint string
+}
+
+func (b *RequestTypeBuilder) AggregateReducer(aggregateType string) {
+	b.TypeAggregateReducer = &AggregateReducerType{
+		AggregateType:  aggregateType,
 		HTTPEntrypoint: b.Pattern,
 	}
 }
