@@ -18,8 +18,7 @@ type ScheduleInvokeCMD struct {
 // When runtime is a HTTP server, then this means that runtime will attempt to unmarshall response to this payload
 // and when it is possible, take action
 type ScheduleInvokeResult struct {
-	// Logs is a placeholder that collect logs during collected in a API invocation
-	Logs string `json:"logs,omitempty"`
+	Result
 }
 
 // ScheduleType type has all information necessary for runtime and client
@@ -42,50 +41,63 @@ type ScheduleType struct {
 	RetryTimes uint
 }
 
-// AggrageteChangeType  type tha has all information necessary for runtime and client
+// AggregateChangeType  type tha has all information necessary for runtime and client
 // to define work on a aggregate
-type AggrageteChangeType struct {
+type AggregateChangeType struct {
 	AggregateType  string
 	CommandType    string
 	HTTPEntrypoint string
 }
 
-type AggregateReduceCMD struct {
-	AggregateID   string
-	AggregateType string
-	Snapshot      []byte
-	Changes       []*AggregateChange
+type AggregateRef struct {
+	ID   string
+	Type string
 }
 
+type AggregateReduceCMD struct {
+	AggregateRef AggregateRef
+
+	Snapshot []byte
+	Changes  []*AggregateChange
+}
+
+type Result struct {
+	// Logs is a placeholder that collect logs during collected in a API invocation
+	Logs string `json:"logs,omitempty"`
+	Err  string `json:"err,omitempty"`
+}
+
+//TODO change back to transparent type
+//Snapshot []byte
+type Snapshot = json.RawMessage
+
 type AggregateReduceResult struct {
-	Snapshot json.RawMessage
-	//TODO change back to transparent type
-	//Snapshot []byte
-	Logs string
-	Err  error
+	Result
+	Snapshot Snapshot
 }
 
 type AggregateChange struct {
 	Type       string
 	Payload    []byte
-	RecordTime time.Time
+	RecordTime *time.Time
 }
 
 type AggregateChangeCMD struct {
-	// TODO decide what to do when there is no aggregate ID?
-	//AggregateID string
+	AggregateID   string
 	AggregateType string
-	Payload       []byte
+
+	Payload  []byte
+	Snapshot Snapshot
 }
 
 type AggregateChangeResult struct {
+	Result
+
 	AggregateType string
 	AggregateID   string
-	// Error or not, it's a result
-	Logs    string
-	Changes []*AggregateChange
-	Err     error
-	Result  []byte
+
+	Changes  []*AggregateChange
+	Snapshot Snapshot
 }
 
 type ComposeProjectionRequest struct {
@@ -118,7 +130,7 @@ type MuxRuntimeClient struct {
 
 type RuntimeDescription struct {
 	Schedule         []*ScheduleType
-	Aggregate        []*AggrageteChangeType
+	Aggregate        []*AggregateChangeType
 	AggregateReducer []*AggregateReducerType
 }
 
@@ -164,7 +176,7 @@ type RequestTypeBuilder struct {
 
 	// union types below:
 	TypeSchedule         *ScheduleType
-	TypeAggregateChange  *AggrageteChangeType
+	TypeAggregateChange  *AggregateChangeType
 	TypeAggregateReducer *AggregateReducerType
 }
 
@@ -180,7 +192,7 @@ func (b *RequestTypeBuilder) Schedule(interval string) {
 }
 
 func (b *RequestTypeBuilder) AggregateChange(aggregateType, commandType string) {
-	b.TypeAggregateChange = &AggrageteChangeType{
+	b.TypeAggregateChange = &AggregateChangeType{
 		AggregateType:  aggregateType,
 		CommandType:    commandType,
 		HTTPEntrypoint: b.Pattern,

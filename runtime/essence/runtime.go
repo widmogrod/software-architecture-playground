@@ -3,18 +3,18 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/robfig/cron/v3"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation/eventsourcing"
 	"github.com/widmogrod/software-architecture-playground/runtime"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
 func main() {
-	client := NewRuntimeSDK("http://localhost:8080")
-	description, err := client.Describe()
+	sdk := NewRuntimeSDK("http://localhost:8080")
+	description, err := sdk.Describe()
 	panicError(err)
 
 	storage := eventsourcing.NewEventStore()
@@ -22,29 +22,11 @@ func main() {
 	c := cron.New()
 
 	for _, schedule := range description.Schedule {
-		call := func(schedule *runtime.ScheduleType) func() {
-			return func() {
-				url := client.address + schedule.HTTPEntrypoint
-				input := &runtime.ScheduleInvokeCMD{}
-				output := &runtime.ScheduleInvokeResult{}
-
-				body := &bytes.Buffer{}
-				json.NewEncoder(body).Encode(input)
-				result, err := client.client.Post(url, "application/json", body)
-				if err != nil {
-					panicError(err)
-				}
-
-				err = json.NewDecoder(result.Body).Decode(output)
-				if err != nil {
-					panicError(err)
-				}
-
-				fmt.Println(output.Logs)
-			}
-		}
-
-		c.AddFunc(schedule.CRONInterval, call(schedule))
+		schedule := schedule
+		c.AddFunc(schedule.CRONInterval, func() {
+			result := sdk.ScheduleInvoke(schedule, &runtime.ScheduleInvokeCMD{})
+			log.Printf("[schedgule=%s] %s \n", schedule.HTTPEntrypoint, result.Logs)
+		})
 	}
 
 	c.Start()
@@ -52,116 +34,78 @@ func main() {
 	mux := http.NewServeMux()
 
 	for _, aggregate := range description.Aggregate {
+		aggregate := aggregate
 		mux.HandleFunc(aggregate.HTTPEntrypoint, func(w http.ResponseWriter, rq *http.Request) {
-			input := &runtime.AggregateChangeCMD{}
-			output := &runtime.AggregateChangeResult{}
+			changes := make([]*runtime.AggregateChange, 0)
+			_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
+				changes = append(changes, change.(*runtime.AggregateChange))
+				return result
+			}, eventsourcing.Reduced{})
 
-			defer json.NewEncoder(w).Encode(output)
+			// Todo applicator and reducer must be a pair!
+			reducer := &runtime.AggregateReducerType{
+				AggregateType:  aggregate.AggregateType,
+				HTTPEntrypoint: "/order/reduce",
+			}
+			output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
+				AggregateRef: runtime.AggregateRef{
+					ID:   rq.Header.Get("AggID"),
+					Type: reducer.AggregateType,
+				},
+				Snapshot: nil,
+				Changes:  changes,
+			})
 
 			payload, err := ioutil.ReadAll(rq.Body)
 			if err != nil && err != io.EOF {
-				output.Err = err
+				output.Err = err.Error()
 				output.Logs += "failed reading request body, err=" + err.Error()
 				return
 			}
 
-			url := client.address + aggregate.HTTPEntrypoint
-			input.Payload = payload
-			input.AggregateType = aggregate.AggregateType
-
-			body, err := json.Marshal(input)
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed marshalling AggregateChangeCMD, err=" + err.Error()
-				return
+			input2 := &runtime.AggregateChangeCMD{
+				AggregateID:   rq.Header.Get("AggID"),
+				AggregateType: aggregate.AggregateType,
+				Payload:       payload,
+				Snapshot:      output.Snapshot,
 			}
 
-			result, err := client.client.Post(url, "application/json", bytes.NewBuffer(body))
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed forwarding request to " + url + ", err=" + err.Error()
-				return
-			}
+			output2 := sdk.AggregateChange(aggregate, input2)
 
-			//body, err = ioutil.ReadAll(result.Body)
-			//output.Logs += fmt.Sprintf("body(%s)\n", body)
-
-			err = json.NewDecoder(result.Body).Decode(&output)
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed decoding response to AggregateChangeResult struct, err=" + err.Error()
-				return
-			}
+			defer json.NewEncoder(w).Encode(output2)
 
 			// do storage
-
-			for _, ch := range output.Changes {
-				output.Logs += fmt.Sprintf("record change(%#v)\n", ch)
+			for _, ch := range output2.Changes {
+				log.Printf("record change(%#v)\n", ch)
 				storage.Append(ch)
 			}
 
 			// output result
-			//w.Write(output.Result)
-
+			//w.Write(output.Snapshot)
 		})
 	}
 
 	for _, reducer := range description.AggregateReducer {
 		// TODO make it automatic, background not a API request
 		// since this is a runtime responsibility
+		reducer := reducer
 		mux.HandleFunc(reducer.HTTPEntrypoint, func(w http.ResponseWriter, rq *http.Request) {
-			input := &runtime.AggregateReduceCMD{}
-			output := &runtime.AggregateReduceResult{}
+			changes := make([]*runtime.AggregateChange, 0)
+			_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
+				changes = append(changes, change.(*runtime.AggregateChange))
+				return result
+			}, eventsourcing.Reduced{})
 
-			defer json.NewEncoder(w).Encode(output)
+			output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
+				AggregateRef: runtime.AggregateRef{
+					ID:   rq.Header.Get("AggID"),
+					Type: reducer.AggregateType,
+				},
+				Snapshot: nil,
+				Changes:  changes,
+			})
 
-			url := client.address + reducer.HTTPEntrypoint
-			input.AggregateType = reducer.AggregateType
-			init := eventsourcing.Reduced{
-				Value: input,
-			}
-
-			err = storage.
-				Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
-					output.Logs += fmt.Sprintf("change(%#v)\n", change)
-					//input := result.Value.(*runtime.AggregateReduceCMD)
-					input.Changes = append(input.Changes, change.(*runtime.AggregateChange))
-					return result
-				}, init).Err
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed collecting changes for AggregateReduceCMD, err=" + err.Error()
-				return
-			}
-
-			body, err := json.Marshal(input)
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed marshalling AggregateChangeCMD, err=" + err.Error()
-				return
-			}
-
-			output.Logs += string(body)
-			result, err := client.client.Post(url, "application/json", bytes.NewBuffer(body))
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed forwarding request to " + url + ", err=" + err.Error()
-				return
-			}
-			//output.Snapshot = result
-
-			err = json.NewDecoder(result.Body).Decode(&output)
-			if err != nil {
-				output.Err = err
-				output.Logs += "failed decoding response to AggregateReduceResult struct, err=" + err.Error()
-				return
-			}
-
-			//body, _ = ioutil.ReadAll(result.Body)
-			//output.Snapshot = body
-
-			// Persist snapshot
-			//storage.Snapshot()
+			json.NewEncoder(w).Encode(output)
 		})
 	}
 
@@ -171,6 +115,15 @@ func main() {
 func panicError(err error) {
 	if err != nil {
 		panic(err)
+	}
+}
+
+func NewRuntimeSDK(address string) *RuntimeSDK {
+	return &RuntimeSDK{
+		address: address,
+		client: &http.Client{
+			Timeout: 0,
+		},
 	}
 }
 
@@ -193,11 +146,58 @@ func (s *RuntimeSDK) Describe() (*runtime.RuntimeDescription, error) {
 	return output, err
 }
 
-func NewRuntimeSDK(address string) *RuntimeSDK {
-	return &RuntimeSDK{
-		address: address,
-		client: &http.Client{
-			Timeout: 0,
-		},
+func (s *RuntimeSDK) ScheduleInvoke(schedule *runtime.ScheduleType, input *runtime.ScheduleInvokeCMD) *runtime.ScheduleInvokeResult {
+	output := &runtime.ScheduleInvokeResult{}
+	url := s.address + schedule.HTTPEntrypoint
+
+	err := s.doRequest(url, input, output)
+	if err != nil {
+		output.Err = err.Error()
 	}
+
+	return output
+}
+
+func (s *RuntimeSDK) AggregateReduce(reducer *runtime.AggregateReducerType, input *runtime.AggregateReduceCMD) *runtime.AggregateReduceResult {
+	output := &runtime.AggregateReduceResult{}
+	url := s.address + reducer.HTTPEntrypoint
+
+	err := s.doRequest(url, input, output)
+	if err != nil {
+		output.Err = err.Error()
+	}
+
+	return output
+}
+
+func (s *RuntimeSDK) AggregateChange(reducer *runtime.AggregateChangeType, input *runtime.AggregateChangeCMD) *runtime.AggregateChangeResult {
+	output := &runtime.AggregateChangeResult{}
+	url := s.address + reducer.HTTPEntrypoint
+
+	err := s.doRequest(url, input, output)
+	if err != nil {
+		output.Err = err.Error()
+	}
+
+	return output
+}
+
+func (s *RuntimeSDK) doRequest(url string, input, output interface{}) error {
+	body := &bytes.Buffer{}
+	err := json.NewEncoder(body).Encode(input)
+	if err != nil {
+		return err
+	}
+
+	result, err := s.client.Post(url, "application/json", body)
+	if err != nil {
+		return err
+	}
+
+	err = json.NewDecoder(result.Body).Decode(&output)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
