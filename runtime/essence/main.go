@@ -12,216 +12,98 @@ import (
 	"time"
 )
 
-var (
-	mappings = make(map[interface{}]map[string]interface{})
-)
+func NewOrderAggregate() *OrderAggregate {
+	store := runtime.NewEventStore()
+	aggregate := &OrderAggregate{
+		state:   nil,
+		changes: store,
+		ref: &runtime.AggregateRef{
+			ID:   "",
+			Type: "order",
+		},
+	}
 
-func init() {
-	RegisterAggregateChanges(&OrderAggregateState{}, map[string]interface{}{
-		"OrderCreated": &OrderCreated{},
-		"ProductAdded": &ProductAdded{},
-	})
+	return aggregate
 }
 
-type eventName = string
-type aggregateState = interface{}
-type aggregateEvent = interface{}
-type doFunc = func() error
-
-type whenApplyFunc = func(eventName, aggregateEvent, doFunc)
-type hasEventFunc = func(aggregateState, ...func(whenApplyFunc))
-type initAggregateFunc = func(hasEventFunc)
-
-func x() {
-	AggregateState(func(hasEvents hasEventFunc) {
-		state := &OrderAggregateState{}
-		hasEvents(
-			state,
-			func(whenApply whenApplyFunc) {
-				event := &OrderCreated{}
-				whenApply("OrderCreated", event, func() error {
-					if state.isOrderCreated {
-						return errors.New("order cannot be created twice, check your logic")
-					}
-
-					state.OrderID = event.OrderID
-					state.OrderCreatedAt = event.CreatedAt
-					state.isOrderCreated = true
-					return nil
-				})
-			},
-			func(whenApply whenApplyFunc) {
-				event := &ProductAdded{}
-				whenApply("ProductAdded", event, func() error {
-					if !state.isOrderCreated {
-						return errors.New("You cannot add products to not created order")
-					}
-
-					state.ProductID = event.ProductID
-					state.ProductQuantity = event.Quantity
-					return nil
-				})
-			})
-	})
+type OrderAggregate struct {
+	state   *OrderAggregateState
+	changes *runtime.EventStore
+	ref     *runtime.AggregateRef
 }
 
-func AggregateState(init initAggregateFunc) {
-	hasEvents := func(state aggregateState, addEvents ...func(whenApplyFunc)) {
-		for _, addEvent := range addEvents {
-			whenApply := func(name eventName, event aggregateEvent, do doFunc) {
+func (o *OrderAggregate) Ref() *runtime.AggregateRef {
+	return o.ref
+}
 
-			}
+func (o *OrderAggregate) State() interface{} {
+	return o.state
+}
 
-			addEvent(whenApply)
+func (o *OrderAggregate) Changes() *runtime.EventStore {
+	return o.changes
+}
+
+func (o *OrderAggregate) Handle(cmd interface{}) error {
+	switch c := cmd.(type) {
+	case *OrderCreateCMD:
+		// validate necessary condition
+		if o.state != nil {
+			return errors.New("Order already exists!")
 		}
-	}
-
-	init(hasEvents)
-}
-
-func Apply2(state agg, change interface{}) error {
-	t0 := reflect.TypeOf(change).String()
-	tName := ""
-	fmt.Println(reflect.TypeOf(state).String(), mappings)
-	for typ, c := range mappings[reflect.TypeOf(state).String()] {
-		t1 := reflect.TypeOf(c).String()
-		fmt.Println(t1, change)
-		if t0 == t1 {
-			tName = typ
-			break
+		if c.Quantity == "" {
+			return errors.New(fmt.Sprintf("Given quantity is to low %v", c))
 		}
+
+		now := time.Now()
+		return o.changes.
+			Append(&OrderCreated{
+				OrderID:   ksuid.New().String(),
+				UserId:    c.UserID,
+				CreatedAt: &now,
+			}).Ok.
+			Append(&ProductAdded{
+				ProductID: c.ProductID,
+				Quantity:  c.Quantity,
+			}).Ok.
+			Reducer(o).Err
 	}
 
-	if tName == "" {
-		return errors.New(fmt.Sprintf("type %T cannot be found in mapping return by mapOfChanges()", change))
-	}
-
-	// todo delegate to diferent layer
-	payload, err := json.Marshal(change)
-	if err != nil {
-		return errors.New(fmt.Sprintf("coudn't marchal change %T", change))
-	}
-
-	now := time.Now()
-	c := &runtime.AggregateChange{
-		Type:       tName,
-		Payload:    payload,
-		RecordTime: &now,
-	}
-
-	err = state.Handle(change)
-	if err != nil {
-		state.AggregateAppendChange(c)
-	}
-
-	return err
+	return nil
 }
 
-type AggregateApply struct {
-	modifications []*runtime.AggregateChange
-}
-
-func (a *AggregateApply) AggregateModifications() []*runtime.AggregateChange {
-	return a.modifications
-}
-func (a *AggregateApply) AggregateAppendChange(change *runtime.AggregateChange) {
-	if a.modifications == nil {
-		a.modifications = make([]*runtime.AggregateChange, 0)
-	}
-	a.modifications = append(a.modifications, change)
-}
-
-//func (a *AggregateApply) apply(change interface{}) error {
-//	if a.modifications == nil {
-//		a.modifications = make([]*runtime.AggregateChange, 0)
-//	}
-//
-//	//convert domain object to aggregate change
-//
-//	t0 := reflect.TypeOf(change).String()
-//	tName := ""
-//	for typ, c := range a.mapOfChanges() {
-//		t1 := reflect.TypeOf(c).String()
-//		if t0 == t1 {
-//			tName = typ
-//			break
-//		}
-//	}
-//
-//	if tName == "" {
-//		return errors.New(fmt.Sprintf("type %t cannot be found in mapping return by mapOfChanges()", change))
-//	}
-//
-//	// todo delegate to diferent layer
-//	payload, err := json.Marshal(change)
-//	if err != nil {
-//		return errors.New(fmt.Sprintf("coudn't marchal change %t", change))
-//	}
-//
-//	now := time.Now()
-//	c := &runtime.AggregateChange{
-//		Type:       tName,
-//		Payload:    payload,
-//		RecordTime: &now,
-//	}
-//
-//	a.modifications = append(a.modifications, c)
-//
-//	return nil
-//}
-
-type agg interface {
-	Handle(interface{}) error
-	AggregateAppendChange(*runtime.AggregateChange)
-	AggregateModifications() []*runtime.AggregateChange
-}
-
-func Apply(state agg, change interface{}) error {
-	t0 := reflect.TypeOf(change).String()
-	tName := ""
-	fmt.Println(reflect.TypeOf(state).String(), mappings)
-	for typ, c := range mappings[reflect.TypeOf(state).String()] {
-		t1 := reflect.TypeOf(c).String()
-		fmt.Println(t1, change)
-		if t0 == t1 {
-			tName = typ
-			break
+func (o *OrderAggregate) Apply(change interface{}) error {
+	switch c := change.(type) {
+	case *OrderCreated:
+		if o.state != nil {
+			return errors.New("order cannot be created twice, check your logic")
 		}
+
+		o.ref.ID = c.OrderID
+
+		// when everything is ok, record changes that you want to make
+		o.state = &OrderAggregateState{}
+		o.state.OrderID = c.OrderID
+		o.state.OrderCreatedAt = c.CreatedAt
+
+		o.state.isOrderCreated = true
+
+	case *ProductAdded:
+		if !o.state.isOrderCreated {
+			return errors.New("You cannot add products to not created order")
+		}
+
+		o.state.ProductID = c.ProductID
+		o.state.ProductQuantity = c.Quantity
+
+	default:
+		return errors.New(fmt.Sprintf("unsupported type to handle %T", change))
 	}
 
-	if tName == "" {
-		return errors.New(fmt.Sprintf("type %T cannot be found in mapping return by mapOfChanges()", change))
-	}
-
-	// todo delegate to diferent layer
-	payload, err := json.Marshal(change)
-	if err != nil {
-		return errors.New(fmt.Sprintf("coudn't marchal change %T", change))
-	}
-
-	now := time.Now()
-	c := &runtime.AggregateChange{
-		Type:       tName,
-		Payload:    payload,
-		RecordTime: &now,
-	}
-
-	err = state.Handle(change)
-	if err != nil {
-		state.AggregateAppendChange(c)
-	}
-
-	return err
-}
-
-func RegisterAggregateChanges(state interface{}, ma map[string]interface{}) {
-	key := reflect.TypeOf(state).String()
-	mappings[key] = ma
+	return nil
 }
 
 type OrderAggregateState struct {
-	AggregateApply
-
 	OrderID        string
 	OrderCreatedAt *time.Time
 
@@ -244,51 +126,9 @@ type OrderAggregateState struct {
 	isOrderCreated bool
 }
 
-func (s *OrderAggregateState) Handle(change interface{}) error {
-	switch c := change.(type) {
-	case *OrderCreated:
-		if s.isOrderCreated {
-			return errors.New("order cannot be created twice, check your logic")
-		}
-
-		s.OrderID = c.OrderID
-		s.OrderCreatedAt = c.CreatedAt
-
-		s.isOrderCreated = true
-
-	case *ProductAdded:
-		s.ProductID = c.ProductID
-		s.ProductQuantity = c.Quantity
-
-	default:
-		return errors.New(fmt.Sprintf("unsupported type to handle %T", change))
-	}
-
-	return nil
-}
-func (s *OrderAggregateState) CreateNew(userID string) error {
-	now := time.Now()
-	return Apply(s, &OrderCreated{
-		OrderID:   ksuid.New().String(),
-		UserId:    userID,
-		CreatedAt: &now,
-	})
-}
-
 type ProductAdded struct {
 	ProductID string
 	Quantity  string
-}
-
-func (s *OrderAggregateState) AddProduct(productID, quantity string) error {
-	if !s.isOrderCreated {
-		return errors.New("You cannot add products to not created order")
-	}
-
-	return Apply(s, &ProductAdded{
-		ProductID: productID,
-		Quantity:  quantity,
-	})
 }
 
 type OrderCreateCMD struct {
@@ -338,6 +178,63 @@ type OrderCompleteCMD struct {
 type OrderCompleteResult struct {
 }
 
+func NewMarchaller() *ChangesRegistry {
+	return &ChangesRegistry{
+		changes: map[string]interface{}{
+			"OrderCreated": &OrderCreated{},
+			"ProductAdded": &ProductAdded{},
+		},
+	}
+}
+
+type ChangesRegistry struct {
+	changes map[string]interface{}
+}
+
+func (m *ChangesRegistry) SetChange(name string, change interface{}) {
+	m.changes[name] = change
+}
+
+type RuntimeChangeStorage struct {
+	input  *runtime.AggregateChangeCMD
+	output *runtime.AggregateChangeResult
+	//registry *ChangesRegistry
+}
+
+type Aggregate interface {
+	Changes() *runtime.EventStore
+	State() interface{}
+	Ref() *runtime.AggregateRef
+}
+
+func (s *RuntimeChangeStorage) Persist(a Aggregate) error {
+	_ = a.Changes().Reduce(func(change interface{}, result *runtime.Reduced) *runtime.Reduced {
+		data, _ := json.Marshal(change)
+
+		now := time.Now()
+		s.output.Changes = append(s.output.Changes, &runtime.AggregateChange{
+			// TODO change name can be provided by Event
+			Type:       reflect.TypeOf(change).Name(),
+			Payload:    data,
+			RecordTime: &now,
+			// TODO introduce version of change
+			//Version: 1
+		})
+
+		return result
+	}, nil).Err
+
+	data, err := json.Marshal(a.State())
+	if err != nil {
+		return err
+	}
+
+	s.output.AggregateType = a.Ref().Type
+	s.output.AggregateID = a.Ref().ID
+	s.output.Snapshot = data
+	return nil
+}
+
 func main() {
 	// what if data is polymorfic
 	// what if everything is an networks call
@@ -358,189 +255,33 @@ func main() {
 		Schedule("* * * * *")
 
 	app.
-		HandleFunc("/order/create", AggregateChangeHandlerFunc(func(apply ApplyChangeFunc) {
-			cmd := &OrderCreateCMD{}
-			state := &OrderAggregateState{}
-			apply(cmd, state, func() error {
-				return state.CreateNew(cmd.UserID)
-			}, func() error {
-				return state.AddProduct(cmd.ProductID, cmd.Quantity)
-			})
-		})).
-		AggregateChange("order", "create")
-
-	//app.
-	//	HandleFunc("/order/create", func(w http.ResponseWriter, rq *http.Request) {
-	//		// what if response decides what this handler is about?
-	//		// runtime.AggregateInvokeCommand()
-	//		// - runtimes receives it and apply command on aggregate
-	//		// - application of command is an API call that takes as input
-	//		//		runtime.AggregateApplyCommand(cmd, agg_type, agg_id, snapshot)
-	//		// - application of command is always on snapshot, snapshot is generated by invoking another API call
-	//		//
-	//		//         CLIENT                      RUNTIME					STORAGE		    APPLICATION
-	//		//            |
-	//		//            +---- POST /something  ----------------------------------------------> +
-	//		//										  								  			 |]
-	//		//                           			  | <- AggregateInvokeCommand() ------------ +
-	//		//										  |	-- GetAggregate() --> |
-	//		//										  |	-- ProdudeState -----------------------> +
-	//		//										  								  			 |]
-	//		//                           			  | <- state:=AggregateState()  ------------ +
-	//		//										  |	-- AggregateApply(cmd,state) ----------> +
-	//		//										  								  			 |]
-	//		//                           			  | <- changes:=AggregateApplyChanges()----- +
-	//		//
-	//		//										  |	-- ApplyChanges(ch) > |
-	//		//
-	//		// runtime.ScheduleInvokeCommand()
-	//
-	//		input := &runtime.AggregateChangeCMD{}
-	//		output := &runtime.AggregateChangeResult{}
-	//		JsonRequestResponse(w, rq, input, output, func() {
-	//			cmd := &OrderCreateCMD{}
-	//			err := json.Unmarshal(input.Payload, cmd)
-	//			if err != nil {
-	//				output.Err = err.Error()
-	//				output.Logs += "fail to unmarshall command, terminate command, err=" + err.Error()
-	//				return
-	//			}
-	//
-	//			// validate if product exists
-	//			state := &OrderAggregateState{}
-	//			handle2 := func(state interface{}, input *runtime.AggregateChangeCMD, do func()) {
-	//				err = json.Unmarshal(input.Snapshot, state)
-	//				if err != nil && err != io.EOF {
-	//					output.Err = err.Error()
-	//					output.Logs += "fail to unmarshall state aggregate, terminate command, err=" + err.Error()
-	//					return
-	//				}
-	//			}
-	//
-	//			handle2(state, input, func() {
-	//				state.CreateNew()
-	//				state.AddProduct(cmd.ProductID, cmd.Quantity)
-	//			})
-	//
-	//			retunr2 := func() {
-	//				output.Changes = state.AggregateModifications()
-	//
-	//				data, err := json.Marshal(state)
-	//				if err != nil {
-	//					output.Err = err.Error()
-	//					output.Logs += "fail to marshal change, terminate command, err=" + err.Error()
-	//					return
-	//				}
-	//
-	//				output.Snapshot = data
-	//
-	//			}
-	//
-	//			retunr2()
-	//		})
-	//	}).
-	//	AggregateChange("order", "create")
-
-	app.
-		HandleFunc("/order/reduce", func(w http.ResponseWriter, rq *http.Request) {
-			input := &runtime.AggregateReduceCMD{}
-			output := &runtime.AggregateReduceResult{}
+		HandleFunc("/order/create", func(w http.ResponseWriter, rq *http.Request) {
+			input := &runtime.AggregateChangeCMD{}
+			output := &runtime.AggregateChangeResult{}
+			store := &RuntimeChangeStorage{
+				input:  input,
+				output: output,
+			}
 			JsonRequestResponse(w, rq, input, output, func() {
-				aggregate := &OrderAggregateState{}
-				err := json.Unmarshal(input.Snapshot, aggregate)
-				if err != nil && input.Snapshot != nil {
+				cmd := &OrderCreateCMD{}
+				_ = json.Unmarshal(input.Payload, cmd)
+
+				aggregate := NewOrderAggregate()
+				err := aggregate.Handle(cmd)
+				if err != nil {
 					output.Err = err.Error()
-					output.Logs += "snapshot(" + string(input.Snapshot) + ")"
-					output.Logs += "failed on snapshot restore, end reduction, err=" + err.Error()
+					output.Logs += "error from ApplyCommand"
 					return
 				}
 
-				for _, change := range input.Changes {
-					output.Logs += fmt.Sprintf("change(%s)\n", change.Type)
-					switch change.Type {
-					case "OrderCreated":
-						c := &OrderCreated{}
-						err := json.Unmarshal(change.Payload, c)
-						if err != nil {
-							output.Err = err.Error()
-							output.Logs += "failed on event, end changes application, err=" + err.Error()
-							return
-						}
-
-						aggregate.UserID = c.UserId
-						aggregate.OrderID = c.OrderID
-						aggregate.OrderCreatedAt = c.CreatedAt
-						// etc on other types of changes
-					}
-				}
-
-				// This is a snapshot that will be serialise and available to other commands in aggregate
-				data, err := json.Marshal(aggregate)
+				err = store.Persist(aggregate)
 				if err != nil {
 					output.Err = err.Error()
-					output.Logs += err.Error()
-				} else {
-					output.Snapshot = data
+					output.Logs += "error from ApplyCommand"
 				}
 			})
 		}).
-		AggregateReducer("order")
-
-	//type OrderAggregate struct {
-	//	AggregateChange
-	//}
-	//
-	//func (a OrderAggregate) Reducer()
-	//
-	//app.AggregateChange("order").
-	//	Command("create").
-	//	Func(func(w http.ResponseWriter, rq *http.Request){
-	//		return &AggregateChange{
-	//			Type: "order",
-	//			ID: "asdasd",
-	//			Snapshot: &Order{},
-	//			Changes: []interface{}{
-	//				&OrderCreatedAt{
-	//					ID: "",
-	//					UserID:
-	//				},
-	//			},
-	//		}
-	//	})
-	//
-	//app.HandleFunc("/order/create", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/internal/collect-price-information")
-	//})
-	//app.HandleFunc("/order/status", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]},
-	//})
-	////app.HandleFunc("/order/internal/collect-price-information", func(w http.ResponseWriter, rq *http.Request) {
-	////	return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]},
-	////}).WhenCompleted("/order/create")
-	//
-	//app.HandleFunc("/order/internal/reserve-availability", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/internal/collect-payment")
-	//})
-	//app.HandleFunc("/order/internal/collect-payment", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/internal/commit-to-availability")
-	//})
-	//app.HandleFunc("/order/internal/commit-to-availability", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/ship")
-	//})
-	//app.HandleFunc("/order/internal/ship", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/internal/check-for-delivery-status")
-	//})
-	//app.HandleFunc("/order/internal/check-for-delivery-status", func(w http.ResponseWriter, rq *http.Request) {
-	//	// wait-for(delivery).delivered
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/complete")
-	//})
-	//app.HandleFunc("/order/complete", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}
-	//})
-	//
-	//app.HandleFunc("/shipping/webhook/delivered", func(w http.ResponseWriter, rq *http.Request) {
-	//	//return result{aggregateType: order, aggregateID: 123, state: "", changes: [""]}, invoke("order/ship")
-	//})
+		AggregateChange("order", "create")
 
 	http.ListenAndServe(":8080", app)
 }
@@ -572,52 +313,6 @@ func ScheduleInvokeHandlerFunc(handle func(*runtime.ScheduleInvokeCMD, *runtime.
 		output := &runtime.ScheduleInvokeResult{}
 		JsonRequestResponse(w, rq, input, output, func() {
 			handle(input, output)
-		})
-	}
-}
-
-type ApplyChangeFunc = func(interface{}, AggregateHelper, func() error, ...func() error)
-
-type AggregateHelper interface {
-	AggregateModifications() []*runtime.AggregateChange
-}
-
-func AggregateChangeHandlerFunc(handle func(apply ApplyChangeFunc)) http.HandlerFunc {
-	return func(w http.ResponseWriter, rq *http.Request) {
-		input := &runtime.AggregateChangeCMD{}
-		output := &runtime.AggregateChangeResult{}
-		JsonRequestResponse(w, rq, input, output, func() {
-			apply := func(cmd interface{}, state AggregateHelper, do func() error, dos ...func() error) {
-				err := json.Unmarshal(input.Snapshot, state)
-				if err != nil && err != io.EOF {
-					output.Err = err.Error()
-					output.Logs += "fail to unmarshall state aggregate, terminate command, err=" + err.Error()
-					return
-				}
-
-				dos = append([]func() error{do}, dos...)
-				for _, do := range dos {
-					err = do()
-					if err != nil {
-						output.Err = err.Error()
-						output.Logs += fmt.Sprintf("fail during application of command %T to aggregate %T", cmd, state)
-						return
-					}
-				}
-
-				output.Changes = state.AggregateModifications()
-
-				data, err := json.Marshal(state)
-				if err != nil {
-					output.Err = err.Error()
-					output.Logs += "fail to marshal change, terminate command, err=" + err.Error()
-					return
-				}
-
-				output.Snapshot = data
-			}
-
-			handle(apply)
 		})
 	}
 }

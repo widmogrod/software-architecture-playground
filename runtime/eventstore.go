@@ -102,7 +102,7 @@ type Reduced struct {
 	Value         interface{}
 }
 
-func (a *EventStore) Reduce(f func(cmd interface{}, result *Reduced) *Reduced, init interface{}) *AggregateResultResult {
+func (a *EventStore) Reduce(f func(change interface{}, result *Reduced) *Reduced, init interface{}) *AggregateResultResult {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -130,12 +130,40 @@ func (a *EventStore) Reduce(f func(cmd interface{}, result *Reduced) *Reduced, i
 	}
 }
 
+type Reducer interface {
+	Apply(change interface{}) error
+}
+
+func (a *EventStore) Reducer(reducer Reducer) *AggregateResultResult {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if a.err != nil {
+		return &AggregateResultResult{
+			Err: a.err,
+		}
+	}
+
+	for e := a.log.Front(); e != nil; e = e.Next() {
+		err := reducer.Apply(e.Value)
+		if err != nil {
+			return &AggregateResultResult{
+				Err: err,
+			}
+		}
+	}
+
+	return &AggregateResultResult{
+		Ok: reducer,
+	}
+}
+
 type AggregateAppendResult struct {
 	Ok  *EventStore
 	Err error
 }
 
 type AggregateResultResult struct {
-	Ok  *Reduced
+	Ok  interface{}
 	Err error
 }
