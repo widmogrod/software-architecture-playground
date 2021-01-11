@@ -43,6 +43,12 @@ func (o *OrderAggregate) State() interface{} {
 func (o *OrderAggregate) Changes() *runtime.EventStore {
 	return o.changes
 }
+func (o *OrderAggregate) Hydrate(state interface{}, ref *runtime.AggregateRef) error {
+	o.state = state.(*OrderAggregateState)
+	o.ref = ref
+
+	return nil
+}
 
 func (o *OrderAggregate) Handle(cmd interface{}) error {
 	switch c := cmd.(type) {
@@ -67,6 +73,21 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 				Quantity:  c.Quantity,
 			}).Ok.
 			Reducer(o).Err
+
+	case *OrderCollectPaymentsCMD:
+		// validate necessary condition
+		if o.state == nil {
+			return errors.New("Order dont exists!")
+		}
+		if c.OrderID != o.state.OrderID {
+			return errors.New(fmt.Sprintf("Order missmatch %v", c))
+		}
+
+		return o.changes.
+			Append(&OrderCollectPaymentsResult{
+				PaymentCollected: true,
+			}).Ok.
+			Reducer(o).Err
 	}
 
 	return nil
@@ -86,15 +107,20 @@ func (o *OrderAggregate) Apply(change interface{}) error {
 		o.state.OrderID = c.OrderID
 		o.state.OrderCreatedAt = c.CreatedAt
 
-		o.state.isOrderCreated = true
-
 	case *ProductAdded:
-		if !o.state.isOrderCreated {
+		if o.state == nil {
 			return errors.New("You cannot add products to not created order")
 		}
 
 		o.state.ProductID = c.ProductID
 		o.state.ProductQuantity = c.Quantity
+
+	case *OrderCollectPaymentsResult:
+		if o.state == nil {
+			return errors.New("You cannot collect payment for order that don't exists")
+		}
+
+		o.state.PaymentCollected = c.PaymentCollected
 
 	default:
 		return errors.New(fmt.Sprintf("unsupported type to handle %T", change))
@@ -110,9 +136,10 @@ type OrderAggregateState struct {
 	UserID string
 
 	OrderTotalPrice string
-	Created         *time.Time
 
-	Updated          *time.Time
+	Created *time.Time
+	Updated *time.Time
+
 	ProductID        string
 	ProductUnitPrice string
 
@@ -122,8 +149,9 @@ type OrderAggregateState struct {
 	WarehouseReservationID string
 	ShippingStatus         string
 
-	ShippingID     string
-	isOrderCreated bool
+	ShippingID       string
+	isOrderCreated   bool
+	PaymentCollected bool
 }
 
 type ProductAdded struct {
@@ -187,11 +215,19 @@ func NewMarchaller() *ChangesRegistry {
 	}
 }
 
+func NewChangesRegistry() *ChangesRegistry {
+	return &ChangesRegistry{
+		state:   &OrderAggregateState{},
+		changes: nil,
+	}
+}
+
 type ChangesRegistry struct {
+	state   interface{}
 	changes map[string]interface{}
 }
 
-func (m *ChangesRegistry) SetChange(name string, change interface{}) {
+func (m *ChangesRegistry) Set(name string, change interface{}) {
 	m.changes[name] = change
 }
 
@@ -205,20 +241,23 @@ type Aggregate interface {
 	Changes() *runtime.EventStore
 	State() interface{}
 	Ref() *runtime.AggregateRef
+	Hydrate(state interface{}, ref *runtime.AggregateRef) error
 }
 
 func (s *RuntimeChangeStorage) Persist(a Aggregate) error {
+	version := s.input.SnapshotVersion
 	_ = a.Changes().Reduce(func(change interface{}, result *runtime.Reduced) *runtime.Reduced {
 		data, _ := json.Marshal(change)
+
+		version++
 
 		now := time.Now()
 		s.output.Changes = append(s.output.Changes, &runtime.AggregateChange{
 			// TODO change name can be provided by Event
-			Type:       reflect.TypeOf(change).Name(),
+			Type:       reflect.TypeOf(change).Elem().Name(),
 			Payload:    data,
 			RecordTime: &now,
-			// TODO introduce version of change
-			//Version: 1
+			Version:    version,
 		})
 
 		return result
@@ -235,18 +274,29 @@ func (s *RuntimeChangeStorage) Persist(a Aggregate) error {
 	return nil
 }
 
+func (s *RuntimeChangeStorage) Retrieve(ref *runtime.AggregateRef, aggregate Aggregate) error {
+	if !(s.input.AggregateType == ref.Type && s.input.AggregateID == ref.ID) {
+		return errors.New(fmt.Sprintf("Aggregate not found"))
+	}
+
+	// TODO get read of ths explicit type
+	state := &OrderAggregateState{}
+	err := json.Unmarshal(s.input.Snapshot, state)
+	if err != nil {
+		return err
+	}
+
+	return aggregate.Hydrate(state, ref)
+}
+
 func main() {
 	// what if data is polymorfic
 	// what if everything is an networks call
 	// what if response contains data to be persisted, events to be publish, ...
 	// what if storage is not a user defined concern?
 	// what if external communication also is HTTP base, and persisting results must always happen in aggregates
-	//  and external information can be only delivered as a webhook
+	// and external information can be only delivered as a webhook
 
-	//mux := http.NewServeMux()
-	//mux.HandleFunc("/entrypoint/schedule", func(rq http.ResponseWriter, r *http.Request) {
-	//	fmt.Fprintln(rq, "Hohohoho")
-	//})
 	app := runtime.NewMuxRuntimeClient()
 	app.
 		HandleFunc("/schedule/time", ScheduleInvokeHandlerFunc(func(cmd *runtime.ScheduleInvokeCMD, result *runtime.ScheduleInvokeResult) {
@@ -282,6 +332,48 @@ func main() {
 			})
 		}).
 		AggregateChange("order", "create")
+
+	app.
+		HandleFunc("/order/colpay", func(w http.ResponseWriter, rq *http.Request) {
+			input := &runtime.AggregateChangeCMD{}
+			output := &runtime.AggregateChangeResult{}
+			store := &RuntimeChangeStorage{
+				input:  input,
+				output: output,
+			}
+			JsonRequestResponse(w, rq, input, output, func() {
+				aggregate := NewOrderAggregate()
+				err := store.Retrieve(&runtime.AggregateRef{
+					input.AggregateID,
+					input.AggregateType,
+				}, aggregate)
+
+				if err != nil {
+					output.Err = err.Error()
+					output.Logs += "error when store.Retrieve"
+					return
+				}
+
+				cmd := &OrderCollectPaymentsCMD{}
+				_ = json.Unmarshal(input.Payload, cmd)
+
+				err = aggregate.Handle(cmd)
+				if err != nil {
+					output.Err = err.Error()
+					output.Logs += fmt.Sprintf("cmd=%v", cmd)
+					output.Logs += string(input.Snapshot)
+					output.Logs += "error from ApplyCommand"
+					return
+				}
+
+				err = store.Persist(aggregate)
+				if err != nil {
+					output.Err = err.Error()
+					output.Logs += "error from ApplyCommand"
+				}
+			})
+		}).
+		AggregateChange("order", "collect-payment")
 
 	http.ListenAndServe(":8080", app)
 }

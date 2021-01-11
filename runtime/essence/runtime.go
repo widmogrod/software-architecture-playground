@@ -6,7 +6,6 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation/eventsourcing"
 	"github.com/widmogrod/software-architecture-playground/runtime"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -33,44 +32,49 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	var snapshot runtime.Snapshot
+
 	for _, aggregate := range description.Aggregate {
 		aggregate := aggregate
 		mux.HandleFunc(aggregate.HTTPEntrypoint, func(w http.ResponseWriter, rq *http.Request) {
-			changes := make([]*runtime.AggregateChange, 0)
-			_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
-				changes = append(changes, change.(*runtime.AggregateChange))
-				return result
-			}, eventsourcing.Reduced{})
-
-			// Todo applicator and reducer must be a pair!
-			reducer := &runtime.AggregateReducerType{
-				AggregateType:  aggregate.AggregateType,
-				HTTPEntrypoint: "/order/reduce",
-			}
-			output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
-				AggregateRef: runtime.AggregateRef{
-					ID:   rq.Header.Get("AggID"),
-					Type: reducer.AggregateType,
-				},
-				Snapshot: nil,
-				Changes:  changes,
-			})
-
-			payload, err := ioutil.ReadAll(rq.Body)
-			if err != nil && err != io.EOF {
-				output.Err = err.Error()
-				output.Logs += "failed reading request body, err=" + err.Error()
-				return
-			}
+			//changes := make([]*runtime.AggregateChange, 0)
+			//_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
+			//	changes = append(changes, change.(*runtime.AggregateChange))
+			//	return result
+			//}, eventsourcing.Reduced{})
+			//
+			//// Todo applicator and reducer must be a pair!
+			//reducer := &runtime.AggregateReducerType{
+			//	AggregateType:  aggregate.AggregateType,
+			//	HTTPEntrypoint: "/order/reduce",
+			//}
+			//output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
+			//	AggregateRef: runtime.AggregateRef{
+			//		ID:   rq.Header.Get("AggID"),
+			//		Type: reducer.AggregateType,
+			//	},
+			//	Snapshot: nil,
+			//	Changes:  changes,
+			//})
+			//
+			payload, _ := ioutil.ReadAll(rq.Body)
+			//if err != nil && err != io.EOF {
+			//	output.Err = err.Error()
+			//	output.Logs += "failed reading request body, err=" + err.Error()
+			//	return
+			//}
 
 			input2 := &runtime.AggregateChangeCMD{
 				AggregateID:   rq.Header.Get("AggID"),
 				AggregateType: aggregate.AggregateType,
 				Payload:       payload,
-				Snapshot:      output.Snapshot,
+				Snapshot:      snapshot,
 			}
 
 			output2 := sdk.AggregateChange(aggregate, input2)
+			if output2.Err == "" {
+				snapshot = output2.Snapshot
+			}
 
 			defer json.NewEncoder(w).Encode(output2)
 
@@ -85,29 +89,29 @@ func main() {
 		})
 	}
 
-	for _, reducer := range description.AggregateReducer {
-		// TODO make it automatic, background not a API request
-		// since this is a runtime responsibility
-		reducer := reducer
-		mux.HandleFunc(reducer.HTTPEntrypoint, func(w http.ResponseWriter, rq *http.Request) {
-			changes := make([]*runtime.AggregateChange, 0)
-			_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
-				changes = append(changes, change.(*runtime.AggregateChange))
-				return result
-			}, eventsourcing.Reduced{})
-
-			output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
-				AggregateRef: runtime.AggregateRef{
-					ID:   rq.Header.Get("AggID"),
-					Type: reducer.AggregateType,
-				},
-				Snapshot: nil,
-				Changes:  changes,
-			})
-
-			json.NewEncoder(w).Encode(output)
-		})
-	}
+	//for _, reducer := range description.AggregateReducer {
+	//	// TODO make it automatic, background not a API request
+	//	// since this is a runtime responsibility
+	//	reducer := reducer
+	//	mux.HandleFunc(reducer.HTTPEntrypoint, func(w http.ResponseWriter, rq *http.Request) {
+	//		changes := make([]*runtime.AggregateChange, 0)
+	//		_ = storage.Reduce(func(change interface{}, result *eventsourcing.Reduced) *eventsourcing.Reduced {
+	//			changes = append(changes, change.(*runtime.AggregateChange))
+	//			return result
+	//		}, eventsourcing.Reduced{})
+	//
+	//		output := sdk.AggregateReduce(reducer, &runtime.AggregateReduceCMD{
+	//			AggregateRef: runtime.AggregateRef{
+	//				ID:   rq.Header.Get("AggID"),
+	//				Type: reducer.AggregateType,
+	//			},
+	//			Snapshot: nil,
+	//			Changes:  changes,
+	//		})
+	//
+	//		json.NewEncoder(w).Encode(output)
+	//	})
+	//}
 
 	http.ListenAndServe(":8081", mux)
 }

@@ -79,6 +79,7 @@ type AggregateReduceResult struct {
 type AggregateChange struct {
 	Type       string
 	Payload    []byte
+	Version    uint
 	RecordTime *time.Time
 }
 
@@ -86,8 +87,9 @@ type AggregateChangeCMD struct {
 	AggregateID   string
 	AggregateType string
 
-	Payload  []byte
-	Snapshot Snapshot
+	Payload         []byte
+	Snapshot        Snapshot
+	SnapshotVersion uint
 }
 
 type AggregateChangeResult struct {
