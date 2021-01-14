@@ -1,13 +1,10 @@
-module github.com/widmogrod/software-architecture-playground
+module github.com/widmogrod/software-architecture-playground/runtime
 
-go 1.14
+go 1.15
 
 require (
 	github.com/EventStore/EventStore-Client-Go v0.0.0-20201109153453-2eb2093c8197
-	github.com/aws/aws-lambda-go v1.21.0
-	github.com/badoux/checkmail v1.2.1
 	github.com/golang/protobuf v1.4.3
-	github.com/lib/pq v1.9.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/segmentio/ksuid v1.0.3
 	github.com/stretchr/testify v1.6.1

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/robfig/cron/v3"
-	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/interpretation/eventsourcing"
 	"github.com/widmogrod/software-architecture-playground/runtime"
 	"io/ioutil"
 	"log"
@@ -16,7 +15,7 @@ func main() {
 	description, err := sdk.Describe()
 	panicError(err)
 
-	storage := eventsourcing.NewEventStore()
+	storage := runtime.NewEventStore()
 
 	c := cron.New()
 
