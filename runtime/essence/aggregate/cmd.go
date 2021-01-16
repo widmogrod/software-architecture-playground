@@ -1,6 +1,8 @@
 package aggregate
 
-import "time"
+import (
+	"time"
+)
 
 type ProductAdded struct {
 	ProductID string
@@ -22,6 +24,6 @@ type OrderCreated struct {
 type OrderCollectPaymentsCMD struct {
 	OrderID string
 }
-type OrderCollectPaymentsResult struct {
+type OrderPaymentsCollected struct {
 	PaymentCollected bool
 }

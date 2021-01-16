@@ -28,7 +28,7 @@ func (o *OrderAggregate) Apply(change interface{}) error {
 		o.state.ProductID = c.ProductID
 		o.state.ProductQuantity = c.Quantity
 
-	case *OrderCollectPaymentsResult:
+	case *OrderPaymentsCollected:
 		if o.state == nil {
 			return errors.New("You cannot collect payment for order that don't exists")
 		}

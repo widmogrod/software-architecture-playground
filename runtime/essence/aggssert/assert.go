@@ -60,9 +60,8 @@ func ChangesSequence(t *testing.T, store *runtime.EventStore, seq ...interface{}
 		}
 
 		if len(changes) == 0 {
+			assert.Fail(t, "ChangesSequence has more events to compare", "Next object in sequence should have type %T", change)
 			result.StopReduction = true
-			assert.Fail(t, "ChangesSequence has more events to compare, but provided sequence has ended")
-
 			return result
 		}
 

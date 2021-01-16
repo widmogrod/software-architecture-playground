@@ -37,11 +37,11 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 			return errors.New("Order dont exists!")
 		}
 		if c.OrderID != o.state.OrderID {
-			return errors.New(fmt.Sprintf("Order missmatch %v", c))
+			return errors.New(fmt.Sprintf("Order missmatch %#v", c))
 		}
 
 		return o.changes.
-			Append(&OrderCollectPaymentsResult{
+			Append(&OrderPaymentsCollected{
 				PaymentCollected: true,
 			}).Ok.
 			Reducer(o).Err

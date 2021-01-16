@@ -6,25 +6,32 @@ import (
 )
 
 func NewEventStore() *EventStore {
+	l := list.New()
 	return &EventStore{
-		log:  list.New(),
-		lock: &sync.Mutex{},
-		err:  nil,
+		log:           l,
+		lock:          &sync.Mutex{},
+		version:       0,
+		lastReduction: l.Front(),
+		err:           nil,
 	}
 }
 
 func WithError(err error, a *EventStore) *EventStore {
 	return &EventStore{
-		log:  a.log,
-		lock: a.lock,
-		err:  err,
+		log:           a.log,
+		lock:          a.lock,
+		version:       a.version,
+		lastReduction: a.lastReduction,
+		err:           err,
 	}
 }
 
 type EventStore struct {
-	lock sync.Locker
-	log  *list.List
-	err  error
+	lock          sync.Locker
+	log           *list.List
+	version       uint
+	lastReduction *list.Element
+	err           error
 }
 
 type Aggregate struct {
@@ -74,9 +81,9 @@ type Aggregate struct {
 //}
 
 type Change struct {
-	Type    string
-	Version uint
+	//Type    string
 	Payload interface{}
+	Version uint
 }
 
 func (a *EventStore) Append(input interface{}) *AggregateAppendResult {
@@ -90,7 +97,17 @@ func (a *EventStore) Append(input interface{}) *AggregateAppendResult {
 		}
 	}
 
-	a.log.PushBack(input)
+	a.version++
+
+	el := a.log.PushBack(&Change{
+		Payload: input,
+		Version: a.version,
+	})
+
+	// TODO workaround, that is. Intoduce something like ReduceFromLatest()
+	if a.lastReduction == nil {
+		a.lastReduction = el
+	}
 
 	return &AggregateAppendResult{
 		Ok: a,
@@ -119,7 +136,7 @@ func (a *EventStore) Reduce(f func(change interface{}, result *Reduced) *Reduced
 	}
 
 	for e := a.log.Front(); e != nil; e = e.Next() {
-		result = f(e.Value, result)
+		result = f(e.Value.(*Change).Payload, result)
 		if result.StopReduction {
 			break
 		}
@@ -144,14 +161,16 @@ func (a *EventStore) Reducer(reducer Reducer) *AggregateResultResult {
 		}
 	}
 
-	for e := a.log.Front(); e != nil; e = e.Next() {
-		err := reducer.Apply(e.Value)
+	for e := a.lastReduction; e != nil; e = e.Next() {
+		err := reducer.Apply(e.Value.(*Change).Payload)
 		if err != nil {
 			return &AggregateResultResult{
 				Err: err,
 			}
 		}
 	}
+
+	a.lastReduction = nil
 
 	return &AggregateResultResult{
 		Ok: reducer,
