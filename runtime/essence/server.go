@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/protoorder"
 	"google.golang.org/grpc"
@@ -25,12 +24,4 @@ func __() {
 	server := grpc.NewServer()
 	protoorder.RegisterOrderAggregateServer(server, &protoorder.UnimplementedOrderAggregateServer{})
 	_ = server.Serve(ln)
-}
-
-var _ protoorder.OrderAggregateServer = &MyServer{}
-
-type MyServer struct{}
-
-func (m *MyServer) CreateOrder(ctx context.Context, request *protoorder.CreateOrderRequest) (*protoorder.OrderAggregateState, error) {
-	panic("implement me")
 }

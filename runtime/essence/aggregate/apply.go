@@ -16,6 +16,7 @@ func (o *OrderAggregate) Apply(change interface{}) error {
 
 		// when everything is ok, record changes that you want to make
 		o.state = &OrderAggregateState{}
+		o.state.UserID = c.UserID
 		o.state.OrderID = c.OrderID
 		o.state.OrderCreatedAt = c.CreatedAt
 

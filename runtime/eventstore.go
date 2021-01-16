@@ -126,7 +126,7 @@ func (a *EventStore) Reduce(f func(change interface{}, result *Reduced) *Reduced
 	}
 
 	return &AggregateResultResult{
-		Ok: result,
+		Ok: result.Value,
 	}
 }
 

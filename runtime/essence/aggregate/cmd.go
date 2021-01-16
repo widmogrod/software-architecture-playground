@@ -15,7 +15,7 @@ type OrderCreateCMD struct {
 
 type OrderCreated struct {
 	OrderID   string
-	UserId    string
+	UserID    string
 	CreatedAt *time.Time
 }
 

@@ -41,3 +41,11 @@ func (o *OrderAggregate) Hydrate(state interface{}, ref *runtime.AggregateRef) e
 
 	return nil
 }
+
+type Aggregate interface {
+	State() interface{}
+	Changes() *runtime.EventStore
+	Ref() *runtime.AggregateRef
+	Apply(change interface{}) error
+	Handle(cmd interface{}) error
+}

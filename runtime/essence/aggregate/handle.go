@@ -22,7 +22,7 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 		return o.changes.
 			Append(&OrderCreated{
 				OrderID:   ksuid.New().String(),
-				UserId:    c.UserID,
+				UserID:    c.UserID,
 				CreatedAt: &now,
 			}).Ok.
 			Append(&ProductAdded{
@@ -47,5 +47,5 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 			Reducer(o).Err
 	}
 
-	return nil
+	return errors.New(fmt.Sprintf("Invalid command: %T", cmd))
 }
