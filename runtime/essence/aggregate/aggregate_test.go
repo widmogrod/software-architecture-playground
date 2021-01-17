@@ -135,28 +135,6 @@ func TestOrderAggregateState_cmd_permutation(t *testing.T) {
 			" ",
 		))
 	})
-
-	/*
-		       OC PC OS OD
-			OC  x  √  √  √		(OC,PC) -> (PC,OS) -> (OS,OD)
-			PC  x  x  x  x
-			OS  x  x  x  x
-			OD  x  x  x  x
-
-				 OS PC OD
-			OC   x  √  x
-			OS   x  x  x
-			PC   x  x  x
-			OD   x  x  x
-
-				 OS PC OD
-			OC   x  √  x
-			OS   x  x  x
-			PC   x  x  x
-			OD   x  x  x
-
-	*/
-
 }
 
 func Perm(p []interface{}, f func(perm []interface{})) {
