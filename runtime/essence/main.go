@@ -72,7 +72,7 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 				ProductID: c.ProductID,
 				Quantity:  c.Quantity,
 			}).Ok.
-			Reducer(o).Err
+			ReduceRecent(o).Err
 
 	case *OrderCollectPaymentsCMD:
 		// validate necessary condition
@@ -87,7 +87,7 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 			Append(&OrderCollectPaymentsResult{
 				PaymentCollected: true,
 			}).Ok.
-			Reducer(o).Err
+			ReduceRecent(o).Err
 	}
 
 	return nil

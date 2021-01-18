@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"errors"
@@ -29,22 +29,28 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 				ProductID: c.ProductID,
 				Quantity:  c.Quantity,
 			}).Ok.
-			Reducer(o).Err
+			ReduceRecent(o).Err
 
 	case *OrderCollectPaymentsCMD:
 		// validate necessary condition
 		if o.state == nil {
 			return errors.New("Order dont exists!")
 		}
-		if c.OrderID != o.state.OrderID {
-			return errors.New(fmt.Sprintf("Order missmatch %#v", c))
+		if c.Method != "apple" {
+			return errors.New(fmt.Sprintf("Accept ApplePay only %#v", c))
+		}
+
+		if c.Amount <= 0 {
+			return errors.New(fmt.Sprintf("Payment must be positive amount %#v", c))
 		}
 
 		return o.changes.
 			Append(&OrderPaymentsCollected{
-				PaymentCollected: true,
+				Method: c.Method,
+				Amount: c.Amount,
+				Date:   c.Date,
 			}).Ok.
-			Reducer(o).Err
+			ReduceRecent(o).Err
 	}
 
 	return errors.New(fmt.Sprintf("Invalid command: %T", cmd))

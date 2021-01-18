@@ -58,3 +58,18 @@ Example report could look like this in tests
 - Road trip planner (collaborative adventure schedule)
 - Auction Bidding platform (with Game theory twist - how to make optimise $)
 
+
+## API that can reflect about itself
+Aggregate could return list of actions that user can take with a given state.
+
+
+## Protobuf validation
+https://github.com/envoyproxy/protoc-gen-validate
+
+## Explore languages
+http://chor-lang.org/
+https://links-lang.org/
+
+
+## Session types
+https://www.researchgate.net/profile/Ugo_Deliguoro2/publication/225835882_Sessions_and_Session_Types_An_Overview/links/53d7745e0cf29f55cfb4cfc2/Sessions-and-Session-Types-An-Overview.pdf

@@ -151,7 +151,7 @@ type Reducer interface {
 	Apply(change interface{}) error
 }
 
-func (a *EventStore) Reducer(reducer Reducer) *AggregateResultResult {
+func (a *EventStore) ReduceRecent(reducer Reducer) *AggregateResultResult {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

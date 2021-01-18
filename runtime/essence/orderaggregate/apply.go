@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"errors"
@@ -33,7 +33,7 @@ func (o *OrderAggregate) Apply(change interface{}) error {
 			return errors.New("You cannot collect payment for order that don't exists")
 		}
 
-		o.state.PaymentCollected = c.PaymentCollected
+		o.state.PaymentCollected = true
 
 	default:
 		return errors.New(fmt.Sprintf("unsupported type to handle %T", change))

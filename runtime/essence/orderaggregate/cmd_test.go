@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"github.com/stretchr/testify/assert"

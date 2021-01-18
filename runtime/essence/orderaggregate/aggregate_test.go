@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ var (
 	okUserID    = "666"
 	okProductID = "p7"
 	okQuantity  = "3"
+	now         = time.Now()
 )
 
 func TestOrderAggregateState_new_aggregate_has_empty_state(t *testing.T) {
@@ -39,7 +40,6 @@ func TestOrderAggregateState_aggregate_state_equal_to_new_replay_state(t *testin
 		assert.Equal(t, okQuantity, a.state.ProductQuantity)
 	}
 
-	now := time.Now()
 	aggssert.ChangesSequence(t, a.Changes(),
 		&OrderCreated{
 			OrderID:   a.Ref().ID,
@@ -63,7 +63,9 @@ func TestOrderAggregateState_a_scenario(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = a.Handle(&OrderCollectPaymentsCMD{
-		OrderID: a.Ref().ID,
+		Method: "apple",
+		Amount: 100,
+		Date:   &now,
 	})
 	assert.NoError(t, err)
 
@@ -78,7 +80,6 @@ func TestOrderAggregateState_a_scenario(t *testing.T) {
 		assert.True(t, a.state.PaymentCollected)
 	}
 
-	now := time.Now()
 	aggssert.ChangesSequence(t, a.Changes(),
 		&OrderCreated{
 			OrderID:   a.Ref().ID,
@@ -89,7 +90,11 @@ func TestOrderAggregateState_a_scenario(t *testing.T) {
 			ProductID: okProductID,
 			Quantity:  okQuantity,
 		},
-		&OrderPaymentsCollected{PaymentCollected: true},
+		&OrderPaymentsCollected{
+			Method: "apple",
+			Amount: 100,
+			Date:   &now,
+		},
 	)
 }
 
@@ -100,7 +105,9 @@ func TestOrderAggregateState_cmd_permutation(t *testing.T) {
 			ProductID: okProductID,
 			Quantity:  okQuantity,
 		}, &OrderCollectPaymentsCMD{
-			OrderID: "todo-order-id-for-OrderCollectPaymentsCMD",
+			Method: "apple",
+			Amount: 100,
+			Date:   &now,
 		},
 		&OrderCreateCMD{
 			UserID:    okUserID,

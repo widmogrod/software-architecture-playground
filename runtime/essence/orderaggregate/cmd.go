@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"time"
@@ -22,8 +22,12 @@ type OrderCreated struct {
 }
 
 type OrderCollectPaymentsCMD struct {
-	OrderID string
+	Method string
+	Amount uint
+	Date   *time.Time
 }
 type OrderPaymentsCollected struct {
-	PaymentCollected bool
+	Method string
+	Amount uint
+	Date   *time.Time
 }

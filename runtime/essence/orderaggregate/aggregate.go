@@ -1,4 +1,4 @@
-package aggregate
+package orderaggregate
 
 import (
 	"github.com/widmogrod/software-architecture-playground/runtime"

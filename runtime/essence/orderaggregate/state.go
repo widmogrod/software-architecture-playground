@@ -1,12 +1,12 @@
-package aggregate
+package orderaggregate
 
 import "time"
 
 type OrderAggregateState struct {
-	OrderID        string
+	OrderID        string `uri:"corp:product:order:id"`
 	OrderCreatedAt *time.Time
 
-	UserID string
+	UserID string `uri:"corp:product:user:id"`
 
 	OrderTotalPrice string
 
