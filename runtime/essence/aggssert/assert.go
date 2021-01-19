@@ -26,7 +26,7 @@ func Reproducible(t *testing.T, reply, fresh Aggregate) bool {
 func Empty(t *testing.T, a Aggregate) {
 	assert.Empty(t, a.State())
 	assert.Empty(t, a.Ref().ID)
-	assert.Equal(t, "order", a.Ref().Type)
+	assert.NotEmpty(t, a.Ref().Type)
 	ChangesLen(t, a, 0)
 }
 
