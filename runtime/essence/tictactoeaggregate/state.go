@@ -4,6 +4,10 @@ type PlayerID = string
 type Move = string
 
 type (
+	GameWaitingForPlayer struct {
+		NeedsPlayers int32
+	}
+
 	GameProgress struct {
 		NextMovePlayerID Move
 		AvailableMoves   map[Move]struct{}
@@ -19,8 +23,9 @@ type (
 		MovesTaken map[Move]PlayerID
 		MovesOrder []Move
 		OneOf      struct {
-			GameProgress *GameProgress
-			GameResult   *GameResult
+			GameWaitingForPlayer *GameWaitingForPlayer
+			GameProgress         *GameProgress
+			GameResult           *GameResult
 		}
 	}
 )

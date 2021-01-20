@@ -3,6 +3,7 @@ package tictactoeaggregate
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/aggssert"
+	"math/rand"
 	"testing"
 )
 
@@ -18,14 +19,27 @@ func TestTicTacToe_new_aggregate_has_empty_state(t *testing.T) {
 
 func TestTicTacToe_aggregate_state_equal_to_new_replay_state(t *testing.T) {
 	a := NewTicTacToeAggregate()
-	err := a.Handle(&StartGameCMD{
-		FirstPlayerID:  p1,
-		SecondPlayerID: p2,
-	})
-	assert.NoError(t, err)
-	//assert.NotEmpty(t, a.Ref().ID)
 
-	err = a.Handle(&MoveCMD{
+	// Two ways to start game
+	if rand.Float32() < 0.5 {
+		err := a.Handle(&CreateGameCMD{
+			FirstPlayerID: p1,
+		})
+		assert.NoError(t, err)
+
+		err = a.Handle(&JoinGameCMD{
+			SecondPlayerID: p2,
+		})
+		assert.NoError(t, err)
+	} else {
+		err := a.Handle(&StartGameCMD{
+			FirstPlayerID:  p1,
+			SecondPlayerID: p2,
+		})
+		assert.NoError(t, err)
+	}
+
+	err := a.Handle(&MoveCMD{
 		PlayerID: p1,
 		Position: "1.1",
 	})
@@ -65,8 +79,10 @@ func TestTicTacToe_aggregate_state_equal_to_new_replay_state(t *testing.T) {
 	aggssert.Reproducible(t, a, NewTicTacToeAggregate())
 
 	aggssert.ChangesSequence(t, a.Changes(),
-		&GameStarted{
-			FirstPlayerID:  p1,
+		&GameCreated{
+			FirstPlayerID: p1,
+		},
+		&SecondPlayerJoined{
 			SecondPlayerID: p2,
 		},
 		&Moved{

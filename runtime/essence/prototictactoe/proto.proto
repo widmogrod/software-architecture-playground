@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+option go_package = ".;prototictactoe";
+
+service TicTacToeAggregate {
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {}
+  rpc Move(MoveRequest) returns (MoveResponse) {}
+}
+
+message CreateGameRequest {
+  string gameID = 1;
+  string firstPlayerID = 2;
+}
+
+message CreateGameResponse {
+  GameState state = 1;
+}
+
+message JoinGameRequest {
+  string gameID = 1;
+  string secondPlayerID = 2;
+}
+
+message JoinGameResponse {
+  GameState state = 1;
+}
+
+message MoveRequest {
+  string gameID = 1;
+  string playerID = 2;
+  string move = 3;
+}
+
+message MoveResponse {
+  GameState state = 1;
+}
+
+
+
+message GameState {
+  message GameWaitingForPlayer {
+    sint32 needsPlayers = 1;
+  }
+  message GameProgress {
+    string nextMovePlayerID = 1;
+    repeated string availableMoves = 2;
+  }
+  message GameResult {
+    string winner = 1;
+    repeated string winingSequence = 2;
+  }
+
+  oneof state {
+    GameWaitingForPlayer  waiting = 1;
+    GameProgress  progress = 2;
+    GameResult  result = 3;
+  }
+}

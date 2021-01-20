@@ -7,7 +7,7 @@ import (
 
 func (o *TicTacToeAggregate) Apply(change interface{}) error {
 	switch c := change.(type) {
-	case *GameStarted:
+	case *GameCreated:
 		if o.state != nil {
 			return errors.New("order cannot be created game twice, check your logic")
 		}
@@ -20,24 +20,34 @@ func (o *TicTacToeAggregate) Apply(change interface{}) error {
 		}
 
 		o.state.Players[c.FirstPlayerID] = struct{}{}
-		o.state.Players[c.SecondPlayerID] = struct{}{}
 		o.state.OneOf = struct {
-			GameProgress *GameProgress
-			GameResult   *GameResult
+			GameWaitingForPlayer *GameWaitingForPlayer
+			GameProgress         *GameProgress
+			GameResult           *GameResult
 		}{
-			GameProgress: &GameProgress{
-				NextMovePlayerID: c.FirstPlayerID,
-				AvailableMoves: map[Move]struct{}{
-					"1.1": struct{}{},
-					"1.2": struct{}{},
-					"1.3": struct{}{},
-					"2.1": struct{}{},
-					"2.2": struct{}{},
-					"2.3": struct{}{},
-					"3.1": struct{}{},
-					"3.2": struct{}{},
-					"3.3": struct{}{},
-				},
+			GameWaitingForPlayer: &GameWaitingForPlayer{NeedsPlayers: 1},
+		}
+
+	case *SecondPlayerJoined:
+		if o.state == nil {
+			return errors.New("order cannot be created game twice, check your logic")
+		}
+
+		o.state.Players[c.SecondPlayerID] = struct{}{}
+		o.state.OneOf.GameWaitingForPlayer = nil
+		o.state.OneOf.GameResult = nil
+		o.state.OneOf.GameProgress = &GameProgress{
+			NextMovePlayerID: getNext(o.state.Players, c.SecondPlayerID),
+			AvailableMoves: map[Move]struct{}{
+				"1.1": struct{}{},
+				"1.2": struct{}{},
+				"1.3": struct{}{},
+				"2.1": struct{}{},
+				"2.2": struct{}{},
+				"2.3": struct{}{},
+				"3.1": struct{}{},
+				"3.2": struct{}{},
+				"3.3": struct{}{},
 			},
 		}
 
@@ -62,6 +72,7 @@ func (o *TicTacToeAggregate) Apply(change interface{}) error {
 			return errors.New("Cannot finish game that don't started")
 		}
 
+		o.state.OneOf.GameWaitingForPlayer = nil
 		o.state.OneOf.GameProgress = nil
 		o.state.OneOf.GameResult = &GameResult{
 			Winner:         c.WinnerPlayerID,

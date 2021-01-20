@@ -7,6 +7,43 @@ import (
 
 func (o *TicTacToeAggregate) Handle(cmd interface{}) error {
 	switch c := cmd.(type) {
+
+	case *CreateGameCMD:
+		// validate necessary condition
+		if o.state != nil {
+			return errors.New("Game already exists")
+		}
+
+		return o.changes.
+			Append(&GameCreated{
+				FirstPlayerID: c.FirstPlayerID,
+			}).Ok.
+			ReduceRecent(o).Err
+
+	case *JoinGameCMD:
+		// validate necessary condition
+		if o.state == nil {
+			return errors.New("Game don't exists")
+		}
+
+		if o.state.OneOf.GameWaitingForPlayer == nil {
+			return errors.New(fmt.Sprintf("Game must be waiting for player to join game: %#v", c))
+		}
+
+		if o.state.OneOf.GameWaitingForPlayer.NeedsPlayers == 0 {
+			return errors.New("All player join the game")
+		}
+
+		if _, found := o.state.Players[c.SecondPlayerID]; found {
+			return errors.New("Player ID already taken")
+		}
+
+		return o.changes.
+			Append(&SecondPlayerJoined{
+				SecondPlayerID: c.SecondPlayerID,
+			}).Ok.
+			ReduceRecent(o).Err
+
 	case *StartGameCMD:
 		// validate necessary condition
 		if o.state != nil {
@@ -14,8 +51,10 @@ func (o *TicTacToeAggregate) Handle(cmd interface{}) error {
 		}
 
 		return o.changes.
-			Append(&GameStarted{
-				FirstPlayerID:  c.FirstPlayerID,
+			Append(&GameCreated{
+				FirstPlayerID: c.FirstPlayerID,
+			}).Ok.
+			Append(&SecondPlayerJoined{
 				SecondPlayerID: c.SecondPlayerID,
 			}).Ok.
 			ReduceRecent(o).Err

@@ -1,11 +1,22 @@
 package tictactoeaggregate
 
-type StartGameCMD struct {
-	FirstPlayerID  string
+type CreateGameCMD struct {
+	FirstPlayerID string
+}
+
+type GameCreated struct {
+	FirstPlayerID string
+}
+
+type JoinGameCMD struct {
 	SecondPlayerID string
 }
 
-type GameStarted struct {
+type SecondPlayerJoined struct {
+	SecondPlayerID string
+}
+
+type StartGameCMD struct {
 	FirstPlayerID  string
 	SecondPlayerID string
 }
