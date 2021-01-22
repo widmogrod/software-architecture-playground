@@ -67,9 +67,17 @@ Aggregate could return list of actions that user can take with a given state.
 https://github.com/envoyproxy/protoc-gen-validate
 
 ## Explore languages
-http://chor-lang.org/
-https://links-lang.org/
+- https://www.choral-lang.org (research project of https://www.fabriziomontesi.com/projects/choco/)
+- https://www.jolie-lang.org
+- http://chor-lang.org/
+- https://links-lang.org/
 
 
 ## Session types
 https://www.researchgate.net/profile/Ugo_Deliguoro2/publication/225835882_Sessions_and_Session_Types_An_Overview/links/53d7745e0cf29f55cfb4cfc2/Sessions-and-Session-Types-An-Overview.pdf
+
+Since session are bases on channels, then when
+something happen with connection, then process may not be able to communicate
+but what if we would emply idenpotency of request, consisten caching and state of operation
+would be capure by ie eventsourcing aggregate?
+
