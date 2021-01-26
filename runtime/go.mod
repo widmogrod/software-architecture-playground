@@ -6,6 +6,7 @@ require (
 	github.com/EventStore/EventStore-Client-Go v0.0.0-20201109153453-2eb2093c8197
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/fullstorydev/grpcui v1.1.0 // indirect
+	github.com/gizak/termui/v3 v3.1.0
 	github.com/golang/protobuf v1.4.3
 	github.com/nathany/looper v0.3.3 // indirect
 	github.com/robfig/cron/v3 v3.0.1

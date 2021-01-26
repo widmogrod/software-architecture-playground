@@ -9,7 +9,7 @@ func (o *TicTacToeAggregate) Apply(change interface{}) error {
 	switch c := change.(type) {
 	case *GameCreated:
 		if o.state != nil {
-			return errors.New("order cannot be created game twice, check your logic")
+			return errors.New("GameCreated, order cannot be created game twice, check your logic")
 		}
 
 		// when everything is ok, record changes that you want to make
@@ -30,7 +30,7 @@ func (o *TicTacToeAggregate) Apply(change interface{}) error {
 
 	case *SecondPlayerJoined:
 		if o.state == nil {
-			return errors.New("order cannot be created game twice, check your logic")
+			return errors.New("SecondPlayerJoined, order cannot be created game twice, check your logic")
 		}
 
 		o.state.Players[c.SecondPlayerID] = struct{}{}
@@ -64,12 +64,12 @@ func (o *TicTacToeAggregate) Apply(change interface{}) error {
 
 			o.state.OneOf.GameProgress.NextMovePlayerID = getNext(o.state.Players, c.PlayerID)
 		} else {
-			return errors.New("Wrong player move, from replyied events")
+			return errors.New("Moved, Wrong player move, from replyied events")
 		}
 
 	case *GameFinish:
 		if o.state == nil {
-			return errors.New("Cannot finish game that don't started")
+			return errors.New("GameFinish, Cannot finish game that don't started")
 		}
 
 		o.state.OneOf.GameWaitingForPlayer = nil

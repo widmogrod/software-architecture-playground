@@ -29,7 +29,7 @@ func WithError(err error, a *EventStore) *EventStore {
 type EventStore struct {
 	lock          sync.Locker
 	log           *list.List
-	version       uint
+	version       uint64
 	lastReduction *list.Element
 	err           error
 }
@@ -83,7 +83,7 @@ type Aggregate struct {
 type Change struct {
 	//Type    string
 	Payload interface{}
-	Version uint
+	Version uint64
 }
 
 func (a *EventStore) Append(input interface{}) *AggregateAppendResult {
@@ -97,12 +97,12 @@ func (a *EventStore) Append(input interface{}) *AggregateAppendResult {
 		}
 	}
 
-	a.version++
-
 	el := a.log.PushBack(&Change{
 		Payload: input,
 		Version: a.version,
 	})
+
+	a.version++
 
 	// TODO workaround, that is. Intoduce something like ReduceFromLatest()
 	if a.lastReduction == nil {
@@ -117,6 +117,34 @@ func (a *EventStore) Append(input interface{}) *AggregateAppendResult {
 type Reduced struct {
 	StopReduction bool
 	Value         interface{}
+}
+
+func (a *EventStore) ReduceChange(f func(change Change, result *Reduced) *Reduced, init interface{}) *AggregateResultResult {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	result := &Reduced{
+		StopReduction: false,
+		Value:         init,
+	}
+
+	if a.err != nil {
+		return &AggregateResultResult{
+			Ok:  result,
+			Err: a.err,
+		}
+	}
+
+	for e := a.log.Front(); e != nil; e = e.Next() {
+		result = f(*e.Value.(*Change), result)
+		if result.StopReduction {
+			break
+		}
+	}
+
+	return &AggregateResultResult{
+		Ok: result.Value,
+	}
 }
 
 func (a *EventStore) Reduce(f func(change interface{}, result *Reduced) *Reduced, init interface{}) *AggregateResultResult {
