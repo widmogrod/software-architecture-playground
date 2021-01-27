@@ -3,7 +3,7 @@ package aggregate
 import (
 	"context"
 	"fmt"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/store"
 )
 
 type Aggregate interface {

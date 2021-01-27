@@ -8,8 +8,8 @@ import (
 	"github.com/EventStore/EventStore-Client-Go/messages"
 	"github.com/EventStore/EventStore-Client-Go/streamrevision"
 	"github.com/gofrs/uuid"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/store"
 	"strings"
 )
 

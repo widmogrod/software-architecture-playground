@@ -2,8 +2,8 @@ package inmemorystore
 
 import (
 	"context"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/store"
 	"sync"
 )
 

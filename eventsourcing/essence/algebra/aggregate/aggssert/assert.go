@@ -2,7 +2,7 @@ package aggssert
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate"
 	"testing"
 )
 

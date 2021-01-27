@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/aggssert"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/aggssert"
 	"strings"
 	"testing"
 	"time"

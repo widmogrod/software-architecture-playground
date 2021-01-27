@@ -1,7 +1,7 @@
 package orderaggregate
 
 import (
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate"
 )
 
 func NewOrderAggregate() *OrderAggregate {

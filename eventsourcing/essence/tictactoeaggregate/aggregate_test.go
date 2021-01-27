@@ -2,7 +2,7 @@ package tictactoeaggregate
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/aggssert"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/aggssert"
 	"math/rand"
 	"testing"
 )
