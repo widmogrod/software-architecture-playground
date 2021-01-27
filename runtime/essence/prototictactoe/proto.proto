@@ -6,6 +6,7 @@ service TicTacToeAggregate {
   rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
   rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {}
   rpc Move(MoveRequest) returns (MoveResponse) {}
+  rpc GetGame(GetGameRequest) returns (GetGameResponse) {}
 }
 
 message CreateGameRequest {
@@ -36,7 +37,13 @@ message MoveResponse {
   GameState state = 1;
 }
 
+message GetGameRequest {
+  string gameID = 1;
+}
 
+message GetGameResponse {
+  GameState state = 1;
+}
 
 message GameState {
   message GameWaitingForPlayer {

@@ -77,6 +77,7 @@ func (s *storere) MutateAggregate(ctx context.Context, aggregateID string, handl
 			return nil, fmt.Errorf("MutateAggregate, error while mutating aggregate %s, event=%#v. Details: %w", aggregateID, err)
 		}
 
+		// TODO check if there we mutations
 		lastError = s.save(ctx, aggregateID, version, agg)
 		if lastError == nil {
 			return agg, nil

@@ -119,6 +119,22 @@ func (s *tictactoeServer) Move(ctx context.Context, request *prototictactoe.Move
 	}, nil
 }
 
+func (s *tictactoeServer) GetGame(ctx context.Context, request *prototictactoe.GetGameRequest) (*prototictactoe.GetGameResponse, error) {
+	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggssert.Aggregate) error {
+		return nil
+	})
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal,
+			"Game error GetGame()! details %w", request.GameID, err,
+		)
+	}
+
+	return &prototictactoe.GetGameResponse{
+		State: serialise(agg.State().(*tictactoeaggregate.TicTacToeState)),
+	}, nil
+}
+
 func serialise(state *tictactoeaggregate.TicTacToeState) *prototictactoe.GameState {
 	result := &prototictactoe.GameState{}
 
