@@ -3,7 +3,6 @@ package orderaggregate
 import (
 	"errors"
 	"fmt"
-	"github.com/segmentio/ksuid"
 	"time"
 )
 
@@ -21,7 +20,7 @@ func (o *OrderAggregate) Handle(cmd interface{}) error {
 		now := time.Now()
 		return o.changes.
 			Append(&OrderCreated{
-				OrderID:   ksuid.New().String(),
+				OrderID:   c.OrderID,
 				UserID:    c.UserID,
 				CreatedAt: &now,
 			}).Ok.

@@ -2,6 +2,7 @@ package orderaggregate
 
 import (
 	"fmt"
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/aggssert"
 	"strings"
@@ -13,6 +14,7 @@ var (
 	okUserID    = "666"
 	okProductID = "p7"
 	okQuantity  = "3"
+	okOrderID   = ksuid.New().String()
 	now         = time.Now()
 )
 
@@ -24,12 +26,12 @@ func TestOrderAggregateState_new_aggregate_has_empty_state(t *testing.T) {
 func TestOrderAggregateState_aggregate_state_equal_to_new_replay_state(t *testing.T) {
 	a := NewOrderAggregate()
 	err := a.Handle(&OrderCreateCMD{
+		OrderID:   okOrderID,
 		UserID:    okUserID,
 		ProductID: okProductID,
 		Quantity:  okQuantity,
 	})
 	assert.NoError(t, err)
-	assert.NotEmpty(t, a.Ref().ID)
 
 	aggssert.Reproducible(t, a, NewOrderAggregate())
 
@@ -42,7 +44,7 @@ func TestOrderAggregateState_aggregate_state_equal_to_new_replay_state(t *testin
 
 	aggssert.ChangesSequence(t, a.Changes(),
 		&OrderCreated{
-			OrderID:   a.Ref().ID,
+			OrderID:   okOrderID,
 			UserID:    okUserID,
 			CreatedAt: &now,
 		},
@@ -56,6 +58,7 @@ func TestOrderAggregateState_aggregate_state_equal_to_new_replay_state(t *testin
 func TestOrderAggregateState_a_scenario(t *testing.T) {
 	a := NewOrderAggregate()
 	err := a.Handle(&OrderCreateCMD{
+		OrderID:   okOrderID,
 		UserID:    okUserID,
 		ProductID: okProductID,
 		Quantity:  okQuantity,
@@ -82,7 +85,7 @@ func TestOrderAggregateState_a_scenario(t *testing.T) {
 
 	aggssert.ChangesSequence(t, a.Changes(),
 		&OrderCreated{
-			OrderID:   a.Ref().ID,
+			OrderID:   okOrderID,
 			UserID:    okUserID,
 			CreatedAt: &now,
 		},
@@ -101,6 +104,7 @@ func TestOrderAggregateState_a_scenario(t *testing.T) {
 func TestOrderAggregateState_cmd_permutation(t *testing.T) {
 	commands := []interface{}{
 		&OrderCreateCMD{
+			OrderID:   okOrderID,
 			UserID:    okUserID,
 			ProductID: okProductID,
 			Quantity:  okQuantity,

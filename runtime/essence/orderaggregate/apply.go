@@ -12,8 +12,6 @@ func (o *OrderAggregate) Apply(change interface{}) error {
 			return errors.New("order cannot be created twice, check your logic")
 		}
 
-		o.ref.ID = c.OrderID
-
 		// when everything is ok, record changes that you want to make
 		o.state = &OrderAggregateState{}
 		o.state.UserID = c.UserID

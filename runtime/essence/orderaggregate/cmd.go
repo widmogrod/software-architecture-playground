@@ -10,6 +10,7 @@ type ProductAdded struct {
 }
 
 type OrderCreateCMD struct {
+	OrderID   string
 	UserID    string
 	ProductID string
 	Quantity  string
