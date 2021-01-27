@@ -2,7 +2,7 @@ package interpretation
 
 import (
 	"context"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/protoorder"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/protoorder"
 )
 
 var _ protoorder.OrderAggregateServer = &EventStore{}

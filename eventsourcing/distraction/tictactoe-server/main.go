@@ -72,7 +72,7 @@ func (s *tictactoeServer) CreateGame(ctx context.Context, request *prototictacto
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"Game error CreateGame()! details %w", request.GameID, err,
+			"Game error CreateGame(%s)! details %w", request.GameID, err,
 		)
 	}
 
@@ -90,7 +90,7 @@ func (s *tictactoeServer) JoinGame(ctx context.Context, request *prototictactoe.
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"Game error JoinGame()! details %w", request.GameID, err,
+			"Game error JoinGame(%s)! details %w", request.GameID, err,
 		)
 	}
 
@@ -109,7 +109,7 @@ func (s *tictactoeServer) Move(ctx context.Context, request *prototictactoe.Move
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"Game error Move()! details %w", request.GameID, err,
+			"Game error Move(%s)! details %w", request.GameID, err,
 		)
 	}
 
@@ -125,7 +125,7 @@ func (s *tictactoeServer) GetGame(ctx context.Context, request *prototictactoe.G
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"Game error GetGame()! details %w", request.GameID, err,
+			"Game error GetGame(%s)! details %w", request.GameID, err,
 		)
 	}
 
