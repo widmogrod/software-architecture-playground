@@ -2,20 +2,12 @@ package aggssert
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/runtime"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
 	"testing"
 )
 
-type Aggregate interface {
-	State() interface{}
-	Changes() *runtime.EventStore
-	Ref() *runtime.AggregateRef
-	Apply(change interface{}) error
-	Handle(cmd interface{}) error
-}
-
-func Reproducible(t *testing.T, reply, fresh Aggregate) bool {
-	reply.Changes().Reduce(func(change interface{}, result *runtime.Reduced) *runtime.Reduced {
+func Reproducible(t *testing.T, reply, fresh aggregate.Aggregate) bool {
+	reply.Changes().Reduce(func(change interface{}, result *aggregate.Reduced) *aggregate.Reduced {
 		result.StopReduction = !assert.NoError(t, fresh.Apply(change))
 		return result
 	}, nil)
@@ -23,15 +15,13 @@ func Reproducible(t *testing.T, reply, fresh Aggregate) bool {
 	return assert.Equal(t, reply.State(), fresh.State())
 }
 
-func Empty(t *testing.T, a Aggregate) {
+func Empty(t *testing.T, a aggregate.Aggregate) {
 	assert.Empty(t, a.State())
-	assert.Empty(t, a.Ref().ID)
-	assert.NotEmpty(t, a.Ref().Type)
 	ChangesLen(t, a, 0)
 }
 
-func ChangesLen(t *testing.T, a Aggregate, expected uint) bool {
-	length := a.Changes().Reduce(func(change interface{}, result *runtime.Reduced) *runtime.Reduced {
+func ChangesLen(t *testing.T, a aggregate.Aggregate, expected uint) bool {
+	length := a.Changes().Reduce(func(change interface{}, result *aggregate.Reduced) *aggregate.Reduced {
 		result.Value = result.Value.(int) + 1
 		return result
 	}, uint(0)).Ok
@@ -51,8 +41,8 @@ func CustomEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...inter
 	return assert.Equal(t, expected, actual, msgAndArgs)
 }
 
-func ChangesSequence(t *testing.T, store *runtime.EventStore, seq ...interface{}) bool {
-	result := store.Reduce(func(change interface{}, result *runtime.Reduced) *runtime.Reduced {
+func ChangesSequence(t *testing.T, store *aggregate.EventStore, seq ...interface{}) bool {
+	result := store.Reduce(func(change interface{}, result *aggregate.Reduced) *aggregate.Reduced {
 		changes, ok := result.Value.([]interface{})
 		if !assert.Truef(t, ok, "ChangesSequence is not of type `[]interface{}` but %T", result.Value) {
 			result.StopReduction = true

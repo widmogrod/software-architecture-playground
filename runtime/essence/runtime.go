@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/robfig/cron/v3"
 	"github.com/widmogrod/software-architecture-playground/runtime"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,7 +16,7 @@ func main() {
 	description, err := sdk.Describe()
 	panicError(err)
 
-	storage := runtime.NewEventStore()
+	storage := aggregate.NewEventStore()
 
 	c := cron.New()
 

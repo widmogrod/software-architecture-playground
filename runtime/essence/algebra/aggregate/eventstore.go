@@ -1,4 +1,4 @@
-package runtime
+package aggregate
 
 import (
 	"container/list"
@@ -34,46 +34,13 @@ type EventStore struct {
 	err           error
 }
 
-type Aggregate struct {
-	ID       string
-	Type     string
-	Snapshot *Snapshot
-	Changes  []*Change
-}
-
-/*
-	creating path:
-		req = {aggRef, cmd}
-		state, changes, create()
-
-		err = append(aggId, changes, state)
-
-	updating path:
-		// aggRef = {aggId, aggType}
-		req = {aggRef, cmd}
-
-		retry = 3
-		white retry-- > 0 {
-			changes = get(req.aggRef)
-			initial_state := {}
-			state = reduce(changes, initial_state) {
-				match {
-					"create"
-					"turnUp"
-					"rotateLeft"
-					"moveEast":
-				}
-
-				return state
-			}
-
-			changes, state = apply(cmd, state)
-			err = append(req.aggRef, changes, state)
-			if err != VersionConflict {
-				break
-			}
-		}
-*/
+//
+//type Aggregate struct {
+//	ID       string
+//	Type     string
+//	Snapshot *runtime.Snapshot
+//	Changes  []*Change
+//}
 
 //type Snapshot struct {4
 //	Version uint

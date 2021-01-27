@@ -3,18 +3,23 @@ package aggregate
 import (
 	"context"
 	"fmt"
-	"github.com/widmogrod/software-architecture-playground/runtime"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/aggssert"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store"
 )
 
-type newAgg = func() aggssert.Aggregate
+type Aggregate interface {
+	State() interface{}
+	Changes() *EventStore
+	Apply(change interface{}) error
+	Handle(cmd interface{}) error
+}
 
-type HandleFunc = func(agg aggssert.Aggregate) error
+type newAgg = func() Aggregate
+
+type HandleFunc = func(agg Aggregate) error
 
 type dataStore interface {
-	ReadChanges(ctx context.Context, aggregateID string) ([]runtime.Change, error)
-	AppendChanges(ctx context.Context, aggregateID string, version uint64, changes []runtime.Change) error
+	ReadChanges(ctx context.Context, aggregateID string) ([]Change, error)
+	AppendChanges(ctx context.Context, aggregateID string, version uint64, changes []Change) error
 }
 
 func NewAggregate(new newAgg, store dataStore) *storere {
@@ -29,7 +34,7 @@ type storere struct {
 	store dataStore
 }
 
-func (s *storere) NewAggregate(ctx context.Context, aggregateID string, handle HandleFunc) (aggssert.Aggregate, error) {
+func (s *storere) NewAggregate(ctx context.Context, aggregateID string, handle HandleFunc) (Aggregate, error) {
 	fmt.Println("NewAggregate ID=" + aggregateID)
 	_, err := s.store.ReadChanges(ctx, aggregateID)
 	if err == nil {
@@ -52,7 +57,7 @@ func (s *storere) NewAggregate(ctx context.Context, aggregateID string, handle H
 	return agg, nil
 }
 
-func (s *storere) MutateAggregate(ctx context.Context, aggregateID string, handle HandleFunc) (aggssert.Aggregate, error) {
+func (s *storere) MutateAggregate(ctx context.Context, aggregateID string, handle HandleFunc) (Aggregate, error) {
 	fmt.Println("MutateAggregate ID=" + aggregateID)
 	var lastError error
 	for retry := 0; retry < 2; retry++ {
@@ -74,7 +79,7 @@ func (s *storere) MutateAggregate(ctx context.Context, aggregateID string, handl
 
 		err = handle(agg)
 		if err != nil {
-			return nil, fmt.Errorf("MutateAggregate, error while mutating aggregate %s, event=%#v. Details: %w", aggregateID, err)
+			return nil, fmt.Errorf("MutateAggregate, error while mutating aggregate %s. Details: %w", aggregateID, err)
 		}
 
 		// TODO check if there we mutations
@@ -87,9 +92,9 @@ func (s *storere) MutateAggregate(ctx context.Context, aggregateID string, handl
 	return nil, fmt.Errorf("MutateAggregate, fail to store even after retrying X times. Details: %w", lastError)
 }
 
-func (s storere) save(ctx context.Context, aggregateID string, version uint64, agg aggssert.Aggregate) error {
-	newChanges := make([]runtime.Change, 0)
-	err := agg.Changes().ReduceChange(func(change runtime.Change, result *runtime.Reduced) *runtime.Reduced {
+func (s storere) save(ctx context.Context, aggregateID string, version uint64, agg Aggregate) error {
+	newChanges := make([]Change, 0)
+	err := agg.Changes().ReduceChange(func(change Change, result *Reduced) *Reduced {
 		if version == ^uint64(0) || change.Version > version {
 			newChanges = append(newChanges, change)
 		}

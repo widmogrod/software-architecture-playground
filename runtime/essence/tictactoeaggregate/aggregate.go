@@ -1,9 +1,12 @@
 package tictactoeaggregate
 
-import "github.com/widmogrod/software-architecture-playground/runtime"
+import (
+	"github.com/widmogrod/software-architecture-playground/runtime"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
+)
 
 func NewTicTacToeAggregate() *TicTacToeAggregate {
-	store := runtime.NewEventStore()
+	store := aggregate.NewEventStore()
 	aggregate := &TicTacToeAggregate{
 		state:   nil,
 		changes: store,
@@ -18,7 +21,7 @@ func NewTicTacToeAggregate() *TicTacToeAggregate {
 
 type TicTacToeAggregate struct {
 	state   *TicTacToeState
-	changes *runtime.EventStore
+	changes *aggregate.EventStore
 	ref     *runtime.AggregateRef
 }
 
@@ -30,7 +33,7 @@ func (o *TicTacToeAggregate) State() interface{} {
 	return o.state
 }
 
-func (o *TicTacToeAggregate) Changes() *runtime.EventStore {
+func (o *TicTacToeAggregate) Changes() *aggregate.EventStore {
 	return o.changes
 }
 func (o *TicTacToeAggregate) Hydrate(state interface{}, ref *runtime.AggregateRef) error {

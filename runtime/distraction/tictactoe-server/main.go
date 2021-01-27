@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	eventstore "github.com/EventStore/EventStore-Client-Go/client"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/aggssert"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store/eventstoredb"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/deserializer"
@@ -45,7 +44,7 @@ func main() {
 	st := eventstoredb.NewEventStoreDB(client, ser)
 
 	tictactoe := &tictactoeServer{
-		store: aggregate.NewAggregate(func() aggssert.Aggregate {
+		store: aggregate.NewAggregate(func() aggregate.Aggregate {
 			return tictactoeaggregate.NewTicTacToeAggregate()
 		}, st),
 	}
@@ -56,8 +55,8 @@ func main() {
 var _ prototictactoe.TicTacToeAggregateServer = &tictactoeServer{}
 
 type storer interface {
-	NewAggregate(ctx context.Context, aggregateID string, handle aggregate.HandleFunc) (aggssert.Aggregate, error)
-	MutateAggregate(ctx context.Context, aggregateID string, handle aggregate.HandleFunc) (aggssert.Aggregate, error)
+	NewAggregate(ctx context.Context, aggregateID string, handle aggregate.HandleFunc) (aggregate.Aggregate, error)
+	MutateAggregate(ctx context.Context, aggregateID string, handle aggregate.HandleFunc) (aggregate.Aggregate, error)
 }
 
 type tictactoeServer struct {
@@ -65,7 +64,7 @@ type tictactoeServer struct {
 }
 
 func (s *tictactoeServer) CreateGame(ctx context.Context, request *prototictactoe.CreateGameRequest) (*prototictactoe.CreateGameResponse, error) {
-	agg, err := s.store.NewAggregate(ctx, request.GameID, func(agg aggssert.Aggregate) error {
+	agg, err := s.store.NewAggregate(ctx, request.GameID, func(agg aggregate.Aggregate) error {
 		return agg.Handle(&tictactoeaggregate.CreateGameCMD{
 			FirstPlayerID: request.FirstPlayerID,
 		})
@@ -83,7 +82,7 @@ func (s *tictactoeServer) CreateGame(ctx context.Context, request *prototictacto
 }
 
 func (s *tictactoeServer) JoinGame(ctx context.Context, request *prototictactoe.JoinGameRequest) (*prototictactoe.JoinGameResponse, error) {
-	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggssert.Aggregate) error {
+	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggregate.Aggregate) error {
 		return agg.Handle(&tictactoeaggregate.JoinGameCMD{
 			SecondPlayerID: request.SecondPlayerID,
 		})
@@ -101,7 +100,7 @@ func (s *tictactoeServer) JoinGame(ctx context.Context, request *prototictactoe.
 }
 
 func (s *tictactoeServer) Move(ctx context.Context, request *prototictactoe.MoveRequest) (*prototictactoe.MoveResponse, error) {
-	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggssert.Aggregate) error {
+	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggregate.Aggregate) error {
 		return agg.Handle(&tictactoeaggregate.MoveCMD{
 			PlayerID: request.PlayerID,
 			Position: request.Move,
@@ -120,7 +119,7 @@ func (s *tictactoeServer) Move(ctx context.Context, request *prototictactoe.Move
 }
 
 func (s *tictactoeServer) GetGame(ctx context.Context, request *prototictactoe.GetGameRequest) (*prototictactoe.GetGameResponse, error) {
-	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggssert.Aggregate) error {
+	agg, err := s.store.MutateAggregate(ctx, request.GameID, func(agg aggregate.Aggregate) error {
 		return nil
 	})
 	if err != nil {

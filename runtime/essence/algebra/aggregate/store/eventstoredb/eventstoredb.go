@@ -8,7 +8,7 @@ import (
 	"github.com/EventStore/EventStore-Client-Go/messages"
 	"github.com/EventStore/EventStore-Client-Go/streamrevision"
 	"github.com/gofrs/uuid"
-	"github.com/widmogrod/software-architecture-playground/runtime"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
 	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/store"
 	"strings"
 )
@@ -33,7 +33,7 @@ type evenstordbimpl struct {
 	deser  SerDeSer
 }
 
-func (i *evenstordbimpl) ReadChanges(ctx context.Context, aggregateID string) ([]runtime.Change, error) {
+func (i *evenstordbimpl) ReadChanges(ctx context.Context, aggregateID string) ([]aggregate.Change, error) {
 	// TODO read til exhaustion, don't wait for limit 20, or snapshot?
 	events, err := i.client.ReadStreamEvents(ctx, direction.Forwards, aggregateID, streamrevision.StreamRevisionStart, 20, false)
 	if err != nil {
@@ -44,9 +44,9 @@ func (i *evenstordbimpl) ReadChanges(ctx context.Context, aggregateID string) ([
 		return nil, err
 	}
 
-	changes := make([]runtime.Change, 0)
+	changes := make([]aggregate.Change, 0)
 	for _, event := range events {
-		change := runtime.Change{
+		change := aggregate.Change{
 			Payload: nil,
 			// TODO uint64!
 			Version: event.EventNumber,
@@ -65,7 +65,7 @@ func (i *evenstordbimpl) ReadChanges(ctx context.Context, aggregateID string) ([
 	return changes, nil
 }
 
-func (i *evenstordbimpl) AppendChanges(ctx context.Context, aggregateID string, version uint64, changes []runtime.Change) error {
+func (i *evenstordbimpl) AppendChanges(ctx context.Context, aggregateID string, version uint64, changes []aggregate.Change) error {
 	events := make([]messages.ProposedEvent, 0)
 
 	for _, change := range changes {

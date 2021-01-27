@@ -3,7 +3,7 @@ package orderaggregate
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/runtime/essence/aggssert"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate/aggssert"
 	"strings"
 	"testing"
 	"time"

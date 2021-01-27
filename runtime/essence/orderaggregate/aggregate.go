@@ -2,10 +2,11 @@ package orderaggregate
 
 import (
 	"github.com/widmogrod/software-architecture-playground/runtime"
+	"github.com/widmogrod/software-architecture-playground/runtime/essence/algebra/aggregate"
 )
 
 func NewOrderAggregate() *OrderAggregate {
-	store := runtime.NewEventStore()
+	store := aggregate.NewEventStore()
 	aggregate := &OrderAggregate{
 		state:   nil,
 		changes: store,
@@ -20,7 +21,7 @@ func NewOrderAggregate() *OrderAggregate {
 
 type OrderAggregate struct {
 	state   *OrderAggregateState
-	changes *runtime.EventStore
+	changes *aggregate.EventStore
 	ref     *runtime.AggregateRef
 }
 
@@ -32,7 +33,7 @@ func (o *OrderAggregate) State() interface{} {
 	return o.state
 }
 
-func (o *OrderAggregate) Changes() *runtime.EventStore {
+func (o *OrderAggregate) Changes() *aggregate.EventStore {
 	return o.changes
 }
 func (o *OrderAggregate) Hydrate(state interface{}, ref *runtime.AggregateRef) error {
@@ -44,7 +45,7 @@ func (o *OrderAggregate) Hydrate(state interface{}, ref *runtime.AggregateRef) e
 
 type Aggregate interface {
 	State() interface{}
-	Changes() *runtime.EventStore
+	Changes() *aggregate.EventStore
 	Ref() *runtime.AggregateRef
 	Apply(change interface{}) error
 	Handle(cmd interface{}) error
