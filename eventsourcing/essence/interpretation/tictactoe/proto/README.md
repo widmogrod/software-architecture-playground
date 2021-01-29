@@ -2,12 +2,14 @@ Install
 ```
 go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
 go get -u google.golang.org/grpc
+go get -u github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2 
 ```
 Generate
 
 For: Go
-``` 
+```
 protoc --go_out=plugins=grpc:. *.proto
+protoc --go_out=plugins=grpc:. --openapiv2_out=. *.proto
 ```
 
 For: JS
