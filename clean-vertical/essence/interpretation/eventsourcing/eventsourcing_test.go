@@ -1,4 +1,4 @@
-package inmemory
+package eventsourcing
 
 import (
 	"github.com/widmogrod/software-architecture-playground/clean-vertical/essence/algebra/dispatch"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestInMemoryImplementationConformsToSpecification(t *testing.T) {
+func TestEventSourcingImplementationConformsToSpecification(t *testing.T) {
 	implementation := New()
 	dispatch.Interpret(implementation)
 	interpretation.Specification(t)

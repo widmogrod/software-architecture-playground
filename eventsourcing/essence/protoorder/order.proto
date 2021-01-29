@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = ".;proto";
+
+// The greeting service definition.
+service OrderAggregate {
+  // Sends a greeting
+  rpc CreateOrder (CreateOrderRequest) returns (OrderAggregateState) {}
+}
+
+message CreateOrderRequest {
+  string OrderID = 1;
+  string UserID = 2;
+  string Quantity = 3;
+}
+
+message OrderAggregateState {
+  string OrderID = 1;
+  string OrderCreatedAt = 2;
+  repeated Product product = 3;
+}
+
+message Product {
+  string ProductID = 1;
+  string Quantity = 2;
+  string Price = 3;
+}

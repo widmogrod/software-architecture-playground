@@ -9,6 +9,7 @@ import (
 
 func SpecCreateUserIdentity(t *testing.T) {
 	uuid := time.Now().String()
+	uuid2 := time.Now().Add(1).String()
 	email := EmailAddress("some-email-address@email.com")
 
 	ctx := dispatch.Background()
@@ -24,7 +25,11 @@ func SpecCreateUserIdentity(t *testing.T) {
 		assert.NotNil(t, resui.SuccessfulResult)
 		assert.Equal(t, resui.SuccessfulResult.UUID, uuid)
 
-		t.Run("CreateUserIdentity: should prevent from creation of duplicates of emails", func(t *testing.T) {
+		t.Run("CreateUserIdentity: should prevent from creation of duplicates of emails even with different UUID", func(t *testing.T) {
+			cmd = CreateUserIdentity{
+				UUID:         uuid2,
+				EmailAddress: email,
+			}
 			res := dispatch.Invoke(ctx, cmd)
 			resui := res.(ResultOfCreateUserIdentity)
 			assert.Nil(t, resui.SuccessfulResult)
@@ -32,6 +37,5 @@ func SpecCreateUserIdentity(t *testing.T) {
 			assert.True(t, resui.ValidationError.EmailAddressAlreadyExists)
 		})
 
-		// TODO What about UUID duplication?
 	})
 }

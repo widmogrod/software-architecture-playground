@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+option go_package = ".;prototictactoe";
+
+import "google/api/annotations.proto";
+
+service TicTacToeAggregate {
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {
+    option (google.api.http) = {
+      post: "/v1/game/{id}"
+      body: "*"
+    };
+  }
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {
+    option (google.api.http) = {
+      post: "/v1/game/{id}/join"
+      body: "*"
+    };
+  }
+  rpc Move(MoveRequest) returns (MoveResponse) {
+    option (google.api.http) = {
+      post: "/v1/game/{id}/move"
+      body: "*"
+    };
+  }
+  rpc GetGame(GetGameRequest) returns (GetGameResponse) {
+    option (google.api.http) = {
+      get: "/v1/game/{id}"
+    };
+  }
+}
+
+message CreateGameRequest {
+  string gameID = 1;
+  string firstPlayerID = 2;
+}
+
+message CreateGameResponse {
+  GameState state = 1;
+}
+
+message JoinGameRequest {
+  string gameID = 1;
+  string secondPlayerID = 2;
+}
+
+message JoinGameResponse {
+  GameState state = 1;
+}
+
+message MoveRequest {
+  string gameID = 1;
+  string playerID = 2;
+  string move = 3;
+}
+
+message MoveResponse {
+  GameState state = 1;
+}
+
+message GetGameRequest {
+  string gameID = 1;
+}
+
+message GetGameResponse {
+  GameState state = 1;
+}
+
+message GameState {
+  message GameWaitingForPlayer {
+    sint32 needsPlayers = 1;
+  }
+  message GameProgress {
+    string nextMovePlayerID = 1;
+    repeated string availableMoves = 2;
+  }
+  message GameResult {
+    string winner = 1;
+    repeated string winingSequence = 2;
+  }
+
+  oneof state {
+    GameWaitingForPlayer  waiting = 1;
+    GameProgress  progress = 2;
+    GameResult  result = 3;
+  }
+}

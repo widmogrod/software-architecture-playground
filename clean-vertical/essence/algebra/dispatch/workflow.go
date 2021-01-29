@@ -167,7 +167,7 @@ func (w *Workflow) log(activityID string, work *work) {
 func (w *Workflow) Result(activityID string) interface{} {
 	value, ok := w.partition.Load(activityID)
 	if !ok {
-		panic("dispatch: Result could not find activity" + activityID)
+		panic("dispatch: Snapshot could not find activity" + activityID)
 	}
 	activity := value.(*list.List)
 
@@ -190,13 +190,13 @@ func (w *Workflow) Result(activityID string) interface{} {
 					newcmd2 := newcmd.Interface()
 					err := json.Unmarshal(work.outputPayload, newcmd2)
 					if err != nil {
-						panic("dispatch: Result could not be unmarshal. reason: " + err.Error())
+						panic("dispatch: Snapshot could not be unmarshal. reason: " + err.Error())
 					}
 
 					res <- newcmd.Elem().Interface()
 					return
 				case Err:
-					panic("dispatch: Result could failed. reason: " + string(work.outputPayload))
+					panic("dispatch: Snapshot could failed. reason: " + string(work.outputPayload))
 				}
 			}
 		}

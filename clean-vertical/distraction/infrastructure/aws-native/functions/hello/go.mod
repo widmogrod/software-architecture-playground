@@ -2,10 +2,9 @@ module github.com/widmogrod/software-architecture-playground/clean-vertical/dist
 
 go 1.15
 
-replace github.com/widmogrod/software-architecture-playground v0.0.0-20200908164406-4dffa2e08cb3 => ../../../../../../
+replace github.com/widmogrod/software-architecture-playground/clean-vertical v0.0.0-20201229151317-712ba5d90829 => ../../../../../
 
 require (
 	github.com/aws/aws-lambda-go v1.21.0
-	github.com/badoux/checkmail v1.2.1 // indirect
-	github.com/widmogrod/software-architecture-playground v0.0.0-20200908164406-4dffa2e08cb3
+	github.com/widmogrod/software-architecture-playground/clean-vertical v0.0.0-20201229151317-712ba5d90829
 )
