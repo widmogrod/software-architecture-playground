@@ -1,33 +1,12 @@
 syntax = "proto3";
 
-option go_package = ".;prototictactoe";
-
-import "google/api/annotations.proto";
+option go_package = ".;proto";
 
 service TicTacToeAggregate {
-  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {
-    option (google.api.http) = {
-      post: "/v1/game/{id}"
-      body: "*"
-    };
-  }
-  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {
-    option (google.api.http) = {
-      post: "/v1/game/{id}/join"
-      body: "*"
-    };
-  }
-  rpc Move(MoveRequest) returns (MoveResponse) {
-    option (google.api.http) = {
-      post: "/v1/game/{id}/move"
-      body: "*"
-    };
-  }
-  rpc GetGame(GetGameRequest) returns (GetGameResponse) {
-    option (google.api.http) = {
-      get: "/v1/game/{id}"
-    };
-  }
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
+  rpc JoinGame(JoinGameRequest) returns (JoinGameResponse) {}
+  rpc Move(MoveRequest) returns (MoveResponse) {}
+  rpc GetGame(GetGameRequest) returns (GetGameResponse) {}
 }
 
 message CreateGameRequest {

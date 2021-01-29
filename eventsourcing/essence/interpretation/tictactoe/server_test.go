@@ -1,4 +1,4 @@
-package interpretation
+package tictactoe
 
 import (
 	"flag"
