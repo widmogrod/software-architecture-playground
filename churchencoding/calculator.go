@@ -6,7 +6,7 @@ type (
 	Lit  = func(int) calc
 	Add  = func(calc, calc) calc
 	Mul  = func(calc, calc) calc
-	Calc = func(Lit, Add, Mul) interface{}
+	Calc = func(Lit, Add, Mul) calc
 )
 
 func _Lit(v int) Calc {
