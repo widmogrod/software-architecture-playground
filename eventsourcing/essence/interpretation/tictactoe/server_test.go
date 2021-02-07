@@ -14,7 +14,7 @@ func TestEventStoreImplementationConformsToSpecification(t *testing.T) {
 		t.Skip("Skipping tests because this tests requires `docker-compose up`")
 	}
 
-	conf, err := eventstore.ParseConnectionString("tcp://localhost:1113")
+	conf, err := eventstore.ParseConnectionString("esdb://admin:changeit@localhost:2113?tls=false&tlsverifycert=false")
 	assert.NoError(t, err)
 
 	client, err := eventstore.NewClient(conf)
