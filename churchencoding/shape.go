@@ -4,29 +4,21 @@ import (
 	"math"
 )
 
-//type T = interface{}
-//
-//type Visitor interface {
-//	VisitCreateGame(tictactoeaggregate.CreateGameCMD) T
-//	VisitJoinGame(tictactoeaggregate.JoinGameCMD) T
-//	VisitStartGame(tictactoeaggregate.StartGameCMD) T
-//	VisitMove(tictactoeaggregate.MoveCMD) T
-//}
-
 type shape = float64
-type Shape = func(
-	func(float64, float64, float64) shape,
-	func(float64, float64, float64, float64) shape,
-) shape
+type (
+	Circle    = func(float64, float64, float64) shape
+	Rectangle = func(float64, float64, float64, float64) shape
+	Shape     = func(Circle, Rectangle) shape
+)
 
 func _Circle(x, y, r float64) Shape {
-	return func(circle func(float64, float64, float64) shape, _ func(float64, float64, float64, float64) shape) shape {
+	return func(circle Circle, _ Rectangle) shape {
 		return circle(x, y, r)
 	}
 }
 
 func _Rectangle(x, y, w, h float64) Shape {
-	return func(_ func(float64, float64, float64) shape, rectangle func(float64, float64, float64, float64) shape) shape {
+	return func(_ Circle, rectangle Rectangle) shape {
 		return rectangle(x, y, w, h)
 	}
 }
