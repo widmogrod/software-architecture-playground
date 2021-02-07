@@ -3,7 +3,9 @@ Having fun with a software architecture to understand where are essential parts 
 and where are distractions that force us to focus on type two problems.
 
 One of constrains is to organize code in such way that is oriented for change, 
-and there is no need to jump between many directories.
+and there is no need to jump between many directories, 
+or introduction of new parameter don't require numerus of method signature changes 
+(group params into single object like Commend, Query, ).
 
 Way of witting in this architecture should follow iterative process where
 1. `Make it work` - write essential code a.k.a. business logic, you defer any infrastructure related distraction
