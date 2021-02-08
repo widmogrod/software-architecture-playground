@@ -1,5 +1,10 @@
 package churchencoding
 
+import (
+	"fmt"
+	"math/rand"
+)
+
 type calc = interface{}
 
 type (
@@ -37,16 +42,25 @@ func eval(c Calc) int {
 	}).(int)
 }
 
+func print(c Calc) string {
+	return c(func(i int) calc {
+		return fmt.Sprintf("%d", i)
+	}, func(a, b calc) calc {
+		return fmt.Sprintf("(%s + %s)", a, b)
+	}, func(a, b calc) calc {
+		return fmt.Sprintf("(%s * %s)", a, b)
+	}).(string)
+}
+
 func generate(v int) Calc {
-	if v > 1 || v < -1 {
-		if v%5 == 0 {
-			return _Mul(_Lit(5), generate(v/5))
+	if v > 100 || v < -100 {
+		sub := 2 + rand.Int()%8
+		if v%sub == 0 {
+			return _Mul(_Lit(sub), generate(v/sub))
 		}
 
-		if v%2 == 0 {
-			return _Mul(_Lit(2), generate(v/2))
-		}
+		return _Add(generate(v-sub), _Lit(sub))
 	}
 
-	return _Lit(int(v))
+	return _Lit(v)
 }
