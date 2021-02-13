@@ -18,6 +18,7 @@ func TestCalculator(t *testing.T) {
 	assert.Equal(t, 10, eval(calculation))
 
 	_ = quick.Check(func(v int) bool {
+		t.Log(print(generate(v)))
 		return assert.Equal(t, v, eval(generate(v)))
 	}, nil)
 }

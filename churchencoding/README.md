@@ -13,3 +13,4 @@ You can see example in this package, below you can find my thoughts on Church en
 ## What I don't like
 - **Need to type cast**. Take a look at `preorder` [function](./tree.go) in interpretation part is `.([]int)`. We know that this translates to lack of type polymorphism in Golang
 - **Cognitive load**. Idea in itself is quite exiting, but implications hider practical usecases, especially when you consider production environment were many engineers with different level of experience are moving on the codebase. Cognitive load that is required to introduce change, debug is impractical in Golang.
+- **Rigid**. Recursive structure like `Tree` encodes how it can be traversed, and I cannot work with it as data structure and ie. implement easily and efficient breath-first-search
