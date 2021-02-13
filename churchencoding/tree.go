@@ -20,7 +20,7 @@ func _Leaf() Tree {
 }
 
 func preorder(t Tree) []int {
-	return t(func(i int, left tree, right tree) tree {
+	return t(func(i int, left, right tree) tree {
 		result := []int{i}
 		result = append(result, left.([]int)...)
 		result = append(result, right.([]int)...)
