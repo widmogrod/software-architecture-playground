@@ -23,3 +23,4 @@ Currently, you can find those experiments, some of them are not connected to tho
 - [Experiment with Clean Architecture and Vertical Architecture in Golang](./clean-vertical/README.md)
 - [Experiment with EventSourcing in Golang](./eventsourcing/README.md)
 - [Church encoding in Golang](./churchencoding/README.md)
+- [McCarthy's Ambiguous Operator & SatSolver in Golang](./continuations/README.md)
