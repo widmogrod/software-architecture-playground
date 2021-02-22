@@ -1,7 +1,7 @@
 package continuations
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/continuations/sat"
 	"testing"
 )
@@ -16,5 +16,5 @@ func TestSatSolve(t *testing.T) {
 	solve.And(sat.Not(a))
 	solve.And(sat.Imply(a, sat.Not(b)))
 
-	fmt.Println(solve.Solution(a, b, c))
+	assert.Equal(t, []bool{false, false, true}, solve.Solution(a, b, c))
 }
