@@ -1,53 +1,53 @@
 package amb
 
-type stack struct {
+type Values struct {
 	values []int
 	len    int
 	index  int
 }
 
-func (s *stack) push(i int) {
+func (s *Values) Push(i int) {
 	s.values = append(s.values, i)
 	s.len++
 }
 
-func (s *stack) has() bool {
+func (s *Values) has() bool {
 	return s.index < s.len
 }
 
-func (s *stack) Val() int {
+func (s *Values) Val() int {
 	return s.values[s.index]
 }
 
-func (s *stack) next() {
+func (s *Values) next() {
 	if s.has() {
 		s.index++
 	}
 }
 
-func (s *stack) end() bool {
+func (s *Values) end() bool {
 	return s.index == s.len-1
 }
 
-func (s *stack) reset() {
+func (s *Values) reset() {
 	s.index = 0
 }
 
-type timemachine2 struct {
-	el    []*stack
+type Permutations struct {
+	el    []*Values
 	len   int
 	state int
 	path  []func() bool
 }
 
-func (t *timemachine2) With(xs ...*stack) {
+func (t *Permutations) With(xs ...*Values) {
 	t.el = xs
 	t.len = len(xs)
 	t.state = 0
 	t.path = nil
 }
 
-func (t *timemachine2) Val() []int {
+func (t *Permutations) Val() []int {
 	res := make([]int, t.len)
 	for i, stack := range t.el {
 		res[i] = stack.Val()
@@ -55,11 +55,11 @@ func (t *timemachine2) Val() []int {
 	return res
 }
 
-func (t *timemachine2) reset() {
+func (t *Permutations) reset() {
 	t.state = t.len - 1
 }
 
-func (t *timemachine2) Until(f func() bool) {
+func (t *Permutations) Until(f func() bool) {
 	t.path = append(t.path, f)
 	for {
 		found := true
@@ -75,7 +75,7 @@ func (t *timemachine2) Until(f func() bool) {
 	}
 }
 
-func (t *timemachine2) backtrack() {
+func (t *Permutations) backtrack() {
 	exhausted := true
 	for i := t.state; i < t.len; i++ {
 		exhausted = exhausted && t.el[i].end()
@@ -105,14 +105,14 @@ func (t *timemachine2) backtrack() {
 	}
 }
 
-func NewRuntime() *timemachine2 {
-	return &timemachine2{}
+func NewRuntime() *Permutations {
+	return &Permutations{}
 }
 
-func MkRange(start, stop int) *stack {
-	result := &stack{}
+func MkRange(start, stop int) *Values {
+	result := &Values{}
 	for i := start; i <= stop; i++ {
-		result.push(i)
+		result.Push(i)
 	}
 
 	return result
