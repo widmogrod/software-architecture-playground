@@ -1,46 +1,50 @@
 package sat
 
 import (
+	"fmt"
 	"github.com/widmogrod/software-architecture-playground/continuations/amb"
 )
 
 func NewSolver() *solver {
 	return &solver{
-		ands: nil,
+		counter: 1,
+		indexes: make(map[*BoolVar]int),
 	}
 }
 
-func MkBool() *boolean {
-	result := &amb.Values{}
+func MkBool() *BoolVar {
+	result := &amb.Value{}
 	result.Push(-1)
 	result.Push(1)
-	return &boolean{
+	return &BoolVar{
 		result,
 	}
 }
 
-type Booler interface {
-	Not() Booler
+type Preposition interface {
+	Not() Preposition
 	IsTrue() bool
 }
 
-type boolean struct {
-	v *amb.Values
+var _ Preposition = &BoolVar{}
+
+type BoolVar struct {
+	v *amb.Value
 }
 
-func (b *boolean) IsTrue() bool {
-	return isTrue(b.v.Val())
-}
-
-func (b *boolean) Not() Booler {
+func (b *BoolVar) Not() Preposition {
 	return &negation{b}
 }
 
-type negation struct {
-	b Booler
+func (b *BoolVar) IsTrue() bool {
+	return isTrue(b.v.Val())
 }
 
-func (n *negation) Not() Booler {
+type negation struct {
+	b Preposition
+}
+
+func (n *negation) Not() Preposition {
 	return n.b
 }
 
@@ -49,14 +53,14 @@ func (n *negation) IsTrue() bool {
 }
 
 type implication struct {
-	p, q Booler
+	p, q Preposition
 }
 
-func (i *implication) Not() Booler {
+func (i *implication) Not() Preposition {
 	return &negation{i}
 }
 
-func (i implication) IsTrue() bool {
+func (i *implication) IsTrue() bool {
 	if i.q.IsTrue() {
 		return true
 	}
@@ -68,53 +72,83 @@ func (i implication) IsTrue() bool {
 	return false
 }
 
+type Closure = [][]Preposition
+
 type solver struct {
-	ands []func() bool
+	closures Closure
+	counter  int
+	indexes  map[*BoolVar]int
 }
 
-//func getValue(value Booler) []*amb.Values {
-//	var result []*amb.Values
-//	switch v := value.(type) {
-//	case *boolean:
-//		result = append(result, v.v)
-//	case *negation:
-//		result = append(result, getValue(v.b)...)
-//	case *implication:
-//		result = append(result, getValue(v.p)...)
-//		result = append(result, getValue(v.q)...)
-//	default:
-//		panic(fmt.Sprintf("unknow type %T", value))
-//	}
-//
-//	return result
-//}
+func (s *solver) And(ors ...Preposition) {
+	s.closures = append(s.closures, ors)
+}
 
-func (s *solver) And(or ...Booler) {
-	fn := func() bool {
-		for _, value := range or {
-			if value.IsTrue() {
-				return true
+func (s *solver) AddClosures(closures Closure) {
+	for _, ors := range closures {
+		s.closures = append(s.closures, ors)
+		for _, or := range ors {
+			// create variable number
+			if x, ok := or.(*BoolVar); ok {
+				if _, found := s.indexes[x]; !found {
+					s.indexes[x] = s.counter
+					s.counter++
+				}
 			}
 		}
 
-		return false
 	}
-
-	s.ands = append(s.ands, fn)
 }
 
-func (s *solver) Solution(values ...*boolean) []bool {
+func (s *solver) PrintCNF() {
+	fmt.Printf("p cnf %d %d\n", s.counter-1, len(s.closures))
+	for _, ors := range s.closures {
+		fmt.Printf("%s 0\n", s.printPrepositions(ors))
+	}
+}
+
+func (s *solver) printPrepositions(ors []Preposition) string {
+	result := ""
+	count := len(ors)
+	for i := 0; i < count; i++ {
+		if i > 0 && i < count {
+			result += " "
+			//result += " \u2228 "
+		}
+
+		result += s.printPreposution(ors[i])
+		//result += "(" + s.printPreposution(ors[i]) + ")"
+	}
+
+	return result
+}
+
+func (s *solver) printPreposution(prep Preposition) string {
+	switch or := prep.(type) {
+	case *BoolVar:
+		return fmt.Sprintf("%d", s.indexes[or])
+		//return fmt.Sprintf("x%d", s.indexes[or])
+	case *negation:
+		return fmt.Sprintf("-%s", s.printPreposution(or.b))
+	case *implication:
+		return fmt.Sprintf("%s → %s", s.printPreposution(or.p), s.printPreposution(or.q))
+	}
+
+	return "unknown"
+}
+
+func (s *solver) Solution(values ...*BoolVar) []bool {
 	ctx := amb.NewRuntime()
 
-	var xs []*amb.Values
+	var xs []*amb.Value
 	for _, v := range values {
 		xs = append(xs, v.v)
 	}
 
 	ctx.With(xs...)
 
-	for _, and := range s.ands {
-		ctx.Until(and)
+	for _, ors := range s.closures {
+		ctx.Until(oneOfORs(ors))
 	}
 
 	solutions := ctx.Val()
@@ -125,14 +159,70 @@ func (s *solver) Solution(values ...*boolean) []bool {
 	return result
 }
 
-func Not(c Booler) Booler {
+func oneOfORs(ors []Preposition) func() bool {
+	return func() bool {
+		for _, value := range ors {
+			if value.IsTrue() {
+				return true
+			}
+		}
+
+		return false
+	}
+}
+
+func Not(c Preposition) Preposition {
 	return c.Not()
 }
 
-func Imply(p, q Booler) Booler {
+func Imply(p, q Preposition) Preposition {
 	return &implication{p, q}
 }
 
 func isTrue(x int) bool {
 	return x == 1
+}
+
+func OneOf(vars []*BoolVar) []Preposition {
+	var result = make([]Preposition, len(vars))
+	for i := 0; i < len(vars); i++ {
+		result[i] = vars[i]
+	}
+
+	return result
+}
+
+// X1 or X2 and (!X1 or 1X2)
+func ExactlyOne(vars []*BoolVar) Closure {
+	var closures Closure
+	closures = append(closures, OneOf(vars))
+
+	size := len(vars) - 1
+	for i := -1; i < size; i++ {
+		if i == -1 {
+			pair := []Preposition{
+				Not(vars[size]),
+				Not(vars[0]),
+			}
+			closures = append(closures, pair)
+		} else {
+			pair := []Preposition{
+				Not(vars[i]),
+				Not(vars[i+1]),
+			}
+			closures = append(closures, pair)
+		}
+
+	}
+
+	return closures
+}
+
+func Take(vars []*BoolVar, index int, len int) []*BoolVar {
+	var result []*BoolVar
+	for i := index; i < index+len; i++ {
+		result = append(result, vars[i])
+	}
+
+	return result
 }

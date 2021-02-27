@@ -18,3 +18,17 @@ func TestSatSolve(t *testing.T) {
 
 	assert.Equal(t, []bool{false, false, true}, solve.Solution(a, b, c))
 }
+
+func TestExactlyOnce(t *testing.T) {
+	a := sat.MkBool()
+	b := sat.MkBool()
+	c := sat.MkBool()
+	d := sat.MkBool()
+
+	solve := sat.NewSolver()
+	closures := sat.ExactlyOne([]*sat.BoolVar{a, b, c, d})
+	solve.AddClosures(closures)
+	solve.PrintCNF()
+
+	assert.Equal(t, []bool{false, false, false, true}, solve.Solution(a, b, c, d))
+}
