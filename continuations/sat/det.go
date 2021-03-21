@@ -60,7 +60,7 @@ func (t *DecisionTree) Breadcrumbs() []Preposition {
 
 func (t *DecisionTree) HasFromBranchToRoot(n *Branch, prep Preposition) bool {
 	for !t.IsRoot(n) {
-		if n.name == prep.Name() {
+		if n.name == prep.String() {
 			return true
 		}
 
@@ -77,12 +77,12 @@ func (t *DecisionTree) CreateDecisionBranch(prep Preposition) {
 
 	lb := &Branch{
 		prep:   prep,
-		name:   prep.Name(),
+		name:   prep.String(),
 		parent: t.active,
 	}
 	rb := &Branch{
 		prep:   prep.Not(),
-		name:   prep.Not().Name(),
+		name:   prep.Not().String(),
 		parent: t.active,
 	}
 
@@ -91,13 +91,13 @@ func (t *DecisionTree) CreateDecisionBranch(prep Preposition) {
 }
 func (t *DecisionTree) ActivateBranch(prep Preposition) {
 	if t.active.left != nil {
-		if t.active.left.name == prep.Name() {
+		if t.active.left.name == prep.String() {
 			t.active = t.active.left
 			return
 		}
 	}
 	if t.active.right != nil {
-		if t.active.right.name == prep.Name() {
+		if t.active.right.name == prep.String() {
 			t.active = t.active.right
 			return
 		}
@@ -105,7 +105,7 @@ func (t *DecisionTree) ActivateBranch(prep Preposition) {
 
 	panic(fmt.Sprintf(
 		"ActivateBranch: active branch '%s' don't lead to next decision %s",
-		t.fmtPath(t.active), prep.Name()))
+		t.fmtPath(t.active), prep.String()))
 }
 
 func (t *DecisionTree) Backtrack() {

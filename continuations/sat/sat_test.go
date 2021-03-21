@@ -72,6 +72,21 @@ func TestSat2(t *testing.T) {
 	assert.Equal(t, result, []Preposition{d, b, a})
 }
 
+func TestSat3(t *testing.T) {
+	a := MkBool()
+	b := MkBool()
+	c := MkBool()
+	d := MkBool()
+
+	sat := NewSolver()
+	sat.AddClosures(ExactlyOne([]*BoolVar{a, b, c, d}))
+
+	sat.PrintCNF()
+
+	result := sat.Solution()
+	assert.Equal(t, result, []Preposition{d.Not(), c.Not(), b.Not(), a})
+}
+
 func TestDecisionTree(t *testing.T) {
 	a := MkBool()
 	b := MkBool()
@@ -105,5 +120,5 @@ func TestDecisionTree(t *testing.T) {
 	tree.Print()
 
 	assert.Equal(t, []Preposition{d, c, a.Not()}, tree.Breadcrumbs())
-	assert.True(t, tree.ActiveBranch().Value() == d.Name())
+	assert.True(t, tree.ActiveBranch().Value() == d.String())
 }

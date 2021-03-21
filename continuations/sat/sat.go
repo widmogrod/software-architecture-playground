@@ -20,13 +20,20 @@ func MkBool() *BoolVar {
 	}
 }
 
+func MkBoolC(no int) *BoolVar {
+	return &BoolVar{
+		no: no,
+	}
+}
+
 type Preposition interface {
 	Not() Preposition
 	IsTrue() bool
 	Unwrap() *BoolVar
 	Equal(prep Preposition) bool
 	SameVar(x Preposition) bool
-	Name() string
+	String() string
+	No() int
 }
 
 var _ Preposition = &BoolVar{}
@@ -35,7 +42,11 @@ type BoolVar struct {
 	no int
 }
 
-func (b *BoolVar) Name() string {
+func (b *BoolVar) No() int {
+	return b.no
+}
+
+func (b *BoolVar) String() string {
 	return fmt.Sprintf("%d", b.no)
 }
 
@@ -63,12 +74,16 @@ type negation struct {
 	b Preposition
 }
 
-func (n *negation) Name() string {
+func (n *negation) No() int {
+	return n.Unwrap().No()
+}
+
+func (n *negation) String() string {
 	if n.IsTrue() != n.Unwrap().IsTrue() {
-		return "-" + n.Unwrap().Name()
+		return "-" + n.Unwrap().String()
 	}
 
-	return n.Unwrap().Name()
+	return n.Unwrap().String()
 }
 
 func (n *negation) SameVar(x Preposition) bool {
@@ -99,6 +114,12 @@ type solver struct {
 	indexes  map[*BoolVar]int
 }
 
+func (s *solver) AddClosures(c Closures) {
+	for _, line := range c {
+		s.And(line...)
+	}
+}
+
 func (s *solver) And(ors ...Preposition) {
 	s.closures = append(s.closures, ors)
 	for _, prep := range ors {
@@ -110,15 +131,10 @@ func (s *solver) And(ors ...Preposition) {
 	}
 }
 
-func (s *solver) Index(prep Preposition) int {
-	return s.indexes[prep.Unwrap()]
-}
-
 func (s *solver) PrintCNF() {
 	//fmt.Printf("p cnf %d %d\n", s.counter-1, len(s.closures))
 	fmt.Print(s.printClosures(s.closures))
 }
-
 func (s *solver) printClosures(closures Closures) string {
 	result := ""
 	for _, line := range closures {
@@ -127,6 +143,7 @@ func (s *solver) printClosures(closures Closures) string {
 
 	return result
 }
+
 func (s *solver) printPrepositions(line []Preposition) string {
 	result := ""
 	count := len(line)
@@ -142,7 +159,7 @@ func (s *solver) printPrepositions(line []Preposition) string {
 }
 
 func (s *solver) printPreposition(prep Preposition) string {
-	return prep.Name()
+	return prep.String()
 }
 
 func (s *solver) Solution() []Preposition {
@@ -165,18 +182,6 @@ type State struct {
 	closures Closures
 }
 
-// -1 solved for variable 1=false
-// 1			 variable 1=true
-func (s *solver) candidatePrep(st *State) Preposition {
-	for _, line := range st.closures {
-		for _, prep := range line {
-			return prep
-		}
-	}
-
-	return nil
-}
-
 // lets remove variable from lines
 //
 // Prep that we're filtering out must satisfy!
@@ -190,6 +195,18 @@ func (s *solver) candidatePrep(st *State) Preposition {
 //	1 _ 3
 //  _ 3
 //  3
+
+// -1 solved for variable 1=false
+// 1			 variable 1=true
+func (s *solver) candidatePrep(st *State) Preposition {
+	for _, line := range st.closures {
+		for _, prep := range line {
+			return prep
+		}
+	}
+
+	return nil
+}
 
 func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 	result := &State{}
@@ -212,7 +229,7 @@ func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 		if newLines != nil {
 			result.closures = append(result.closures, newLines)
 		} else if filterSim {
-			return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.Name())
+			return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
 		}
 	}
 
@@ -247,15 +264,13 @@ func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) 
 	t.CreateDecisionBranch(prep)
 	t.ActivateBranch(prep)
 
-	fmt.Println("PATH:", t.Breadcrumbs())
-	t.Print()
-	fmt.Println("BEFORE:")
-	fmt.Println(s.printClosures(st.closures))
+	//fmt.Println("PATH:", t.Breadcrumbs())
+	//t.Print()
 
 	next, err := s.filterLinesWith(prep, st)
 
-	fmt.Println("AFTER:")
-	fmt.Println(s.printClosures(next.closures))
+	//fmt.Println("AFTER:")
+	//fmt.Println(s.printClosures(next.closures))
 
 	if err != nil {
 		t.Backtrack()
@@ -296,20 +311,13 @@ func ExactlyOne(vars []*BoolVar) Closures {
 	var closures Closures
 	closures = append(closures, OneOf(vars))
 
-	size := len(vars) - 1
-	for i := -1; i < size; i++ {
-		if i == -1 {
-			pair := []Preposition{
-				Not(vars[size]),
-				Not(vars[0]),
-			}
-			closures = append(closures, pair)
-		} else {
-			pair := []Preposition{
+	size := len(vars)
+	for i := 0; i < size; i++ {
+		for j := 1; j < size; j++ {
+			closures = append(closures, []Preposition{
 				Not(vars[i]),
-				Not(vars[i+1]),
-			}
-			closures = append(closures, pair)
+				Not(vars[j]),
+			})
 		}
 	}
 
