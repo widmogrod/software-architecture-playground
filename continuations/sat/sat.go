@@ -2,7 +2,6 @@ package sat
 
 import (
 	"fmt"
-	"github.com/widmogrod/software-architecture-playground/continuations/amb"
 )
 
 func NewSolver() *solver {
@@ -12,24 +11,36 @@ func NewSolver() *solver {
 	}
 }
 
+var counter = 0
+
 func MkBool() *BoolVar {
-	result := &amb.Value{}
-	result.Push(-1)
-	result.Push(1)
+	counter += 1
 	return &BoolVar{
-		result,
+		no: counter,
 	}
 }
 
 type Preposition interface {
 	Not() Preposition
 	IsTrue() bool
+	Unwrap() *BoolVar
+	Equal(prep Preposition) bool
+	SameVar(x Preposition) bool
+	Name() string
 }
 
 var _ Preposition = &BoolVar{}
 
 type BoolVar struct {
-	v *amb.Value
+	no int
+}
+
+func (b *BoolVar) Name() string {
+	return fmt.Sprintf("%d", b.no)
+}
+
+func (b *BoolVar) SameVar(x Preposition) bool {
+	return b == x.Unwrap()
 }
 
 func (b *BoolVar) Not() Preposition {
@@ -37,11 +48,31 @@ func (b *BoolVar) Not() Preposition {
 }
 
 func (b *BoolVar) IsTrue() bool {
-	return isTrue(b.v.Val())
+	return true
+}
+
+func (b *BoolVar) Unwrap() *BoolVar {
+	return b
+}
+
+func (b *BoolVar) Equal(prep Preposition) bool {
+	return b.SameVar(prep) && b.IsTrue() == prep.IsTrue()
 }
 
 type negation struct {
 	b Preposition
+}
+
+func (n *negation) Name() string {
+	if n.IsTrue() != n.Unwrap().IsTrue() {
+		return "-" + n.Unwrap().Name()
+	}
+
+	return n.Unwrap().Name()
+}
+
+func (n *negation) SameVar(x Preposition) bool {
+	return n.Unwrap().SameVar(x)
 }
 
 func (n *negation) Not() Preposition {
@@ -52,135 +83,203 @@ func (n *negation) IsTrue() bool {
 	return !n.b.IsTrue()
 }
 
-type implication struct {
-	p, q Preposition
+func (n *negation) Unwrap() *BoolVar {
+	return n.b.Unwrap()
 }
 
-func (i *implication) Not() Preposition {
-	return &negation{i}
+func (n *negation) Equal(prep Preposition) bool {
+	return n.SameVar(prep) && n.IsTrue() == prep.IsTrue()
 }
 
-func (i *implication) IsTrue() bool {
-	if i.q.IsTrue() {
-		return true
-	}
-
-	if !i.p.IsTrue() && !i.q.IsTrue() {
-		return true
-	}
-
-	return false
-}
-
-type Closure = [][]Preposition
+type Closures = [][]Preposition
 
 type solver struct {
-	closures Closure
+	closures Closures
 	counter  int
 	indexes  map[*BoolVar]int
 }
 
 func (s *solver) And(ors ...Preposition) {
 	s.closures = append(s.closures, ors)
+	for _, prep := range ors {
+		x := prep.Unwrap()
+		if _, found := s.indexes[x]; !found {
+			s.indexes[x] = s.counter
+			s.counter++
+		}
+	}
 }
 
-func (s *solver) AddClosures(closures Closure) {
-	for _, ors := range closures {
-		s.closures = append(s.closures, ors)
-		for _, or := range ors {
-			// create variable number
-			if x, ok := or.(*BoolVar); ok {
-				if _, found := s.indexes[x]; !found {
-					s.indexes[x] = s.counter
-					s.counter++
-				}
-			}
-		}
-
-	}
+func (s *solver) Index(prep Preposition) int {
+	return s.indexes[prep.Unwrap()]
 }
 
 func (s *solver) PrintCNF() {
-	fmt.Printf("p cnf %d %d\n", s.counter-1, len(s.closures))
-	for _, ors := range s.closures {
-		fmt.Printf("%s 0\n", s.printPrepositions(ors))
-	}
+	//fmt.Printf("p cnf %d %d\n", s.counter-1, len(s.closures))
+	fmt.Print(s.printClosures(s.closures))
 }
 
-func (s *solver) printPrepositions(ors []Preposition) string {
+func (s *solver) printClosures(closures Closures) string {
 	result := ""
-	count := len(ors)
+	for _, line := range closures {
+		result += fmt.Sprintf("%s \n", s.printPrepositions(line))
+	}
+
+	return result
+}
+func (s *solver) printPrepositions(line []Preposition) string {
+	result := ""
+	count := len(line)
 	for i := 0; i < count; i++ {
 		if i > 0 && i < count {
 			result += " "
-			//result += " \u2228 "
 		}
 
-		result += s.printPreposution(ors[i])
-		//result += "(" + s.printPreposution(ors[i]) + ")"
+		result += s.printPreposition(line[i])
 	}
 
 	return result
 }
 
-func (s *solver) printPreposution(prep Preposition) string {
-	switch or := prep.(type) {
-	case *BoolVar:
-		return fmt.Sprintf("%d", s.indexes[or])
-		//return fmt.Sprintf("x%d", s.indexes[or])
-	case *negation:
-		return fmt.Sprintf("-%s", s.printPreposution(or.b))
-	case *implication:
-		return fmt.Sprintf("%s → %s", s.printPreposution(or.p), s.printPreposution(or.q))
-	}
-
-	return "unknown"
+func (s *solver) printPreposition(prep Preposition) string {
+	return prep.Name()
 }
 
-func (s *solver) Solution(values ...*BoolVar) []bool {
-	ctx := amb.NewRuntime()
+func (s *solver) Solution() []Preposition {
+	t := NewDecisionTree()
 
-	var xs []*amb.Value
-	for _, v := range values {
-		xs = append(xs, v.v)
+	st := &State{
+		closures: s.closures,
 	}
 
-	ctx.With(xs...)
+	candidate := s.candidatePrep(st)
+	s.assumeThatSolves(candidate, t, st)
 
-	for _, ors := range s.closures {
-		ctx.Until(oneOfORs(ors))
-	}
+	fmt.Println("Solutions:")
+	t.Print()
 
-	solutions := ctx.Val()
-	result := make([]bool, len(values))
-	for i, value := range solutions {
-		result[i] = isTrue(value)
-	}
-	return result
+	return t.Breadcrumbs()
 }
 
-func oneOfORs(ors []Preposition) func() bool {
-	return func() bool {
-		for _, value := range ors {
-			if value.IsTrue() {
-				return true
+type State struct {
+	closures Closures
+}
+
+// -1 solved for variable 1=false
+// 1			 variable 1=true
+func (s *solver) candidatePrep(st *State) Preposition {
+	for _, line := range st.closures {
+		for _, prep := range line {
+			return prep
+		}
+	}
+
+	return nil
+}
+
+// lets remove variable from lines
+//
+// Prep that we're filtering out must satisfy!
+//
+// On input: -2
+// 	1 -2 3
+// 	2 3
+// 	3
+//
+// Result should be
+//	1 _ 3
+//  _ 3
+//  3
+
+func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
+	result := &State{}
+	for no, line := range st.closures {
+		var filterSim bool
+		var newLines []Preposition
+		for _, prep2 := range line {
+			if prep2.Equal(prep) {
+				newLines = nil
+				break
+			}
+
+			if !prep2.SameVar(prep) {
+				newLines = append(newLines, prep2)
+			} else {
+				filterSim = true
 			}
 		}
 
-		return false
+		if newLines != nil {
+			result.closures = append(result.closures, newLines)
+		} else if filterSim {
+			return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.Name())
+		}
 	}
+
+	return result, nil
+}
+
+func (s *solver) isUnsat(prep Preposition, st *State) bool {
+	if !prep.IsTrue() {
+		panic(fmt.Sprintf("checkUnsat: preposition %s id not true", s.printPreposition(prep)))
+	}
+
+	for _, line := range st.closures {
+		l := len(line)
+		for _, prep2 := range line {
+			// belong to the same variable
+			if prep2.SameVar(prep2) && !prep2.IsTrue() {
+				if l == 1 {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) {
+	if len(st.closures) == 0 {
+		return
+	}
+
+	t.CreateDecisionBranch(prep)
+	t.ActivateBranch(prep)
+
+	fmt.Println("PATH:", t.Breadcrumbs())
+	t.Print()
+	fmt.Println("BEFORE:")
+	fmt.Println(s.printClosures(st.closures))
+
+	next, err := s.filterLinesWith(prep, st)
+
+	fmt.Println("AFTER:")
+	fmt.Println(s.printClosures(next.closures))
+
+	if err != nil {
+		t.Backtrack()
+		candidate := t.ActiveBranch().prep
+		s.assumeThatSolves(candidate, t, st)
+		return
+	}
+
+	candidate := s.candidatePrep(next)
+	s.assumeThatSolves(candidate, t, next)
+}
+
+func (s *solver) lineHasPrep(line []Preposition, prep Preposition) bool {
+	for _, prep2 := range line {
+		if prep2.Equal(prep) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func Not(c Preposition) Preposition {
 	return c.Not()
-}
-
-func Imply(p, q Preposition) Preposition {
-	return &implication{p, q}
-}
-
-func isTrue(x int) bool {
-	return x == 1
 }
 
 func OneOf(vars []*BoolVar) []Preposition {
@@ -192,9 +291,9 @@ func OneOf(vars []*BoolVar) []Preposition {
 	return result
 }
 
-// X1 or X2 and (!X1 or 1X2)
-func ExactlyOne(vars []*BoolVar) Closure {
-	var closures Closure
+// X1 or X2 and (!X1 or !X2)
+func ExactlyOne(vars []*BoolVar) Closures {
+	var closures Closures
 	closures = append(closures, OneOf(vars))
 
 	size := len(vars) - 1
@@ -212,7 +311,6 @@ func ExactlyOne(vars []*BoolVar) Closure {
 			}
 			closures = append(closures, pair)
 		}
-
 	}
 
 	return closures
