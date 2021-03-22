@@ -11,7 +11,7 @@ func TestSat4(t *testing.T) {
 
 	solver := sat.NewSolver()
 	solver.AddClosures(GameConstraints(sudoku))
-	//solver.PrintCNF()
+	solver.PrintCNF()
 	result := solver.Solution()
 
 	PrintSolution(FillSolution(sudoku, result))

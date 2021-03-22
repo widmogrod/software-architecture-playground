@@ -122,6 +122,10 @@ func (s *solver) AddClosures(c Closures) {
 }
 
 func (s *solver) And(ors ...Preposition) {
+	if len(ors) == 0 {
+		return
+	}
+
 	s.closures = append(s.closures, ors)
 	for _, prep := range ors {
 		x := prep.Unwrap()
@@ -172,6 +176,10 @@ func (s *solver) Solution() []Preposition {
 
 	// TODO sort closures from smalest
 	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
+
+	defer func() {
+		t.Print()
+	}()
 
 	n := 0
 	candidate := s.candidatePrep(st)
