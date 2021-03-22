@@ -92,12 +92,22 @@ func TestSat3(t *testing.T) {
 	d := MkBool()
 
 	sat := NewSolver()
-	sat.AddClosures(ExactlyOne([]*BoolVar{a, b, c, d}))
+	sat.AddClosures(ExactlyOne([]Preposition{a, b, c, d}))
 
 	sat.PrintCNF()
 
 	result := sat.Solution()
 	assert.Equal(t, result, []Preposition{d.Not(), c.Not(), b.Not(), a})
+}
+
+func TestSat4(t *testing.T) {
+	sat := NewSolver()
+	sat.AddClosures(ExactlyOne(Num(1, 2, 3, 4)))
+
+	sat.PrintCNF()
+
+	result := sat.Solution()
+	assert.Equal(t, result, Num(-4, -3, -2, 1))
 }
 
 func TestDecisionTree(t *testing.T) {

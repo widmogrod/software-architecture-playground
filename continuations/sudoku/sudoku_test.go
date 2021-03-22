@@ -1,6 +1,7 @@
 package sudoku
 
 import (
+	"fmt"
 	"github.com/widmogrod/software-architecture-playground/continuations/sat"
 	"testing"
 )
@@ -11,7 +12,6 @@ func TestSat4(t *testing.T) {
 
 	solver := sat.NewSolver()
 	solver.AddClosures(GameConstraints(sudoku))
-	solver.PrintCNF()
 	result := solver.Solution()
 
 	PrintSolution(FillSolution(sudoku, result))

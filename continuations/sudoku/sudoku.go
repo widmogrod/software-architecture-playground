@@ -5,9 +5,9 @@ import (
 	"github.com/widmogrod/software-architecture-playground/continuations/sat"
 )
 
-var maxNumbers = 3
+var maxNumbers = 9
 
-type Board = [3][3]int
+type Board = [9][9]int
 
 var counter = 1
 var index = map[string]int{}
@@ -24,30 +24,25 @@ func Index(r, c, v int) int {
 	//return r*3 + c*3 + v*v
 }
 
-//var game = Board{
-//	{1, 3, 4, 0, 2, 7, 0, 8, 9},
-//	{0, 0, 7, 0, 0, 9, 6, 1, 4},
-//	{6, 0, 0, 1, 4, 8, 0, 0, 7},
-//
-//	{9, 0, 2, 0, 8, 4, 0, 0, 0},
-//	{0, 0, 3, 0, 0, 6, 0, 0, 0},
-//	{0, 0, 8, 0, 5, 0, 4, 0, 0},
-//
-//	{3, 9, 6, 0, 0, 0, 1, 0, 0},
-//	{0, 0, 0, 0, 6, 0, 0, 9, 0},
-//	{0, 0, 1, 0, 0, 0, 0, 0, 5},
-//}
-
 var game = Board{
-	{1, 0, 0},
-	{0, 1, 0},
-	{0, 0, 1},
+	{1, 3, 4, 0, 2, 7, 0, 8, 9},
+	{0, 0, 7, 0, 0, 9, 6, 1, 4},
+	{6, 0, 0, 1, 4, 8, 0, 0, 7},
+
+	{9, 0, 2, 0, 8, 4, 0, 0, 0},
+	{0, 0, 3, 0, 0, 6, 0, 0, 0},
+	{0, 0, 8, 0, 5, 0, 4, 0, 0},
+
+	{3, 9, 6, 0, 0, 0, 1, 0, 0},
+	{0, 0, 0, 0, 6, 0, 0, 9, 0},
+	{0, 0, 1, 0, 0, 0, 0, 0, 5},
 }
 
 //var game = Board{
-//	{1, 0, 4},
-//	{0, 3, 7},
-//	{6, 0, 0},
+//	{1, 0, 0, 0},
+//	{0, 1, 0, 0},
+//	{0, 0, 1, 0},
+//	{0, 0, 0, 1},
 //}
 
 func LoadSudoku() Board {
@@ -61,24 +56,12 @@ func GameConstraints(sudoku Board) sat.Closures {
 	for row := 0; row < cap(sudoku); row++ {
 		for col := 0; col < cap(sudoku[row]); col++ {
 			for v := 1; v <= maxNumbers; v++ {
-				fmt.Printf("index=%d var=%d (%d,%d) \n", Index(row, col, v), v, row, col)
 				if sudoku[row][col] == v {
 					closures = append(closures, []sat.Preposition{
 						sat.MkLit(Index(row, col, v)),
 					})
 				}
 			}
-		}
-	}
-
-	// Each row needs to have exactly-one number (only one 1 in row, only one 2 in row,...)
-	for row := 0; row < cap(sudoku); row++ {
-		for v := 1; v <= maxNumbers; v++ {
-			var lines []*sat.BoolVar
-			for col := 0; col < cap(sudoku[row]); col++ {
-				lines = append(lines, sat.MkLit(Index(row, col, v)))
-			}
-			closures = append(closures, sat.ExactlyOne(lines)...)
 		}
 	}
 
@@ -89,7 +72,18 @@ func GameConstraints(sudoku Board) sat.Closures {
 			for v := 1; v <= maxNumbers; v++ {
 				lines = append(lines, sat.MkLit(Index(row, col, v)))
 			}
-			closures = append(closures, sat.ExactlyOne(lines)...)
+			closures = append(closures, sat.ExactlyOne(sat.OneOf(lines))...)
+		}
+	}
+
+	// Each row needs to have exactly-one number (only one 1 in row, only one 2 in row,...)
+	for row := 0; row < cap(sudoku); row++ {
+		for v := 1; v <= maxNumbers; v++ {
+			var lines []*sat.BoolVar
+			for col := 0; col < cap(sudoku[row]); col++ {
+				lines = append(lines, sat.MkLit(Index(row, col, v)))
+			}
+			closures = append(closures, sat.ExactlyOne(sat.OneOf(lines))...)
 		}
 	}
 
@@ -100,7 +94,7 @@ func GameConstraints(sudoku Board) sat.Closures {
 			for row := 0; row < cap(sudoku[col]); row++ {
 				lines = append(lines, sat.MkLit(Index(row, col, v)))
 			}
-			closures = append(closures, sat.ExactlyOne(lines)...)
+			closures = append(closures, sat.ExactlyOne(sat.OneOf(lines))...)
 		}
 	}
 
@@ -114,13 +108,12 @@ func FillSolution(sudoku Board, solve []sat.Preposition) Board {
 			continue
 		}
 		if _, found := solIndex[prep.No()]; found {
-			panic("cannot happen!")
+			panic("FillSolution: cannot happen!")
 		}
 		solIndex[prep.No()] = prep
 	}
 
 	solution := sudoku
-	fmt.Println(solIndex)
 
 	for row := 0; row < cap(sudoku); row++ {
 		for col := 0; col < cap(sudoku[row]); col++ {
@@ -128,7 +121,7 @@ func FillSolution(sudoku Board, solve []sat.Preposition) Board {
 				if _, ok := solIndex[Index(row, col, v)]; ok {
 					if solution[row][col] != 0 && solution[row][col] != v {
 						panic(fmt.Sprintf(
-							"value is fix, but trying to set value=%d in row=%d col=%d",
+							"FillSolution: value is fix, but trying to set value=%d in row=%d col=%d",
 							v, row+1, col+1))
 					}
 

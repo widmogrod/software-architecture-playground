@@ -27,6 +27,18 @@ func MkLit(no int) *BoolVar {
 	}
 }
 
+func MkPrep(no int) Preposition {
+	if no < 0 {
+		return Not(&BoolVar{
+			no: -no,
+		})
+	} else {
+		return &BoolVar{
+			no: no,
+		}
+	}
+}
+
 type Preposition interface {
 	Not() Preposition
 	IsTrue() bool
@@ -174,12 +186,7 @@ func (s *solver) Solution() []Preposition {
 		closures: s.closures,
 	}
 
-	// TODO sort closures from smalest
 	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
-
-	defer func() {
-		t.Print()
-	}()
 
 	n := 0
 	candidate := s.candidatePrep(st)
@@ -224,6 +231,12 @@ type State struct {
 // -1 solved for variable 1=false
 // 1			 variable 1=true
 func (s *solver) candidatePrep(st *State) Preposition {
+	for _, line := range st.closures {
+		if len(line) == 1 {
+			return line[0]
+		}
+	}
+
 	for _, line := range st.closures {
 		for _, prep := range line {
 			return prep
@@ -280,9 +293,9 @@ func OneOf(vars []*BoolVar) []Preposition {
 }
 
 // X1 or X2 and (!X1 or !X2)
-func ExactlyOne(vars []*BoolVar) Closures {
+func ExactlyOne(vars []Preposition) Closures {
 	var closures Closures
-	closures = append(closures, OneOf(vars))
+	closures = append(closures, vars)
 
 	size := len(vars)
 	for i := 0; i < size-1; i++ {
@@ -304,4 +317,12 @@ func Take(vars []*BoolVar, index int, len int) []*BoolVar {
 	}
 
 	return result
+}
+
+func Num(xs ...int) []Preposition {
+	preps := make([]Preposition, len(xs))
+	for i, v := range xs {
+		preps[i] = MkPrep(v)
+	}
+	return preps
 }
