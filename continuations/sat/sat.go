@@ -183,11 +183,6 @@ func (s *solver) Solution() []Preposition {
 		}
 
 		if err != nil {
-			//if n % 1000  == 0{
-			t.Print()
-			//return nil
-			//}
-
 			t.Backtrack()
 			candidate = t.ActiveBranch().prep
 
@@ -197,49 +192,22 @@ func (s *solver) Solution() []Preposition {
 		}
 	}
 
-	fmt.Println("Solutions:")
-	t.Print()
-
 	return t.Breadcrumbs()
 }
 
 func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) (*State, error) {
-	//if len(st.closures) == 0 {
-	//	return st, nil
-	//}
-
 	if t.IsRoot(t.ActiveBranch()) || !prep.SameVar(t.ActiveBranch().prep) {
 		t.CreateDecisionBranch(prep)
 		t.ActivateBranch(prep)
 	}
 
 	next, err := s.filterLinesWith(prep, st)
-
 	if err != nil {
-		//t.Backtrack()
-		//candidate := t.ActiveBranch().prep
-		//s.assumeThatSolves(candidate, t, st)
 		return st, ErrBack
 	}
 
-	//candidate := s.candidatePrep(next)
-	//s.assumeThatSolves(candidate, t, next)
 	return next, nil
 }
-
-// lets remove variable from lines
-//
-// Prep that we're filtering out must satisfy!
-//
-// On input: -2
-// 	1 -2 3
-// 	2 3
-// 	3
-//
-// Result should be
-//	1 _ 3
-//  _ 3
-//  3
 
 type State struct {
 	closures Closures
@@ -309,8 +277,8 @@ func ExactlyOne(vars []*BoolVar) Closures {
 	closures = append(closures, OneOf(vars))
 
 	size := len(vars)
-	for i := 0; i < size; i++ {
-		for j := 1; j < size; j++ {
+	for i := 0; i < size-1; i++ {
+		for j := i + 1; j < size; j++ {
 			closures = append(closures, []Preposition{
 				Not(vars[i]),
 				Not(vars[j]),

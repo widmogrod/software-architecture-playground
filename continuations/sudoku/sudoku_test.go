@@ -9,16 +9,10 @@ func TestSat4(t *testing.T) {
 	sudoku := LoadSudoku()
 	PrintSolution(sudoku)
 
-	vars := CreateVars(sudoku)
-	//fmt.Println(vars)
-	//fmt.Println("column 1", ColumnValues(sudoku, 0))
-	//fmt.Println("row 2", RowsValues(sudoku, 1))
+	solver := sat.NewSolver()
+	solver.AddClosures(GameConstraints(sudoku))
+	//solver.PrintCNF()
+	result := solver.Solution()
 
-	sat := sat.NewSolver()
-	sat.AddClosures(RowsUniqe(sudoku))
-
-	sat.PrintCNF()
-
-	result := sat.Solution()
-	PrintSolution(FillSolution(sudoku, vars, result))
+	PrintSolution(FillSolution(sudoku, result))
 }
