@@ -2,7 +2,6 @@ package sat
 
 import (
 	"errors"
-	"fmt"
 )
 
 func NewSolver() *solver {
@@ -10,113 +9,6 @@ func NewSolver() *solver {
 		counter: 1,
 		indexes: make(map[*BoolVar]int),
 	}
-}
-
-var counter = 0
-
-func MkBool() *BoolVar {
-	counter += 1
-	return &BoolVar{
-		no: counter,
-	}
-}
-
-func MkLit(no int) *BoolVar {
-	return &BoolVar{
-		no: no,
-	}
-}
-
-func MkPrep(no int) Preposition {
-	if no < 0 {
-		return Not(&BoolVar{
-			no: -no,
-		})
-	} else {
-		return &BoolVar{
-			no: no,
-		}
-	}
-}
-
-type Preposition interface {
-	Not() Preposition
-	IsTrue() bool
-	Unwrap() *BoolVar
-	Equal(prep Preposition) bool
-	SameVar(x Preposition) bool
-	String() string
-	No() int
-}
-
-var _ Preposition = &BoolVar{}
-
-type BoolVar struct {
-	no int
-}
-
-func (b *BoolVar) No() int {
-	return b.no
-}
-
-func (b *BoolVar) String() string {
-	return fmt.Sprintf("%d", b.no)
-}
-
-func (b *BoolVar) SameVar(x Preposition) bool {
-	return b.No() == x.Unwrap().No()
-}
-
-func (b *BoolVar) Not() Preposition {
-	return &negation{b}
-}
-
-func (b *BoolVar) IsTrue() bool {
-	return true
-}
-
-func (b *BoolVar) Unwrap() *BoolVar {
-	return b
-}
-
-func (b *BoolVar) Equal(prep Preposition) bool {
-	return b.SameVar(prep) && b.IsTrue() == prep.IsTrue()
-}
-
-type negation struct {
-	b Preposition
-}
-
-func (n *negation) No() int {
-	return n.Unwrap().No()
-}
-
-func (n *negation) String() string {
-	if n.IsTrue() != n.Unwrap().IsTrue() {
-		return "-" + n.Unwrap().String()
-	}
-
-	return n.Unwrap().String()
-}
-
-func (n *negation) SameVar(x Preposition) bool {
-	return n.Unwrap().SameVar(x)
-}
-
-func (n *negation) Not() Preposition {
-	return n.b
-}
-
-func (n *negation) IsTrue() bool {
-	return !n.b.IsTrue()
-}
-
-func (n *negation) Unwrap() *BoolVar {
-	return n.b.Unwrap()
-}
-
-func (n *negation) Equal(prep Preposition) bool {
-	return n.SameVar(prep) && n.IsTrue() == prep.IsTrue()
 }
 
 type Closures = [][]Preposition
@@ -148,43 +40,10 @@ func (s *solver) And(ors ...Preposition) {
 	}
 }
 
-func (s *solver) PrintCNF() {
-	//fmt.Printf("p cnf %d %d\n", s.counter-1, len(s.closures))
-	fmt.Print(s.printClosures(s.closures))
-}
-func (s *solver) printClosures(closures Closures) string {
-	result := ""
-	for _, line := range closures {
-		result += fmt.Sprintf("%s \n", s.printPrepositions(line))
-	}
-
-	return result
-}
-
-func (s *solver) printPrepositions(line []Preposition) string {
-	result := ""
-	count := len(line)
-	for i := 0; i < count; i++ {
-		if i > 0 && i < count {
-			result += " "
-		}
-
-		result += s.printPreposition(line[i])
-	}
-
-	return result
-}
-
-func (s *solver) printPreposition(prep Preposition) string {
-	return prep.String()
-}
-
 func (s *solver) Solution() ([]Preposition, error) {
 	t := NewDecisionTree()
 
-	st := &State{
-		closures: s.closures,
-	}
+	st := s.closures
 
 	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
 
@@ -193,7 +52,7 @@ func (s *solver) Solution() ([]Preposition, error) {
 	for {
 		n += 1
 		next, err := s.assumeThatSolves(candidate, t, st)
-		if next != nil && len(next.closures) == 0 {
+		if next != nil && len(next) == 0 {
 			break
 		}
 
@@ -212,7 +71,7 @@ func (s *solver) Solution() ([]Preposition, error) {
 	return t.Breadcrumbs(), nil
 }
 
-func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) (*State, error) {
+func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st Closures) (Closures, error) {
 	if t.IsRoot(t.ActiveBranch()) || !prep.SameVar(t.ActiveBranch().prep) {
 		t.CreateDecisionBranch(prep)
 		t.ActivateBranch(prep)
@@ -220,26 +79,20 @@ func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) 
 
 	next, err := s.filterLinesWith(prep, st)
 	if err != nil {
-		return st, ErrBack
+		return st, err
 	}
 
 	return next, nil
 }
 
-type State struct {
-	closures Closures
-}
-
-// -1 solved for variable 1=false
-// 1			 variable 1=true
-func (s *solver) candidatePrep(st *State) Preposition {
-	for _, line := range st.closures {
+func (s *solver) candidatePrep(closures Closures) Preposition {
+	for _, line := range closures {
 		if len(line) == 1 {
 			return line[0]
 		}
 	}
 
-	for _, line := range st.closures {
+	for _, line := range closures {
 		for _, prep := range line {
 			return prep
 		}
@@ -250,9 +103,9 @@ func (s *solver) candidatePrep(st *State) Preposition {
 
 var ErrFilter = errors.New("filterLinesWith")
 
-func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
-	result := &State{}
-	for _, line := range st.closures {
+func (s *solver) filterLinesWith(prep Preposition, st Closures) (Closures, error) {
+	result := Closures{}
+	for _, line := range st {
 		var filterSim bool
 		var newLines []Preposition
 		for _, prep2 := range line {
@@ -269,7 +122,7 @@ func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 		}
 
 		if newLines != nil {
-			result.closures = append(result.closures, newLines)
+			result = append(result, newLines)
 		} else if filterSim {
 			return nil, ErrFilter
 			//return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
@@ -277,54 +130,4 @@ func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 	}
 
 	return result, nil
-}
-
-var ErrBack = errors.New("assumeThatSolves: call Backtrack()")
-
-func Not(c Preposition) Preposition {
-	return c.Not()
-}
-
-func OneOf(vars []*BoolVar) []Preposition {
-	var result = make([]Preposition, len(vars))
-	for i := 0; i < len(vars); i++ {
-		result[i] = vars[i]
-	}
-
-	return result
-}
-
-// X1 or X2 and (!X1 or !X2)
-func ExactlyOne(vars []Preposition) Closures {
-	var closures Closures
-	closures = append(closures, vars)
-
-	size := len(vars)
-	for i := 0; i < size-1; i++ {
-		for j := i + 1; j < size; j++ {
-			closures = append(closures, []Preposition{
-				Not(vars[i]),
-				Not(vars[j]),
-			})
-		}
-	}
-
-	return closures
-}
-
-func Take(vars []*BoolVar, index int, len int) []*BoolVar {
-	var result []*BoolVar
-	for i := index; i < index+len; i++ {
-		result = append(result, vars[i])
-	}
-
-	return result
-}
-
-func Num(xs ...int) []Preposition {
-	preps := make([]Preposition, len(xs))
-	for i, v := range xs {
-		preps[i] = MkPrep(v)
-	}
-	return preps
 }
