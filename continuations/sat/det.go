@@ -1,6 +1,7 @@
 package sat
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -99,36 +100,38 @@ func (t *DecisionTree) ActivateBranch(prep Preposition) {
 		t.fmtPath(t.active), prep.String()))
 }
 
-func (t *DecisionTree) Backtrack() {
+var ErrBacktrackExhausted = errors.New("backtrack: reach root of decision tree, cannot backtrack more")
+
+func (t *DecisionTree) Backtrack() error {
 	if t.IsRoot(t.active) {
-		panic(fmt.Sprintf(
-			"Backtrack: reach root of tree, cannot backtrack more"))
+		return ErrBacktrackExhausted
 	}
 
 	t.DontVisitAnymore(t.active)
 
 	if !t.active.IsLeaf() && !t.active.dontVisit {
 		if t.active.left.dontVisit && t.active.right.dontVisit {
-			t.Backtrack()
-			return
+			return t.Backtrack()
 		}
 	}
 
 	if t.active.parent.left == t.active {
 		if t.active.parent.right.dontVisit {
 			t.active = t.active.parent
-			t.Backtrack()
+			return t.Backtrack()
 		} else {
 			t.active = t.active.parent.right
 		}
 	} else {
 		if t.active.parent.left.dontVisit {
 			t.active = t.active.parent
-			t.Backtrack()
+			return t.Backtrack()
 		} else {
 			t.active = t.active.parent.left
 		}
 	}
+
+	return nil
 }
 
 func (t *DecisionTree) DontVisitAnymore(n *Branch) {

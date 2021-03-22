@@ -179,7 +179,7 @@ func (s *solver) printPreposition(prep Preposition) string {
 	return prep.String()
 }
 
-func (s *solver) Solution() []Preposition {
+func (s *solver) Solution() ([]Preposition, error) {
 	t := NewDecisionTree()
 
 	st := &State{
@@ -198,7 +198,9 @@ func (s *solver) Solution() []Preposition {
 		}
 
 		if err != nil {
-			t.Backtrack()
+			if err := t.Backtrack(); err != nil {
+				return nil, err
+			}
 			candidate = t.ActiveBranch().prep
 
 		} else {
@@ -207,7 +209,7 @@ func (s *solver) Solution() []Preposition {
 		}
 	}
 
-	return t.Breadcrumbs()
+	return t.Breadcrumbs(), nil
 }
 
 func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) (*State, error) {

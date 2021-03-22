@@ -57,9 +57,8 @@ func TestSat1(t *testing.T) {
 	sat := NewSolver()
 	sat.And(a, Not(b))
 
-	sat.PrintCNF()
-
-	result := sat.Solution()
+	result, err := sat.Solution()
+	assert.NoError(t, err)
 	assert.Equal(t, result, []Preposition{a})
 }
 
@@ -79,10 +78,9 @@ func TestSat2(t *testing.T) {
 	sat.And(b, Not(c))
 	sat.And(d)
 
-	sat.PrintCNF()
-
-	result := sat.Solution()
-	assert.Equal(t, result, []Preposition{d, b, a})
+	result, err := sat.Solution()
+	assert.NoError(t, err)
+	assert.Equal(t, result, []Preposition{b, a, d})
 }
 
 func TestSat3(t *testing.T) {
@@ -94,9 +92,8 @@ func TestSat3(t *testing.T) {
 	sat := NewSolver()
 	sat.AddClosures(ExactlyOne([]Preposition{a, b, c, d}))
 
-	sat.PrintCNF()
-
-	result := sat.Solution()
+	result, err := sat.Solution()
+	assert.NoError(t, err)
 	assert.Equal(t, result, []Preposition{d.Not(), c.Not(), b.Not(), a})
 }
 
@@ -104,44 +101,7 @@ func TestSat4(t *testing.T) {
 	sat := NewSolver()
 	sat.AddClosures(ExactlyOne(Num(1, 2, 3, 4)))
 
-	sat.PrintCNF()
-
-	result := sat.Solution()
+	result, err := sat.Solution()
+	assert.NoError(t, err)
 	assert.Equal(t, result, Num(-4, -3, -2, 1))
-}
-
-func TestDecisionTree(t *testing.T) {
-	a := MkBool()
-	b := MkBool()
-	c := MkBool()
-	d := MkBool()
-
-	tree := NewDecisionTree()
-	n := tree.ActiveBranch()
-	assert.True(t, tree.IsRoot(n))
-
-	assert.False(t, tree.HasFromBranchToRoot(n, a))
-	tree.CreateDecisionBranch(a)
-	tree.ActivateBranch(a)
-	tree.CreateDecisionBranch(b)
-	tree.ActivateBranch(b.Not())
-
-	n = tree.ActiveBranch()
-	//tree.Print()
-	assert.True(t, n.IsLeaf())
-	assert.True(t, tree.HasFromBranchToRoot(n, a))
-	assert.True(t, tree.HasFromBranchToRoot(n, b.Not()))
-
-	tree.Backtrack()
-	tree.Backtrack()
-	tree.CreateDecisionBranch(c)
-	tree.ActivateBranch(c.Not())
-	tree.Backtrack()
-	tree.CreateDecisionBranch(d)
-	tree.ActivateBranch(d.Not())
-	tree.Backtrack()
-	tree.Print()
-
-	assert.Equal(t, []Preposition{d, c, a.Not()}, tree.Breadcrumbs())
-	assert.True(t, tree.ActiveBranch().prep == d)
 }
