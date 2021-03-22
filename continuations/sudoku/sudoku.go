@@ -7,15 +7,15 @@ import (
 
 var maxNumbers = 3
 
-func ForEmpty(sudoku Board, f func(int, int, int, int)) {
-	index := 0
+func Index(r, c, v int) int {
+	return r*1 + c*3 + v
+}
+
+func ForEmpty(sudoku Board, f func(int, int, int)) {
 	for x := 0; x < cap(sudoku); x++ {
 		for y := 0; y < cap(sudoku[x]); y++ {
-			if sudoku[x][y] == 0 {
-				for v := 0; v < maxNumbers; v++ {
-					f(x, y, index, v)
-					index += 1
-				}
+			for v := 0; v < maxNumbers; v++ {
+				f(x, y, v)
 			}
 		}
 	}
@@ -42,27 +42,36 @@ func ColumnValues(sudoku Board, column int) map[int]int {
 	return result
 }
 
-func ColumnUniqe(sudoku Board, vars []*sat.BoolVar) sat.Closures {
+func RowsUniqe(sudoku Board) sat.Closures {
 	var closures sat.Closures
 
-	ForEmpty(sudoku, func(x int, y int, index, v int) {
-		if v == 0 {
-			values := sat.Take(vars, index, maxNumbers)
-			closures = append(closures, sat.ExactlyOne(values)...)
+	for x := 0; x < cap(sudoku); x++ {
+		for v := 0; v < maxNumbers; v++ {
+			var lines []*sat.BoolVar
+			for y := 0; y < cap(sudoku[x]); y++ {
+				lines = append(lines, sat.MkLit(Index(x, y, v)))
+			}
+			closures = append(closures, sat.ExactlyOne(lines)...)
 		}
-	})
+	}
+
+	//for x := 0; x < cap(sudoku); x++ {
+	//	for y := 0; y < cap(sudoku[x]); y++ {
+	//		var lines []*sat.BoolVar
+	//		for v := 0; v < maxNumbers; v++ {
+	//			lines = append(lines, sat.MkLit(Index(x, y, v)))
+	//		}
+	//		closures = append(closures, sat.ExactlyOne(lines)...)
+	//	}
+	//}
 
 	return closures
 }
 
-func columnUnique() {
-
-}
-
 func CreateVars(sudoku Board) []*sat.BoolVar {
 	var result []*sat.BoolVar
-	ForEmpty(sudoku, func(x int, y int, index, v int) {
-		result = append(result, sat.MkBoolC(index))
+	ForEmpty(sudoku, func(x int, y int, v int) {
+		result = append(result, sat.MkLit(Index(x, y, v)))
 	})
 	return result
 }
@@ -71,14 +80,15 @@ func FillSolution(sudoku Board, vars []*sat.BoolVar, solve []sat.Preposition) Bo
 	solIndex := map[int]sat.Preposition{}
 	for _, prep := range solve {
 		if _, found := solIndex[prep.No()]; found {
-			panic("cannot happen!")
+			continue
+			//panic("cannot happen!")
 		}
 		solIndex[prep.No()] = prep
 	}
 
 	solution := sudoku
-	ForEmpty(sudoku, func(x int, y int, index, v int) {
-		if _, ok := solIndex[index]; ok {
+	ForEmpty(sudoku, func(x int, y int, v int) {
+		if _, ok := solIndex[Index(x, y, v)]; ok {
 			solution[x][y] = v + 1
 			return
 		}
@@ -104,12 +114,12 @@ func PrintSolution(sudoku Board) {
 	}
 }
 
-type Board = [3][3]int
+type Board = [1][3]int
 
 var game = Board{
-	{1, 2, 0},
-	{3, 0, 4},
-	{0, 6, 0},
+	{1, 0, 3},
+	//{3, 0, 4},
+	//{0, 6, 0},
 }
 
 func LoadSudoku() Board {

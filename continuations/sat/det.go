@@ -6,9 +6,7 @@ import (
 )
 
 func NewDecisionTree() *DecisionTree {
-	root := &Branch{
-		name: "root",
-	}
+	root := &Branch{}
 	return &DecisionTree{
 		root:   root,
 		active: root,
@@ -16,7 +14,6 @@ func NewDecisionTree() *DecisionTree {
 }
 
 type Branch struct {
-	name string
 	prep Preposition
 
 	parent      *Branch
@@ -26,10 +23,6 @@ type Branch struct {
 
 func (b *Branch) IsLeaf() bool {
 	return b.left == nil && b.right == nil
-}
-
-func (b *Branch) Value() string {
-	return b.name
 }
 
 type DecisionTree struct {
@@ -60,7 +53,7 @@ func (t *DecisionTree) Breadcrumbs() []Preposition {
 
 func (t *DecisionTree) HasFromBranchToRoot(n *Branch, prep Preposition) bool {
 	for !t.IsRoot(n) {
-		if n.name == prep.String() {
+		if n.prep.Equal(prep) {
 			return true
 		}
 
@@ -77,12 +70,10 @@ func (t *DecisionTree) CreateDecisionBranch(prep Preposition) {
 
 	lb := &Branch{
 		prep:   prep,
-		name:   prep.String(),
 		parent: t.active,
 	}
 	rb := &Branch{
 		prep:   prep.Not(),
-		name:   prep.Not().String(),
 		parent: t.active,
 	}
 
@@ -91,13 +82,13 @@ func (t *DecisionTree) CreateDecisionBranch(prep Preposition) {
 }
 func (t *DecisionTree) ActivateBranch(prep Preposition) {
 	if t.active.left != nil {
-		if t.active.left.name == prep.String() {
+		if t.active.left.prep.Equal(prep) {
 			t.active = t.active.left
 			return
 		}
 	}
 	if t.active.right != nil {
-		if t.active.right.name == prep.String() {
+		if t.active.right.prep.Equal(prep) {
 			t.active = t.active.right
 			return
 		}
@@ -158,11 +149,12 @@ func (t *DecisionTree) fmtBranch(branch *Branch, level int) string {
 		indent = "\n* "
 	}
 	indent += strings.Repeat(" ", level)
+	name := ""
 	if !t.IsRoot(branch) {
 		indent += "∟"
+		name = branch.prep.String()
 	}
 
-	name := branch.name
 	if branch.dontVisit {
 		name += " ˣ"
 	}
@@ -187,10 +179,9 @@ func (t *DecisionTree) fmtPath(n *Branch) string {
 
 	path := ""
 	for !t.IsRoot(n) {
-		path = n.name + " > " + path
+		path = n.prep.String() + " > " + path
 		n = n.parent
 	}
 
 	return path
-
 }

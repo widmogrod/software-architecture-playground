@@ -37,6 +37,19 @@ func TestBoolVar(t *testing.T) {
 	assert.False(t, Not(b).SameVar(a))
 }
 
+func TestBoolVarC(t *testing.T) {
+	a := MkLit(1)
+	b := MkLit(1)
+	c := MkLit(2)
+
+	assert.True(t, a.Equal(b))
+	assert.True(t, Not(a).Equal(Not(b)))
+
+	assert.True(t, a.SameVar(b))
+	assert.False(t, a.SameVar(c))
+	assert.False(t, Not(a).SameVar(c))
+}
+
 func TestSat1(t *testing.T) {
 	a := MkBool()
 	b := MkBool()
@@ -120,5 +133,5 @@ func TestDecisionTree(t *testing.T) {
 	tree.Print()
 
 	assert.Equal(t, []Preposition{d, c, a.Not()}, tree.Breadcrumbs())
-	assert.True(t, tree.ActiveBranch().Value() == d.String())
+	assert.True(t, tree.ActiveBranch().prep == d)
 }

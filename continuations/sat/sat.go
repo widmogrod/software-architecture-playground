@@ -1,6 +1,7 @@
 package sat
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -20,7 +21,7 @@ func MkBool() *BoolVar {
 	}
 }
 
-func MkBoolC(no int) *BoolVar {
+func MkLit(no int) *BoolVar {
 	return &BoolVar{
 		no: no,
 	}
@@ -51,7 +52,7 @@ func (b *BoolVar) String() string {
 }
 
 func (b *BoolVar) SameVar(x Preposition) bool {
-	return b == x.Unwrap()
+	return b.No() == x.Unwrap().No()
 }
 
 func (b *BoolVar) Not() Preposition {
@@ -169,8 +170,32 @@ func (s *solver) Solution() []Preposition {
 		closures: s.closures,
 	}
 
+	// TODO sort closures from smalest
+	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
+
+	n := 0
 	candidate := s.candidatePrep(st)
-	s.assumeThatSolves(candidate, t, st)
+	for {
+		n += 1
+		next, err := s.assumeThatSolves(candidate, t, st)
+		if next != nil && len(next.closures) == 0 {
+			break
+		}
+
+		if err != nil {
+			//if n % 1000  == 0{
+			t.Print()
+			//return nil
+			//}
+
+			t.Backtrack()
+			candidate = t.ActiveBranch().prep
+
+		} else {
+			candidate = s.candidatePrep(next)
+			st = next
+		}
+	}
 
 	fmt.Println("Solutions:")
 	t.Print()
@@ -178,8 +203,28 @@ func (s *solver) Solution() []Preposition {
 	return t.Breadcrumbs()
 }
 
-type State struct {
-	closures Closures
+func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) (*State, error) {
+	//if len(st.closures) == 0 {
+	//	return st, nil
+	//}
+
+	if t.IsRoot(t.ActiveBranch()) || !prep.SameVar(t.ActiveBranch().prep) {
+		t.CreateDecisionBranch(prep)
+		t.ActivateBranch(prep)
+	}
+
+	next, err := s.filterLinesWith(prep, st)
+
+	if err != nil {
+		//t.Backtrack()
+		//candidate := t.ActiveBranch().prep
+		//s.assumeThatSolves(candidate, t, st)
+		return st, ErrBack
+	}
+
+	//candidate := s.candidatePrep(next)
+	//s.assumeThatSolves(candidate, t, next)
+	return next, nil
 }
 
 // lets remove variable from lines
@@ -196,6 +241,10 @@ type State struct {
 //  _ 3
 //  3
 
+type State struct {
+	closures Closures
+}
+
 // -1 solved for variable 1=false
 // 1			 variable 1=true
 func (s *solver) candidatePrep(st *State) Preposition {
@@ -208,9 +257,11 @@ func (s *solver) candidatePrep(st *State) Preposition {
 	return nil
 }
 
+var ErrFilter = errors.New("filterLinesWith")
+
 func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 	result := &State{}
-	for no, line := range st.closures {
+	for _, line := range st.closures {
 		var filterSim bool
 		var newLines []Preposition
 		for _, prep2 := range line {
@@ -229,69 +280,15 @@ func (s *solver) filterLinesWith(prep Preposition, st *State) (*State, error) {
 		if newLines != nil {
 			result.closures = append(result.closures, newLines)
 		} else if filterSim {
-			return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
+			return nil, ErrFilter
+			//return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
 		}
 	}
 
 	return result, nil
 }
 
-func (s *solver) isUnsat(prep Preposition, st *State) bool {
-	if !prep.IsTrue() {
-		panic(fmt.Sprintf("checkUnsat: preposition %s id not true", s.printPreposition(prep)))
-	}
-
-	for _, line := range st.closures {
-		l := len(line)
-		for _, prep2 := range line {
-			// belong to the same variable
-			if prep2.SameVar(prep2) && !prep2.IsTrue() {
-				if l == 1 {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st *State) {
-	if len(st.closures) == 0 {
-		return
-	}
-
-	t.CreateDecisionBranch(prep)
-	t.ActivateBranch(prep)
-
-	//fmt.Println("PATH:", t.Breadcrumbs())
-	//t.Print()
-
-	next, err := s.filterLinesWith(prep, st)
-
-	//fmt.Println("AFTER:")
-	//fmt.Println(s.printClosures(next.closures))
-
-	if err != nil {
-		t.Backtrack()
-		candidate := t.ActiveBranch().prep
-		s.assumeThatSolves(candidate, t, st)
-		return
-	}
-
-	candidate := s.candidatePrep(next)
-	s.assumeThatSolves(candidate, t, next)
-}
-
-func (s *solver) lineHasPrep(line []Preposition, prep Preposition) bool {
-	for _, prep2 := range line {
-		if prep2.Equal(prep) {
-			return true
-		}
-	}
-
-	return false
-}
+var ErrBack = errors.New("assumeThatSolves: call Backtrack()")
 
 func Not(c Preposition) Preposition {
 	return c.Not()
