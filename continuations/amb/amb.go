@@ -1,49 +1,47 @@
 package amb
 
-type Values struct {
+type Value struct {
 	values []int
 	len    int
 	index  int
 }
 
-func (s *Values) Push(i int) {
+func (s *Value) Push(i int) {
 	s.values = append(s.values, i)
 	s.len++
 }
 
-func (s *Values) has() bool {
+func (s *Value) has() bool {
 	return s.index < s.len
 }
 
-func (s *Values) Val() int {
+func (s *Value) Val() int {
 	return s.values[s.index]
 }
 
-func (s *Values) next() {
+func (s *Value) next() {
 	if s.has() {
 		s.index++
 	}
 }
 
-func (s *Values) end() bool {
+func (s *Value) end() bool {
 	return s.index == s.len-1
 }
 
-func (s *Values) reset() {
+func (s *Value) reset() {
 	s.index = 0
 }
 
 type Permutations struct {
-	el    []*Values
-	len   int
-	state int
-	path  []func() bool
+	el   []*Value
+	len  int
+	path []func() bool
 }
 
-func (t *Permutations) With(xs ...*Values) {
+func (t *Permutations) With(xs ...*Value) {
 	t.el = xs
 	t.len = len(xs)
-	t.state = 0
 	t.path = nil
 }
 
@@ -53,10 +51,6 @@ func (t *Permutations) Val() []int {
 		res[i] = stack.Val()
 	}
 	return res
-}
-
-func (t *Permutations) reset() {
-	t.state = t.len - 1
 }
 
 func (t *Permutations) Until(f func() bool) {
@@ -77,30 +71,25 @@ func (t *Permutations) Until(f func() bool) {
 
 func (t *Permutations) backtrack() {
 	exhausted := true
-	for i := t.state; i < t.len; i++ {
+	for i := 0; i < t.len; i++ {
 		exhausted = exhausted && t.el[i].end()
-	}
-
-	if exhausted && t.state == 0 {
-		panic("cannot backtrack")
+		if !exhausted {
+			break
+		}
 	}
 
 	if exhausted {
-		t.el[t.state-1].next()
-		for i := t.state; i < t.len; i++ {
-			t.el[i].reset()
-		}
-		t.state--
-	} else {
-		for i := t.len - 1; i >= t.state; i-- {
-			if t.el[i].end() {
-				for j := i; j < t.len; j++ {
-					t.el[j].reset()
-				}
-			} else {
-				t.el[i].next()
-				return
+		panic("cannot backtrack")
+	}
+
+	for i := t.len - 1; i >= 0; i-- {
+		if t.el[i].end() {
+			for j := i; j < t.len; j++ {
+				t.el[j].reset()
 			}
+		} else {
+			t.el[i].next()
+			return
 		}
 	}
 }
@@ -109,8 +98,8 @@ func NewRuntime() *Permutations {
 	return &Permutations{}
 }
 
-func MkRange(start, stop int) *Values {
-	result := &Values{}
+func MkRange(start, stop int) *Value {
+	result := &Value{}
 	for i := start; i <= stop; i++ {
 		result.Push(i)
 	}

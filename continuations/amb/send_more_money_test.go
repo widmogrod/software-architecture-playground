@@ -1,8 +1,7 @@
-package continuations
+package amb
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/continuations/amb"
 	"testing"
 )
 
@@ -11,18 +10,18 @@ Solution to a problem send+more == money as described here
 [Alphametic Page](https://www.math.uni-bielefeld.de/~sillke/PUZZLES/ALPHAMETIC/alphametic-mike-keith.html)
 */
 func TestSendMoreMoney(t *testing.T) {
-	s := amb.MkRange(0, 9)
-	e := amb.MkRange(0, 9)
-	n := amb.MkRange(0, 9)
-	d := amb.MkRange(0, 9)
+	s := MkRange(0, 9)
+	e := MkRange(0, 9)
+	n := MkRange(0, 9)
+	d := MkRange(0, 9)
 
-	m := amb.MkRange(1, 1)
-	o := amb.MkRange(0, 9)
-	r := amb.MkRange(0, 9)
+	m := MkRange(1, 1)
+	o := MkRange(0, 9)
+	r := MkRange(0, 9)
 
-	y := amb.MkRange(0, 9)
+	y := MkRange(0, 9)
 
-	ctx := amb.NewRuntime()
+	ctx := NewRuntime()
 	ctx.With(s, e, n, d, m, o, r, y)
 
 	ctx.Until(func() bool {

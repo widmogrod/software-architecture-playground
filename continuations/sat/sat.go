@@ -1,138 +1,133 @@
 package sat
 
 import (
-	"github.com/widmogrod/software-architecture-playground/continuations/amb"
+	"errors"
 )
 
 func NewSolver() *solver {
 	return &solver{
-		ands: nil,
+		counter: 1,
+		indexes: make(map[*BoolVar]int),
 	}
 }
 
-func MkBool() *boolean {
-	result := &amb.Values{}
-	result.Push(-1)
-	result.Push(1)
-	return &boolean{
-		result,
-	}
-}
-
-type Booler interface {
-	Not() Booler
-	IsTrue() bool
-}
-
-type boolean struct {
-	v *amb.Values
-}
-
-func (b *boolean) IsTrue() bool {
-	return isTrue(b.v.Val())
-}
-
-func (b *boolean) Not() Booler {
-	return &negation{b}
-}
-
-type negation struct {
-	b Booler
-}
-
-func (n *negation) Not() Booler {
-	return n.b
-}
-
-func (n *negation) IsTrue() bool {
-	return !n.b.IsTrue()
-}
-
-type implication struct {
-	p, q Booler
-}
-
-func (i *implication) Not() Booler {
-	return &negation{i}
-}
-
-func (i implication) IsTrue() bool {
-	if i.q.IsTrue() {
-		return true
-	}
-
-	if !i.p.IsTrue() && !i.q.IsTrue() {
-		return true
-	}
-
-	return false
-}
+type Closures = [][]Preposition
 
 type solver struct {
-	ands []func() bool
+	closures Closures
+	counter  int
+	indexes  map[*BoolVar]int
 }
 
-//func getValue(value Booler) []*amb.Values {
-//	var result []*amb.Values
-//	switch v := value.(type) {
-//	case *boolean:
-//		result = append(result, v.v)
-//	case *negation:
-//		result = append(result, getValue(v.b)...)
-//	case *implication:
-//		result = append(result, getValue(v.p)...)
-//		result = append(result, getValue(v.q)...)
-//	default:
-//		panic(fmt.Sprintf("unknow type %T", value))
-//	}
-//
-//	return result
-//}
+func (s *solver) AddClosures(c Closures) {
+	for _, line := range c {
+		s.And(line...)
+	}
+}
 
-func (s *solver) And(or ...Booler) {
-	fn := func() bool {
-		for _, value := range or {
-			if value.IsTrue() {
-				return true
+func (s *solver) And(ors ...Preposition) {
+	if len(ors) == 0 {
+		return
+	}
+
+	s.closures = append(s.closures, ors)
+	for _, prep := range ors {
+		x := prep.Unwrap()
+		if _, found := s.indexes[x]; !found {
+			s.indexes[x] = s.counter
+			s.counter++
+		}
+	}
+}
+
+func (s *solver) Solution() ([]Preposition, error) {
+	t := NewDecisionTree()
+
+	st := s.closures
+
+	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
+
+	n := 0
+	candidate := s.candidatePrep(st)
+	for {
+		n += 1
+		next, err := s.assumeThatSolves(candidate, t, st)
+		if next != nil && len(next) == 0 {
+			break
+		}
+
+		if err != nil {
+			if err := t.Backtrack(); err != nil {
+				return nil, err
+			}
+			candidate = t.ActiveBranch().prep
+
+		} else {
+			candidate = s.candidatePrep(next)
+			st = next
+		}
+	}
+
+	return t.Breadcrumbs(), nil
+}
+
+func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st Closures) (Closures, error) {
+	if t.IsRoot(t.ActiveBranch()) || !prep.SameVar(t.ActiveBranch().prep) {
+		t.CreateDecisionBranch(prep)
+		t.ActivateBranch(prep)
+	}
+
+	next, err := s.filterLinesWith(prep, st)
+	if err != nil {
+		return st, err
+	}
+
+	return next, nil
+}
+
+func (s *solver) candidatePrep(closures Closures) Preposition {
+	for _, line := range closures {
+		if len(line) == 1 {
+			return line[0]
+		}
+	}
+
+	for _, line := range closures {
+		for _, prep := range line {
+			return prep
+		}
+	}
+
+	return nil
+}
+
+var ErrFilter = errors.New("filterLinesWith")
+
+func (s *solver) filterLinesWith(prep Preposition, st Closures) (Closures, error) {
+	result := Closures{}
+	for _, line := range st {
+		var filterSim bool
+		var newLines []Preposition
+		for _, prep2 := range line {
+			if prep2.Equal(prep) {
+				newLines = nil
+				break
+			}
+
+			if !prep2.SameVar(prep) {
+				newLines = append(newLines, prep2)
+			} else {
+				filterSim = true
 			}
 		}
 
-		return false
+		if newLines != nil {
+			result = append(result, newLines)
+		} else if filterSim {
+			return nil, ErrFilter
+			//return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
+		}
 	}
 
-	s.ands = append(s.ands, fn)
-}
-
-func (s *solver) Solution(values ...*boolean) []bool {
-	ctx := amb.NewRuntime()
-
-	var xs []*amb.Values
-	for _, v := range values {
-		xs = append(xs, v.v)
-	}
-
-	ctx.With(xs...)
-
-	for _, and := range s.ands {
-		ctx.Until(and)
-	}
-
-	solutions := ctx.Val()
-	result := make([]bool, len(values))
-	for i, value := range solutions {
-		result[i] = isTrue(value)
-	}
-	return result
-}
-
-func Not(c Booler) Booler {
-	return c.Not()
-}
-
-func Imply(p, q Booler) Booler {
-	return &implication{p, q}
-}
-
-func isTrue(x int) bool {
-	return x == 1
+	return result, nil
 }
