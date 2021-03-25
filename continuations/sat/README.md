@@ -5,3 +5,6 @@ Grate help with visualizing output of DPLL
 https://www.inf.ufpr.br/dpasqualin/d3-dpll/
 
 
+TODO 
+- [_] change BoolVar to int
+- [√] backtrack search using recursion

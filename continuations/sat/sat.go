@@ -1,22 +1,13 @@
 package sat
 
-import (
-	"errors"
-)
-
 func NewSolver() *solver {
-	return &solver{
-		counter: 1,
-		indexes: make(map[*BoolVar]int),
-	}
+	return &solver{}
 }
 
 type Closures = [][]Preposition
 
 type solver struct {
 	closures Closures
-	counter  int
-	indexes  map[*BoolVar]int
 }
 
 func (s *solver) AddClosures(c Closures) {
@@ -31,61 +22,41 @@ func (s *solver) And(ors ...Preposition) {
 	}
 
 	s.closures = append(s.closures, ors)
-	for _, prep := range ors {
-		x := prep.Unwrap()
-		if _, found := s.indexes[x]; !found {
-			s.indexes[x] = s.counter
-			s.counter++
-		}
-	}
 }
 
+// Solution SAT with DPLL algorithm
 func (s *solver) Solution() ([]Preposition, error) {
-	t := NewDecisionTree()
-
-	st := s.closures
-
-	// TODO add findingout paradoxes like -7 or -7 (the same prep twice)
-
-	n := 0
-	candidate := s.candidatePrep(st)
-	for {
-		n += 1
-		next, err := s.assumeThatSolves(candidate, t, st)
-		if next != nil && len(next) == 0 {
-			break
-		}
-
-		if err != nil {
-			if err := t.Backtrack(); err != nil {
-				return nil, err
-			}
-			candidate = t.ActiveBranch().prep
-
-		} else {
-			candidate = s.candidatePrep(next)
-			st = next
-		}
-	}
-
-	return t.Breadcrumbs(), nil
-}
-
-func (s *solver) assumeThatSolves(prep Preposition, t *DecisionTree, st Closures) (Closures, error) {
-	if t.IsRoot(t.ActiveBranch()) || !prep.SameVar(t.ActiveBranch().prep) {
-		t.CreateDecisionBranch(prep)
-		t.ActivateBranch(prep)
-	}
-
-	next, err := s.filterLinesWith(prep, st)
+	breadcrumbs, err := s.reduceSolution(s.selectCandidate(s.closures), s.closures, nil)
 	if err != nil {
-		return st, err
+		return nil, err
 	}
 
-	return next, nil
+	return breadcrumbs, nil
 }
 
-func (s *solver) candidatePrep(closures Closures) Preposition {
+func (s *solver) reduceSolution(prep Preposition, st Closures, agg []Preposition) ([]Preposition, error) {
+	if len(st) == 0 {
+		return agg, nil
+	}
+
+	next, emptyLine := s.filterOut(prep, st)
+	if emptyLine {
+		// Backtrack, take another route
+		return s.reduceSolution(prep.Not(), st, agg)
+	}
+
+	return s.reduceSolution(
+		s.selectCandidate(next),
+		next,
+		append(agg, prep),
+	)
+}
+
+func (s *solver) selectCandidate(closures Closures) Preposition {
+	// This line plays very important role,
+	// it sorts and select candidates that are easiest to prove
+	// which is - single preposition in a line -
+	// always must be true whole constraing be true
 	for _, line := range closures {
 		if len(line) == 1 {
 			return line[0]
@@ -101,12 +72,10 @@ func (s *solver) candidatePrep(closures Closures) Preposition {
 	return nil
 }
 
-var ErrFilter = errors.New("filterLinesWith")
-
-func (s *solver) filterLinesWith(prep Preposition, st Closures) (Closures, error) {
+func (s *solver) filterOut(prep Preposition, st Closures) (Closures, bool) {
 	result := Closures{}
 	for _, line := range st {
-		var filterSim bool
+		var emptyLine bool
 		var newLines []Preposition
 		for _, prep2 := range line {
 			if prep2.Equal(prep) {
@@ -117,17 +86,16 @@ func (s *solver) filterLinesWith(prep Preposition, st Closures) (Closures, error
 			if !prep2.SameVar(prep) {
 				newLines = append(newLines, prep2)
 			} else {
-				filterSim = true
+				emptyLine = true
 			}
 		}
 
 		if newLines != nil {
 			result = append(result, newLines)
-		} else if filterSim {
-			return nil, ErrFilter
-			//return nil, fmt.Errorf("filterLinesWith: in line=%d after filtering our similar, there is no other options to satisfy!  Backtrack (%s)!", no, prep.String())
+		} else if emptyLine {
+			return nil, true
 		}
 	}
 
-	return result, nil
+	return result, false
 }
