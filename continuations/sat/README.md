@@ -4,4 +4,4 @@ Implementation is based on [Davis–Putnam–Logemann–Loveland (DPLL) algorith
 Grate help with visualizing output of DPLL 
 https://www.inf.ufpr.br/dpasqualin/d3-dpll/
 
-
+You can see how to use SAT solver to solve Sudoku [solver implementation](./sudoku/sudoku.go).

@@ -48,7 +48,7 @@ func TestSat2(t *testing.T) {
 
 	result, err := sat.Solution()
 	assert.NoError(t, err)
-	assert.Equal(t, result, []Preposition{b, a, d})
+	assert.Equal(t, result, []Preposition{d, a, b})
 }
 
 func TestSat3(t *testing.T) {
@@ -62,7 +62,7 @@ func TestSat3(t *testing.T) {
 
 	result, err := sat.Solution()
 	assert.NoError(t, err)
-	assert.Equal(t, result, []Preposition{d.Not(), c.Not(), b.Not(), a})
+	assert.Equal(t, result, []Preposition{a, b.Not(), c.Not(), d.Not()})
 }
 
 func TestSat4(t *testing.T) {
@@ -71,5 +71,5 @@ func TestSat4(t *testing.T) {
 
 	result, err := sat.Solution()
 	assert.NoError(t, err)
-	assert.Equal(t, result, Num(-4, -3, -2, 1))
+	assert.Equal(t, result, Num(1, -2, -3, -4))
 }
