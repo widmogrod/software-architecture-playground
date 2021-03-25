@@ -21,7 +21,6 @@ func Index(r, c, v int) int {
 		counter += 1
 		return index[key]
 	}
-	//return r*3 + c*3 + v*v
 }
 
 var game = Board{
@@ -37,13 +36,6 @@ var game = Board{
 	{0, 0, 0, 0, 6, 0, 0, 9, 0},
 	{0, 0, 1, 0, 0, 0, 0, 0, 5},
 }
-
-//var game = Board{
-//	{1, 0, 0, 0},
-//	{0, 1, 0, 0},
-//	{0, 0, 1, 0},
-//	{0, 0, 0, 1},
-//}
 
 func LoadSudoku() Board {
 	return game
