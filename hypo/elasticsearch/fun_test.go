@@ -5,18 +5,59 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"github.com/brianvoe/gofakeit/v6"
+	"flag"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 )
 
+const indexName = "fun-index"
+
+var isIntegration = flag.Bool("i-exec-docker-compose-up", false, "Integration that tests require `docker-compose up`")
+
 func TestFun(t *testing.T) {
+	if !*isIntegration {
+		t.Skip("Skipping tests because this tests requires `docker-compose up`")
+	}
+
 	ctx := context.Background()
+	es := mkESClient(t)
+
+	cleanES(t, es)
+	mkIndex(t, es)
+
+	for i := 0; i < 10; i++ {
+		doc := GenFun()
+		body, err := json.Marshal(&doc)
+		assert.NoError(t, err)
+
+		req := esapi.IndexRequest{
+			Index:      indexName,
+			DocumentID: doc.ID,
+			Body:       bytes.NewReader(body),
+			Pretty:     true,
+		}
+
+		res, err := req.Do(ctx, es)
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		rbody, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if !assert.NoError(t, err) {
+			t.Logf("< %s\n", rbody)
+			return
+		}
+	}
+}
+
+func mkESClient(t *testing.T) *elasticsearch.Client {
 	es, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{
 			"https://localhost:9200",
@@ -29,46 +70,49 @@ func TestFun(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, err)
-
-	res, err := es.Info()
 	if err != nil {
-		t.Fatalf("Error getting response: %s", err)
-	}
-	defer res.Body.Close()
-	if res.IsError() {
-		t.Fatalf("Error: %s", res.String())
+		t.Fatalf("mkESClient: %v", err)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	return es
+}
+
+func loadFile(t *testing.T, file string) io.Reader {
+	f, err := os.OpenFile(file, os.O_RDONLY, os.ModeExclusive)
+	if err != nil {
+		t.Fatalf("loadFile: %v", err)
+	}
+
+	return f
+}
+
+func cleanES(t *testing.T, es *elasticsearch.Client) {
+	ctx := context.Background()
+	_, err := esapi.IndicesDeleteRequest{
+		Index:  []string{indexName},
+		Pretty: true,
+	}.Do(ctx, es)
+
+	if err != nil {
+		t.Fatalf("cleanES: %v", err)
+	}
+}
+
+func mkIndex(t *testing.T, es *elasticsearch.Client) {
+	req := esapi.IndicesCreateRequest{
+		Index:  indexName,
+		Pretty: true,
+		Body:   loadFile(t, "./create-index.json"),
+	}
+
+	res, err := req.Do(context.Background(), es)
 	assert.NoError(t, err)
-	fmt.Printf("body: %s", body)
 
-	for i := 0; i < 1000; i++ {
-		doc := Fun{
-			ID:      gofakeit.UUID(),
-			Content: gofakeit.HipsterSentence(10),
-		}
+	assert.False(t, res.IsError())
 
-		body, err := json.Marshal(&doc)
-		assert.NoError(t, err)
-
-		req := esapi.IndexRequest{
-			Index:        "fun-index",
-			DocumentID:   doc.ID,
-			DocumentType: "fun",
-			Body:         bytes.NewReader(body),
-			Pretty:       true,
-		}
-
-		res, err := req.Do(ctx, es)
-		assert.NoError(t, err)
-
-		assert.False(t, res.IsError())
-
-		rbody, err := ioutil.ReadAll(res.Body)
-		assert.NoError(t, err)
-		fmt.Printf("index response body: %s\n", rbody)
-		res.Body.Close()
+	rbody, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if !assert.NoError(t, err) {
+		t.Logf("mkIndex: %s\n", rbody)
 	}
 }
