@@ -41,7 +41,7 @@ jobs:
       - test-go
       - test-cdk
     steps:
-      - uses: actions/github-script@v3
+      - uses: actions/github-script@v4.0.1
 #        if: ${{ success() }}
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
@@ -54,7 +54,7 @@ jobs:
             })
 
 # Not working, because success depends on previous stage form this job.
-#      - uses: actions/github-script@v3
+#      - uses: actions/github-script@v4.0.1
 #        if: ${{ failure() }}
 #        with:
 #          github-token: ${{secrets.GITHUB_TOKEN}}
