@@ -162,14 +162,13 @@ HTTP 200
     - composition of few `source-of-truth`
     - for transactionality can use process manager, sagas
     - offers eventual consistency 
-  `source-of-truth` also lower level of transactionality.
+- `source-of-truth` also lower level of transactionality.
     - read and write
     - closes to storage implementation
     - offers strong consistency
-  `projection` concept of materialised views, aggregations, indexes
+- `projection` concept of materialised views, aggregations, indexes
     - read only
     - offers eventual consistency
-
 
 ```
 /src
