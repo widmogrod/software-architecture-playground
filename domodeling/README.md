@@ -364,8 +364,223 @@ let's take a look at ownership and types of team topologies that can be modeled 
 
 ```
 
+
+#### Separation by ___
+
+```
+area A
+  // data shape
+  user
+
+area B
+  // data shape
+  question
+  extend_user_has_question
+
+  // workflow can span across data areas
+  AddQuestion({user, content})
+
+// question can live without comments, 
+// but comments without answer don't make sence 
+// - explicit dependency direction
+data area C
+  // data shape
+  comment
+  extend_question_has_comment
+  extend_answer_has_comment  
+  
+  // workflow can span across data areas
+  AddCommentToQuestion({user,question,content})
+  AddCommentToAnswer({user,answer,content})
+
+data area D
+  answer
+  extend_user_has_answer
+  
+  AddAnswer({user,question,content})
+
+data area E
+  points
+  extend_user_has_points
+  extend_question_has_points
+
+  // Extending data, also should allow changes in DML
+  // How many extends would be composed? 
+  // Because that would be too complex do via composition/decoration in OOP sense
+  // I believe we should have single place that orchestrate such high level concepts
+  // Below is example showing complexitiy of decoration
+  extend AddQuestion(in@{...,points}, op AddQuestion) {
+    question := op.AddQuestion(in)
+    if points.getPoints(in.userId, in.points) {
+        points.SQL`UPDATE extend_user_has_points SET points -= in.points`
+        points.SQL`INSERT extend_question_has_points(question,user_ud) VALUES()`
+    }
+  }
+  // Data ownership is what we should be modeling
+  // Process ownership is something that spanes across many domains and requires collaboration
+  // clear understanding how domains intertwain and interleave
+  // since owner of data may need to change also shared processes, workflows and discuss with PO and team(s)
+  // how desired effect should look like - this is also solution to "remove user" example that I have written in one of my notes
+  // 
+ 
+
+// Shared ownership, requires communication nad coordination
+// Shared ownership... no AddQuestion is owner of area A, but in opensource maner other teams can contribute and textend behaviour
+// and then other team when merge, takes respobsbility for the changes. I know how strante that may sounds,
+// but thanks to that it becomes clear who owns what and is realted to single source of truth.
+// I can imagine that there may be anomalies that many teams extend or introduce new features to core objects like user, questin,...
+// In such cases
+
+/use-case
+  /AddQuestion{
+    @capability(tx)
+    @iam(user)
+    @data-area-dependency(question, points) {
+      tx := transaction.New()
+      question.Insert(tx, question, user.ID)
+      points.Subsctract(tx, user.ID, points)
+      return tx.Commit()
+    }
+  }
+  /PostCommentQuestion
+  /PostCommentAnswer
+  /ListQuestions {
+   @materialise(m)
+   @data-area-dependency(question, comments) { 
+      m`SELECT 
+        q.id 
+      , count(qc.id) number_of_comments
+      FROM question q 
+      JOIN extend_question_has_comment qc`
+    }
+  }
+
+```
+
+```mermaid
+graph TD
+  answer --> question
+  comment --> question
+  comment --> answer
+```
+
+```
+
+Team A
+
+  /src
+    /use-cases
+      /AddQuestion
+      /ListQuestions
+    /source-of-truth
+      /question
+      
+Team C
+
+  /src
+    /use-cases
+      /PostCommentQuestion
+      /PostCommentAnswer
+    /source-of-truth
+      /comment
+
+Team C
+      
+  /src
+    /use-cases
+    /source-of-truth
+      /answer
+  
+  INFRA TEAM A
+  (core can be imported as dependecies)
+  
+  src/
+    /catalog-of-capabilities
+      /notifications
+      /elasticearch
+      /jobqueue
+
+```
+
+
+---
+
+Data composibility - alow quicly other teams benefit form new information, like with SQL - JOIN tables
+Separate by customer,  but don't rush - 
+  sharing of APIs reasone because it "it's harderer to build new set of joins and expose data" 
+  - but what if it woudn't be the case?
+  and keeping single source of truth would also won't suffer and scalability would be linear
+
+---
+
+We discuss in community about linear scalability, bit how expotencial would look like?
+
 ---
 
 Code generation at B for μservice is interesting productivity gain, but one step further is 
 how can we then remove what engineers need to generate and maintain nad upload only business logic
 and runtime we be updated and managed by other team?
+
+
+---
+
+What if we would have something like external tables...
+What if cost of joining or using external tables would be close to zero
+
+Then if one team has some concept, other team can extend it to
+- extend all object in table (question -> extend_question_has_subject)
+- extend some objects in table (question -> extend_question_with_answer)
+- build bigger structures (subject table -> question)
+
+Then if one team change state of object, other team don't need to know about it? because they already have neves state - false statement?.
+- What if someone change content of object, and such object needs to be process via ML to check whenever it is a spam/toxic/etc
+- To not need to know about change, then we would need to have something like dynamic columns, that when version change we compute newer version of value
+  To avoid performance bottelneck when somone would do aggregation for such columns, then we would need to have dependency graph, to know 
+  Whenever there are views that are rebuild when field changes, but then they can batch updates to those dynamic fields
+  
+```
+--- TEAM A
+CREATE TABLE question (
+  id uuid
+  content string
+  content_toxic dynamic -- always nullable, cannot be written directly
+)
+
+CREATE VIEW question_feed
+  SELECT content
+  FROM question
+  WHERE
+    content_toxic < 10%;
+
+--- materialized view knows that field is dynamic, 
+    and it handles operations
+
+SELECT content FROM question_feed LIMIT 10;
+
+CREATE STREAM question_changes
+  SELECT content
+  FROM question
+  EMIT CHANGES;
+
+SELECT content FROM question_changes
+
+CREATE RESOLVER 
+  LAMBDA dom:sub-domain:lambda:content-toxicity
+  ON question.content_toxic
+ 
+--- TEAM B 
+
+CREATE TABLE moderations (
+  id uuid
+  questionId
+  reportedID
+  moderatorAction
+  moderatorID
+)
+
+CREATE VIEW moderation_feed
+  SELECT
+  FROM moderations
+  JOIN question_changes EMIT(1m,100records)  
+
+```
