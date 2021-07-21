@@ -1,6 +1,8 @@
 package tictactoeaggregate
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/aggssert"
 	"math/rand"
@@ -109,3 +111,85 @@ func TestTicTacToe_aggregate_state_equal_to_new_replay_state(t *testing.T) {
 		},
 	)
 }
+
+func GenerateNextCMD(state *TicTacToeState) interface{} {
+	// introspect from state what are next actions
+	// generate next states - they may be random,
+	// but some fields or information may depend on previous context
+	//if state.OneOf.GameWaitingForPlayer != nil {
+	//
+	//} else if state.OneOf.GameProgress != nil {
+	//
+	//} else if state.OneOf.GameResult != nil {
+	//
+	//}
+
+	switch rand.Int() % 4 {
+	case 0:
+		return &CreateGameCMD{
+			FirstPlayerID: uuid.Must(uuid.NewUUID()).String(),
+		}
+	case 1:
+		return &JoinGameCMD{
+			SecondPlayerID: uuid.Must(uuid.NewUUID()).String(),
+		}
+	case 2:
+		return &StartGameCMD{
+			FirstPlayerID:  uuid.Must(uuid.NewUUID()).String(),
+			SecondPlayerID: uuid.Must(uuid.NewUUID()).String(),
+		}
+	case 3:
+		if state != nil && state.OneOf.GameProgress != nil {
+			for move := range state.OneOf.GameProgress.AvailableMoves {
+				return &MoveCMD{
+					PlayerID: state.OneOf.GameProgress.NextMovePlayerID,
+					Position: move,
+				}
+			}
+		}
+
+		return &MoveCMD{
+			PlayerID: uuid.Must(uuid.NewUUID()).String(),
+			Position: uuid.Must(uuid.NewUUID()).String(),
+		}
+	}
+
+	panic("GenerateNextCMD undefined")
+}
+
+// TODO complete implementation
+func TestTicTacToeAggregate_StateDynamic(t *testing.T) {
+	// Generate States n-times
+	// Collect probabilities of success transitions
+	// Display causation graph
+	// Assert What states are expected, and which are not
+
+	for range rand.Perm(100) {
+		var commands []interface{}
+
+		a := NewTicTacToeAggregate()
+		for {
+			cmd := GenerateNextCMD(a.state)
+			err := a.Handle(cmd)
+			if err != nil {
+				break
+			}
+
+			commands = append(commands, cmd)
+		}
+
+		fmt.Printf("Commands: %d %#v \n", len(commands), commands)
+	}
+}
+
+// Dependent events
+// P(A^B) = P(A) * P(B|A)
+
+/*
+	| A | B | C |
+  ------------------
+  A |
+  B |
+  C |
+  ------------------
+*/
