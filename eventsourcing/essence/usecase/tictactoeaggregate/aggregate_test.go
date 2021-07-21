@@ -2,7 +2,7 @@ package tictactoeaggregate
 
 import (
 	"fmt"
-	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/aggregate/aggssert"
 	"math/rand"
@@ -127,16 +127,16 @@ func GenerateNextCMD(state *TicTacToeState) interface{} {
 	switch rand.Int() % 4 {
 	case 0:
 		return &CreateGameCMD{
-			FirstPlayerID: uuid.Must(uuid.NewUUID()).String(),
+			FirstPlayerID: ksuid.New().String(),
 		}
 	case 1:
 		return &JoinGameCMD{
-			SecondPlayerID: uuid.Must(uuid.NewUUID()).String(),
+			SecondPlayerID: ksuid.New().String(),
 		}
 	case 2:
 		return &StartGameCMD{
-			FirstPlayerID:  uuid.Must(uuid.NewUUID()).String(),
-			SecondPlayerID: uuid.Must(uuid.NewUUID()).String(),
+			FirstPlayerID:  ksuid.New().String(),
+			SecondPlayerID: ksuid.New().String(),
 		}
 	case 3:
 		if state != nil && state.OneOf.GameProgress != nil {
@@ -149,8 +149,8 @@ func GenerateNextCMD(state *TicTacToeState) interface{} {
 		}
 
 		return &MoveCMD{
-			PlayerID: uuid.Must(uuid.NewUUID()).String(),
-			Position: uuid.Must(uuid.NewUUID()).String(),
+			PlayerID: ksuid.New().String(),
+			Position: ksuid.New().String(),
 		}
 	}
 
