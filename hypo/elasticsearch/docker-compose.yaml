@@ -1,0 +1,18 @@
+version: '3.3'
+services:
+  elasticsearch:
+    image: amazon/opendistro-for-elasticsearch:1.13.1
+    restart: always
+    environment:
+      - discovery.type=single-node
+    ports:
+      - 9200:9200
+      - 9600:9600
+  kibana:
+    image: amazon/opendistro-for-elasticsearch-kibana:1.13.1
+    restart: always
+    environment:
+      ELASTICSEARCH_URL: https://elasticsearch:9200
+      ELASTICSEARCH_HOSTS: https://elasticsearch:9200
+    ports:
+      - 5601:5601

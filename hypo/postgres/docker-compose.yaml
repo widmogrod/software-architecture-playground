@@ -1,0 +1,10 @@
+version: '3.3'
+services:
+  postgres:
+    image: library/postgres:12-alpine
+    restart: always
+    environment:
+#      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
