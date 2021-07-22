@@ -114,6 +114,10 @@ func (d *DockerFunction) Call(input FunctionInput) FunctionOutput {
 	return string(body)
 }
 
+func NewDockerFunctionRegistry() *DockerFunctionRegistry {
+	return &DockerFunctionRegistry{}
+}
+
 var _ FunctionRegistry = &DockerFunctionRegistry{}
 
 type DockerFunctionRegistry struct {
@@ -127,6 +131,23 @@ func (d *DockerFunctionRegistry) Register(name FunctionID, path string) error {
 	return nil
 }
 
-func NewDockerFunctionRegistry() *DockerFunctionRegistry {
-	return &DockerFunctionRegistry{}
+func StartDockerRuntime(fun Func) {
+	go func() {
+		<-time.After(time.Second * 2)
+		fmt.Println("Exiting container after 5s")
+		os.Exit(0)
+	}()
+
+	http.HandleFunc("/invoke", func(writer http.ResponseWriter, request *http.Request) {
+		in, _ := ioutil.ReadAll(request.Body)
+		ou := fun(in)
+		switch t := ou.(type) {
+		case string:
+			fmt.Fprint(writer, t)
+		default:
+			fmt.Fprintf(writer, "StartDockerRuntime: Unknown type '%s'", t)
+		}
+	})
+
+	http.ListenAndServe(":9666", http.DefaultServeMux)
 }

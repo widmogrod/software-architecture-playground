@@ -6,6 +6,8 @@ type (
 	FunctionOutput = interface{}
 )
 
+type Func = func(input FunctionInput) FunctionOutput
+
 type Function interface {
 	Call(input FunctionInput) FunctionOutput
 }
