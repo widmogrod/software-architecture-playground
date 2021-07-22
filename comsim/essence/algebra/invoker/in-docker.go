@@ -54,7 +54,7 @@ func (d *DockerFunction) Call(input FunctionInput) FunctionOutput {
 			},
 		},
 		RestartPolicy: container.RestartPolicy{
-			Name: "always",
+			Name: "no",
 		},
 		LogConfig: container.LogConfig{
 			Type:   "json-file",
@@ -62,14 +62,16 @@ func (d *DockerFunction) Call(input FunctionInput) FunctionOutput {
 		},
 	}
 
-	i := 3
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: "demo-func",
 		ExposedPorts: map[nat.Port]struct{}{
 			"9666": struct{}{},
 		},
-		Tty:         false,
-		StopTimeout: &i,
+		Tty: false,
+		Healthcheck: &container.HealthConfig{
+			Test:    []string{"NONE"},
+			Retries: 0,
+		},
 	}, hostConfig, nil, nil, "")
 	if err != nil {
 		panic(err)
@@ -145,7 +147,7 @@ func StartDockerRuntime(fun Func) {
 		case string:
 			fmt.Fprint(writer, t)
 		default:
-			fmt.Fprintf(writer, "StartDockerRuntime: Unknown type '%s'", t)
+			fmt.Fprintf(writer, "StartDockerRuntime: Unexpected function output type '%s', expects string", t)
 		}
 	})
 
