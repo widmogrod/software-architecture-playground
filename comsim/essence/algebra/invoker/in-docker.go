@@ -135,7 +135,7 @@ func (d *DockerFunctionRegistry) Register(name FunctionID, path string) error {
 
 func StartDockerRuntime(fun Func) {
 	go func() {
-		<-time.After(time.Second * 2)
+		<-time.After(time.Second * 5)
 		fmt.Println("Exiting container after 5s")
 		os.Exit(0)
 	}()
