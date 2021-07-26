@@ -16,7 +16,7 @@
     "@aws-cdk/aws-codecommit": "^1.87.1",
     "@aws-cdk/pipelines": "^1.87.1",
     "@aws-cdk/yaml-cfn": "^1.87.1",
-    "@types/aws-lambda": "^8.10.68",
+    "@types/aws-lambda": "^8.10.81",
     "@types/jest": "^26.0.19",
     "@types/node": "14.14.6",
     "aws-cdk": "^1.87.1",
