@@ -1,6 +1,7 @@
 # Communication patters
 
-Idea is to demonstrate different communication patterns between different domains.
+Idea is to demonstrate different communication patterns between different domains,
+that share one trait message passing.
 
 Message passing
 - Actor
@@ -24,12 +25,12 @@ r = runtime.New()
 // is a broker between changes and commands
 // guaranties processing in order
 
-w = eventsubscriber.New()
+w = messagesubscriber.New()
 w.When(domA.Change, r.Invoke(aggregateA.MethodA))
 w.When(domB.Change, r.Invoke(aggreatteA.MethodB))
 
 // or
-w = eventsubscriber.New()
+w = messagesubscriber.New()
 w.When(domA.Change, r.Invoke(state.TransitionA))
 w.When(domB.Change, r.Invoke(state.TransitionB))
 
