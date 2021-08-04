@@ -7,6 +7,6 @@ import (
 
 func main() {
 	invoker.StartDockerRuntime(func(input invoker.FunctionInput) invoker.FunctionOutput {
-		return fmt.Sprintf("Hello %s, from Docker2!", input)
+		return fmt.Sprintf("Hello %s, from Docker!", input)
 	})
 }

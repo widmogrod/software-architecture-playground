@@ -82,23 +82,29 @@ func (d *DockerFunction) Call(input FunctionInput) FunctionOutput {
 	}
 
 	//statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	//select {
-	//case err := <-errCh:
-	//	if err != nil {
-	//		panic(err)
+	//	select {
+	//	case err := <-errCh:
+	//		fmt.Println(">>>>>> err")
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	case <-statusCh:
+	//		fmt.Println(">>>>>> STATUS")
 	//	}
-	//case <-statusCh:
-	//	fmt.Println(">>>>>> STATUS")
-	//}
 
-	time.Sleep(time.Second * 2)
-
-	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		//Follow: true,
+	})
 	if err != nil {
 		panic(err)
 	}
 
 	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+
+	// TODO arbitrary to fix it
+	time.Sleep(time.Second * 5)
 
 	p := new(bytes.Buffer)
 	fmt.Fprintf(p, "%s", input)
@@ -142,13 +148,8 @@ func StartDockerRuntime(fun Func) {
 
 	http.HandleFunc("/invoke", func(writer http.ResponseWriter, request *http.Request) {
 		in, _ := ioutil.ReadAll(request.Body)
-		ou := fun(in)
-		switch t := ou.(type) {
-		case string:
-			fmt.Fprint(writer, t)
-		default:
-			fmt.Fprintf(writer, "StartDockerRuntime: Unexpected function output type '%s', expects string", t)
-		}
+		ou := fun(string(in))
+		fmt.Fprint(writer, ou)
 	})
 
 	http.ListenAndServe(":9666", http.DefaultServeMux)
