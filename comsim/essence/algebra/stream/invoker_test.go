@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/algebra/invoker"
 	"testing"
+	"time"
 )
 
 func TestStreamOfInvocation(t *testing.T) {
@@ -32,6 +33,8 @@ func TestStreamOfInvocation(t *testing.T) {
 	err, r = i.Invoke(MkFunctionID("test-func2"), "32")
 	assert.NoError(t, err)
 	assert.Equal(t, "output of test func2(32)", r)
+
+	time.Sleep(time.Second)
 
 	AssertLogContains(t, s.Log(), []*Message{
 		{
@@ -75,11 +78,15 @@ func AssertLogContains(t *testing.T, log, contains []*Message) {
 
 		var a, b map[string]interface{} = nil, nil
 
-		// TODO fix assumption that message are JSON
-		err := json.Unmarshal(m.Data, &a)
-		assert.NoError(t, err)
-		err = json.Unmarshal(contains[i].Data, &b)
-		assert.NoError(t, err)
+		//TODO fix assumption that message are JSON
+		if m.Data != nil {
+			err := json.Unmarshal(m.Data, &a)
+			assert.NoError(t, err)
+		}
+		if contains[i].Data != nil {
+			err := json.Unmarshal(contains[i].Data, &b)
+			assert.NoError(t, err)
+		}
 		AssertMapSubset(t, a, b)
 	}
 }

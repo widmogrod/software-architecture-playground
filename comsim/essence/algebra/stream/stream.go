@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/algebra/invoker"
+	"math/rand"
 	"sync"
 )
 
@@ -14,7 +15,7 @@ type Streamer interface {
 
 type SelectStreamer interface {
 	Streamer
-	Select(s SelectCMD) []*Message
+	SelectOnce(s SelectOnceCMD) []*Message
 }
 
 type (
@@ -37,8 +38,7 @@ func NewChannelStream() *ChannelStream {
 		ch:  make(chan *Message),
 		log: make([]*Message, 0, 0),
 
-		selectors: make([]*SelectCMD, 0),
-		results:   make(map[*SelectCMD]chan *Message),
+		selectors: make(map[*SelectOnceCMD]chan []*Message),
 
 		probabilityOfRedelivery: 0.5,
 	}
@@ -47,125 +47,150 @@ func NewChannelStream() *ChannelStream {
 type ChannelStream struct {
 	loc sync.Mutex
 
-	ch  chan *Message
-	log []*Message
+	ch     chan *Message
+	log    []*Message
+	cursor int
 
-	selectors []*SelectCMD
-	results   map[*SelectCMD]chan *Message
+	selectors map[*SelectOnceCMD]chan []*Message
 
 	probabilityOfRedelivery float64
 }
 
 type (
 	SelectConditions struct {
-		Eq interface{}
+		// selector   = Every [match]
+		// match      = KeyValue (string, match) | KeyExists(string) | conditions |
+		// conditions = eq | gt | lt | ...
+		Eq        interface{}
+		KeyExists string
+		KeyValue  map[string]SelectConditions
 	}
 
-	SelectCMD struct {
+	SelectOnceCMD struct {
 		Kind         MessageKind
-		JSONKeyValue map[string]SelectConditions
-		Size         int
+		Selector     *SelectConditions
+		MaxFetchSize int
 	}
 )
 
-func (c *ChannelStream) Select(s SelectCMD) []*Message {
+//type selectorResult struct {
+//	S SelectOnceCMD
+//	R chan *Message
+//}
+
+func (c *ChannelStream) SelectOnce(s SelectOnceCMD) []*Message {
 	c.loc.Lock()
-	c.selectors = append(c.selectors, &s)
-	c.results[&s] = make(chan *Message)
+	c.selectors[&s] = make(chan []*Message, 1)
 	c.loc.Unlock()
 
-	var result []*Message
-	for {
-		select {
-		case m := <-c.results[&s]:
-			result = append(result, m)
-
-			if len(result) >= s.Size {
-				c.loc.Lock()
-				close(c.results[&s])
-				delete(c.results, &s)
-				c.loc.Unlock()
-
-				return result
-			}
-		}
-	}
+	return <-c.selectors[&s]
 }
 
 func (c *ChannelStream) Work() {
+	results := make(map[*SelectOnceCMD][]*Message)
+
 	for {
-		select {
-		case m := <-c.ch:
-			for _, s := range c.selectors {
-				if m.Kind != s.Kind {
-					fmt.Printf("select: Kind... selector(%v) message(%v) \n", s, m)
-					continue
-				}
+		for i := c.cursor; i < len(c.log); i++ {
+			m := c.log[i]
 
-				if s.JSONKeyValue == nil {
-					go c.funcName(s, m)
-					fmt.Printf("select: FOUND.JSONKeyValue... selector(%v) message(%v) \n", s, m)
-					continue
-				}
+			c.loc.Lock()
+			sel := c.selectors
+			c.loc.Unlock()
 
-				var a map[string]interface{} = nil
-				err := json.Unmarshal(m.Data, &a)
-				if err != nil {
-					fmt.Printf("select: Unmarshal... selector(%v) message(%v) err = %s \n", s, m, err)
-					continue
-				}
-
-				var found bool = true
-				for key, cond := range s.JSONKeyValue {
-					if !found {
-						break
-					}
-					if value, ok := a[key]; ok {
-						if cond.Eq != nil {
-							found = cond.Eq == value
+			for s, res := range sel {
+				if match(m, s) {
+					results[s] = append(results[s], m)
+					if len(results[s]) >= s.MaxFetchSize {
+						select {
+						case res <- results[s]:
+						default:
 						}
-					}
-				}
 
-				if found {
-					fmt.Printf("select: FOUND ... selector(%v) message(%v) \n", s, m)
-					go c.funcName(s, m)
+						c.loc.Lock()
+						close(c.selectors[s])
+						delete(c.selectors, s)
+						c.loc.Unlock()
+					}
 				}
 			}
+
+			c.cursor = i
 		}
 	}
 }
 
-func (c *ChannelStream) funcName(s *SelectCMD, m *Message) {
-	c.results[s] <- m
+func match(m *Message, s *SelectOnceCMD) bool {
+	if m == nil || s == nil {
+		return false
+	}
+
+	if m.Kind != s.Kind {
+		return false
+	}
+
+	if s.Selector == nil {
+		return true
+	}
+
+	if m.Data == nil {
+		return false
+	}
+
+	var a map[string]interface{} = nil
+	err := json.Unmarshal(m.Data, &a)
+	if err != nil {
+		fmt.Printf("select: Unmarshal... selector(%v) message(%v) err = %s \n", s, m, err)
+		return false
+	}
+
+	if s.Selector.KeyExists != "" {
+		_, ok := a[s.Selector.KeyExists]
+		return ok
+	}
+
+	return matchNested(s.Selector, a)
+}
+
+func matchNested(s *SelectConditions, a map[string]interface{}) bool {
+	var found bool = true
+	for key, cond := range s.KeyValue {
+		if !found {
+			break
+		}
+		if value, ok := a[key]; ok {
+			if cond.Eq != nil {
+				found = cond.Eq == value
+				continue
+			}
+			if cond.KeyValue != nil {
+				if v, ok := value.(map[string]interface{}); ok {
+					found = matchNested(&cond, v)
+					continue
+				}
+			}
+			if cond.KeyExists != "" && cond.KeyExists != key {
+				found = false
+				continue
+			}
+		}
+	}
+
+	return found
 }
 
 func (c *ChannelStream) Fetch(size int) []*Message {
-	return c.log[len(c.log)-size:]
+	if len(c.log) >= size {
+		// Simulate message re-delivery
+		if rand.Float64() < c.probabilityOfRedelivery {
+			return c.log[len(c.log)-size:]
+		}
+	}
 
-	//panic("not implemented")
-	//if len(c.log) >= size {
-	//	// Simulate message re-delivery
-	//	if rand.Float64() < c.probabilityOfRedelivery {
-	//		return c.log[len(c.log)-size:]
-	//	}
-	//}
-	//
-	//var result []*Message
-	//for {
-	//	select {
-	//	case m := <-c.ch:
-	//		result = append(result, m)
-	//		if len(result) == size {
-	//			return result
-	//		}
-	//	}
-	//}
+	return c.log[len(c.log)-size:]
 }
 
 func (c *ChannelStream) Push(message Message) {
 	c.log = append(c.log, &message)
-	c.ch <- &message
 }
 
 func (c *ChannelStream) Log() []*Message {
@@ -176,9 +201,9 @@ type (
 	InvocationID = string
 
 	Invocation struct {
-		IID   InvocationID `json:"iid,omitempty"`
-		FID   invoker.FunctionID
-		Input invoker.FunctionInput
+		IID   InvocationID          `json:"iid,omitempty"`
+		FID   invoker.FunctionID    `json:"fid"`
+		Input invoker.FunctionInput `json:"input"`
 	}
 
 	InvocationResult struct {
@@ -191,6 +216,9 @@ type (
 )
 
 func toBytes(p interface{}) []byte {
-	res, _ := json.Marshal(p)
+	res, err := json.Marshal(p)
+	if err != nil {
+		panic(err)
+	}
 	return res
 }

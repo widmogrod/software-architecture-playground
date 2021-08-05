@@ -62,9 +62,9 @@ func (i *StreamInvoke) Work() {
 		//
 		//	 Solution to this is when functions are idempotent
 
-		for _, m := range i.s.Select(SelectCMD{
-			Kind: "Invocation",
-			Size: 1,
+		for _, m := range i.s.SelectOnce(SelectOnceCMD{
+			Kind:         "Invocation",
+			MaxFetchSize: 1,
 		}) {
 			var mm Invocation
 			err := json.Unmarshal(m.Data, &mm)
@@ -113,12 +113,14 @@ func (i *StreamInvoke) Result(iid InvocationID) (error, invoker.FunctionOutput) 
 	// TODO Fetch should allow to listen on InvocationResult but for a function that was invoke +
 	// i.s.Aggregate(IID)
 	// Invocation
-	for _, m := range i.s.Select(SelectCMD{
+	for _, m := range i.s.SelectOnce(SelectOnceCMD{
 		Kind: "InvocationResult",
-		JSONKeyValue: map[string]SelectConditions{
-			"iid": {Eq: iid},
+		Selector: &SelectConditions{
+			KeyValue: map[string]SelectConditions{
+				"iid": {Eq: iid},
+			},
 		},
-		Size: 1,
+		MaxFetchSize: 1,
 	}) {
 		var ir InvocationResult
 		err := json.Unmarshal(m.Data, &ir)
