@@ -34,24 +34,18 @@ var _ Streamer = &ChannelStream{}
 
 func NewChannelStream() *ChannelStream {
 	return &ChannelStream{
-
-		ch:  make(chan *Message),
-		log: make([]*Message, 0, 0),
-
-		selectors: make(map[*SelectOnceCMD]chan []*Message),
-
+		ch:                      make(chan *Message),
+		log:                     make([]*Message, 0, 0),
 		probabilityOfRedelivery: 0.5,
 	}
 }
 
 type ChannelStream struct {
-	loc sync.Mutex
-
 	ch     chan *Message
 	log    []*Message
 	cursor int
 
-	selectors map[*SelectOnceCMD]chan []*Message
+	selectors sync.Map
 
 	probabilityOfRedelivery float64
 }
@@ -73,31 +67,28 @@ type (
 	}
 )
 
-//type selectorResult struct {
-//	S SelectOnceCMD
-//	R chan *Message
-//}
-
 func (c *ChannelStream) SelectOnce(s SelectOnceCMD) []*Message {
-	c.loc.Lock()
-	c.selectors[&s] = make(chan []*Message, 1)
-	c.loc.Unlock()
+	ch := make(chan []*Message)
+	defer close(ch)
 
-	return <-c.selectors[&s]
+	c.selectors.Store(s, ch)
+	defer c.selectors.Delete(s)
+
+	return <-ch
 }
 
 func (c *ChannelStream) Work() {
-	results := make(map[*SelectOnceCMD][]*Message)
+	results := make(map[SelectOnceCMD][]*Message)
 
 	for {
 		for i := c.cursor; i < len(c.log); i++ {
 			m := c.log[i]
+			c.cursor = i
 
-			c.loc.Lock()
-			sel := c.selectors
-			c.loc.Unlock()
+			c.selectors.Range(func(key, value interface{}) bool {
+				s := key.(SelectOnceCMD)
+				res := value.(chan []*Message)
 
-			for s, res := range sel {
 				if match(m, s) {
 					results[s] = append(results[s], m)
 					if len(results[s]) >= s.MaxFetchSize {
@@ -106,21 +97,20 @@ func (c *ChannelStream) Work() {
 						default:
 						}
 
-						c.loc.Lock()
-						close(c.selectors[s])
-						delete(c.selectors, s)
-						c.loc.Unlock()
+						// Clear
+						delete(results, s)
+						c.selectors.Delete(key)
 					}
 				}
-			}
 
-			c.cursor = i
+				return true
+			})
 		}
 	}
 }
 
-func match(m *Message, s *SelectOnceCMD) bool {
-	if m == nil || s == nil {
+func match(m *Message, s SelectOnceCMD) bool {
+	if m == nil {
 		return false
 	}
 

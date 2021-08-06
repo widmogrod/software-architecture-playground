@@ -124,6 +124,7 @@ func TestChannelStream_SelectOnce(t *testing.T) {
 		},
 	}
 
+	t.Parallel()
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			s := NewChannelStream()
@@ -132,7 +133,8 @@ func TestChannelStream_SelectOnce(t *testing.T) {
 			}
 
 			go func() {
-				time.Sleep(time.Millisecond * 500)
+				// Delay worker so that SelectOnce will register
+				time.Sleep(time.Millisecond * 200)
 				s.Work()
 			}()
 
