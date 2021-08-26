@@ -1,8 +1,10 @@
 package dapar
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 func Parse(in []byte) (*Ast, error) {
@@ -11,6 +13,14 @@ func Parse(in []byte) (*Ast, error) {
 	}
 	err := p.Parse(in)
 	return p.ast, err
+}
+
+func MustParse(in []byte) *Ast {
+	ast, err := Parse(in)
+	if err != nil {
+		panic(err)
+	}
+	return ast
 }
 
 type Ast struct {
@@ -52,7 +62,7 @@ func (p *Parser) Parse(in []byte) error {
 			})
 		case nil:
 			// noop
-			return fmt.Errorf("cannot make sence with: %#v, %s", tok1, rest1)
+			return fmt.Errorf("cannot make sence with: %#v; what left: %s", tok1, rest1)
 		}
 	case nil:
 		// noop
@@ -68,6 +78,13 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 
 	tok1, rest1 := p.Select(in)
 	switch t1 := tok1.(type) {
+	case *Or:
+		dcs, err := p.ParseDataConstructors(rest1)
+		if err != nil {
+			panic(err)
+		}
+		res = append(res, dcs...)
+
 	case *Ident:
 		tok2, rest2 := p.Select(rest1)
 		switch tok2.(type) {
@@ -84,7 +101,7 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 			res = append(res, dcs...)
 
 		case *POpen:
-			types, err := p.ParseArgs(rest2)
+			types, rest3, err := p.ParseArgs(rest2)
 			if err != nil {
 				panic(err)
 			}
@@ -94,6 +111,13 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 				Args: types,
 			}
 			res = append(res, dc)
+
+			dcs, err := p.ParseDataConstructors(rest3)
+			if err != nil {
+				panic(string(rest3))
+				panic(err)
+			}
+			res = append(res, dcs...)
 
 		case nil:
 			dc := DataConstructor{
@@ -112,8 +136,9 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 	return res, nil
 }
 
-func (p *Parser) ParseArgs(in []byte) ([]Typ, error) {
+func (p *Parser) ParseArgs(in []byte) ([]Typ, []byte, error) {
 	var res []Typ
+	var left []byte
 
 	tok1, rest1 := p.Select(in)
 	switch t1 := tok1.(type) {
@@ -123,27 +148,30 @@ func (p *Parser) ParseArgs(in []byte) ([]Typ, error) {
 		}
 		res = append(res, t)
 
-		types, err := p.ParseArgs(rest1)
+		types, rest, err := p.ParseArgs(rest1)
 		if err != nil {
 			panic(err)
 		}
 		res = append(res, types...)
+		left = rest
 
 	case *Comma:
-		types, err := p.ParseArgs(rest1)
+		types, rest, err := p.ParseArgs(rest1)
 		if err != nil {
 			panic(err)
 		}
 		res = append(res, types...)
+		left = rest
 
 	case *PClose, nil:
 		// noop
+		left = rest1
 		break
 
 	default:
-		return nil, fmt.Errorf("expects type or nothing more, but get %#v: %s", tok1, in)
+		return nil, left, fmt.Errorf("expects type or nothing more, but get %#v: %s", tok1, in)
 	}
-	return res, nil
+	return res, left, nil
 }
 
 type Token = interface {
@@ -210,4 +238,31 @@ func (p *Parser) Select(in []byte) (Token, []byte) {
 	}
 
 	return nil, in
+}
+
+type Config struct {
+	PackageName string
+}
+
+func Generate(ast *Ast, c *Config) ([]byte, error) {
+	result := &bytes.Buffer{}
+
+	fmt.Fprintf(result, "// GENERATED do not edit!\n")
+	fmt.Fprintf(result, "package %s\n\n", c.PackageName)
+
+	for _, dt := range ast.DataTypes {
+		fmt.Fprintf(result, "type %s interface {\n", strings.Title(dt.Name))
+		fmt.Fprintf(result, "	%sDataType()\n", strings.Title(dt.Name))
+		fmt.Fprintf(result, "}\n")
+		for _, dc := range dt.Sum {
+			fmt.Fprintf(result, "\ntype %s struct {", strings.Title(dc.Name))
+			for _, t := range dc.Args {
+				fmt.Fprintf(result, "\n\t%s %s\n", strings.Title(t.Name), strings.Title(t.Name))
+			}
+			fmt.Fprintf(result, "}\n")
+			fmt.Fprintf(result, "\nfunc (_ %s) %sDataType() {}\n", strings.Title(dc.Name), strings.Title(dt.Name))
+		}
+	}
+
+	return result.Bytes(), nil
 }
