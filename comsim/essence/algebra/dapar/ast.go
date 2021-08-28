@@ -9,8 +9,9 @@ type (
 		Sum  []DataConstructor `(@@ ("|" @@)* ";"?)`
 	}
 	DataConstructor struct {
-		Name string `@Ident`
-		Args *Typ   `@@*`
+		Name  string  `@Ident`
+		Args  *Typ    `@@*`
+		Alias *string `("=" @Ident)*`
 	}
 	Typ struct {
 		Name   string   `  @Ident`

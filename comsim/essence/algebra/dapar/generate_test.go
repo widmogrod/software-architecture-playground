@@ -19,20 +19,28 @@ func TestGenerate(t *testing.T) {
 			ast:  &Ast{},
 			file: "_assets/empty_gen.go",
 		},
-		"should generate nothing on input = 'maybe = just(a) | nothing`'": {
+		"should generate = 'maybe = just(a) | nothing`'": {
 			c:    c,
 			ast:  MustParse([]byte(`maybe = just(maybe) | nothing`)),
 			file: "_assets/maybe_gen.go",
 		},
-		"should generate nothing on input = 'data = many([in]) | more [to]`'": {
+		"should generate = 'data = many([in]) | more [to]`'": {
 			c:    c,
 			ast:  MustParse([]byte(`data = many([in]) | more [to]`)),
 			file: "_assets/complex_gen.go",
 		},
-		"should generate nothing on input = 'data = many{list:[in], tuple: }`'": {
+		"should generate = 'den = r {list:[in], r: {tu:(a,[b],{k:c})}}`'": {
 			c:    c,
 			ast:  MustParse([]byte(`den = r {list:[in], r: {tu:(a,[b],{k:c})}}`)),
 			file: "_assets/record_gen.go",
+		},
+		"should generate = 'a = r {list:[in], r: {tu:(a,[b],{k:c})}}`'": {
+			c: c,
+			ast: MustParse([]byte(`
+err = Ok | Err = faults;
+faults = IOFault | Unexpected
+`)),
+			file: "_assets/alias_gen.go",
 		},
 	}
 	for name, uc := range useCases {

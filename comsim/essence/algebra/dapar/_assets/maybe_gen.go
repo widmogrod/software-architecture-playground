@@ -11,6 +11,6 @@ type Just struct {
 
 func (_ Just) _unionMaybe() {}
 
-type Nothing struct{}
+type Nothing struct {}
 
 func (_ Nothing) _unionMaybe() {}

@@ -7,7 +7,7 @@ type Den interface {
 
 type R struct {
 	List []In
-	R    struct {
+	R struct {
 		Tu struct {
 			T1 A
 			T2 []B

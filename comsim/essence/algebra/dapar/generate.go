@@ -12,6 +12,7 @@ type Config struct {
 }
 
 func Generate(ast *Ast, c *Config) ([]byte, error) {
+	isAliasToDataType := map[string]string{}
 	result := &bytes.Buffer{}
 
 	fmt.Fprintf(result, "// GENERATED do not edit!\n")
@@ -22,9 +23,15 @@ func Generate(ast *Ast, c *Config) ([]byte, error) {
 		fmt.Fprintf(result, "	_union%s()\n", strings.Title(dt.Name))
 		fmt.Fprintf(result, "}\n")
 		for _, dc := range dt.Sum {
+			if dc.Alias != nil {
+				isAliasToDataType[*dc.Alias] = dt.Name
+			}
 			fmt.Fprintf(result, "\ntype %s ", strings.Title(dc.Name))
 			gentypes(result, dc.Args, 0)
 			fmt.Fprintf(result, "\nfunc (_ %s) _union%s() {}\n", strings.Title(dc.Name), strings.Title(dt.Name))
+			if dataTypeAlias, ok := isAliasToDataType[dt.Name]; ok {
+				fmt.Fprintf(result, "\nfunc (_ %s) _union%s() {} // Alias\n", strings.Title(dc.Name), strings.Title(dataTypeAlias))
+			}
 		}
 	}
 

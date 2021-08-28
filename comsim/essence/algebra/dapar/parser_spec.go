@@ -35,6 +35,10 @@ func SpecRunner(t *testing.T, parse ParserFunc, useCases UseCases) {
 	}
 }
 
+func stringPtr(s string) *string {
+	return &s
+}
+
 var (
 	AdvanceSpec = map[string]Spec{
 		"should return AST with a few data types": {
@@ -71,6 +75,19 @@ other = out`),
 						{Name: "many", Args: ref(tuple(
 							list("in"),
 						))},
+						{Name: "more", Args: ref(
+							list("to"),
+						)},
+					}},
+				},
+			},
+		},
+		"should return AST with data constructor that accept list 3": {
+			in: []byte(`data = many = in | more [to]`),
+			out: &Ast{
+				DataTypes: []DataType{
+					{Name: "data", Sum: []DataConstructor{
+						{Name: "many", Alias: stringPtr("in")},
 						{Name: "more", Args: ref(
 							list("to"),
 						)},
