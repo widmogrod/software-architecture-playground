@@ -1,27 +1,26 @@
 predicate
- =     Eq (path, value)
- | Exists (path)
+ =     Eq {path: path, value: value}
+ | Exists {path: path}
  |    And (predicate, predicate)
  |     Or (predicate, predicate)
 ;
 
 workflow
- =   Activity (AID, activityT)
- | Transition (workflow, workflow)
+ =   Activity {id: AID, activity: activityT}
+ | Transition {from: workflow, to: workflow}
 ;
- // | Transition {from: workflow, to: workflow}
 
 activityT
- = start
- | end(endT)
- | choose (predicate, Activity, Activity)
- | reshape(reshapeT)
- | invocation (fid)
+ =      Start
+ |        End {Reason: endT}
+ |     Choose {if: predicate, then: Activity, else: Activity}
+ |    Reshape (reshapeT)
+ | Invocation (fid)
 ;
 
 endT
- = ok
- | err
+ = Ok
+ | Err
 ;
 
 reshapeT
@@ -30,8 +29,3 @@ reshapeT
  | rdict [(path, reshapeT)]
 ;
 
-//data
-// = dlit (lit)
-// | dlist [data]
-// | ddict [(lit, data)]
-//;

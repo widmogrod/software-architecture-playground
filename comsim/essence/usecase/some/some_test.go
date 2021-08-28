@@ -8,28 +8,28 @@ import (
 
 func TestSome(t *testing.T) {
 	flow := data.Transition{
-		T1: data.Activity{T1: data.AID("start"), T2: data.Start{}},
-		T2: data.Transition{
-			T1: data.Activity{
-				T1: data.AID("run-echo"),
-				T2: data.Invocation{
+		From: data.Activity{Id: data.AID("start"), Activity: data.Start{}},
+		To: data.Transition{
+			From: data.Activity{
+				Id: data.AID("run-echo"),
+				Activity: data.Invocation{
 					T1: data.Fid("echo"),
 				},
 			},
-			T2: data.Activity{
-				T1: data.AID("is-ok?"),
-				T2: data.Choose{
-					T1: data.Eq{
-						T1: data.Path([]string{"a"}),
-						T2: 1,
+			To: data.Activity{
+				Id: data.AID("is-ok?"),
+				Activity: data.Choose{
+					If: data.Eq{
+						Path:  data.Path([]string{"a"}),
+						Value: 1,
 					},
-					T2: data.Activity{
-						T1: data.AID("end"),
-						T2: data.End{T1: data.Ok{}},
+					Then: data.Activity{
+						Id:       data.AID("end"),
+						Activity: data.End{Reason: data.Ok{}},
 					},
-					T3: data.Activity{
-						T1: data.AID("error"),
-						T2: data.End{T1: data.Err{}},
+					Else: data.Activity{
+						Id:       data.AID("error"),
+						Activity: data.End{Reason: data.Err{}},
 					},
 				},
 			},

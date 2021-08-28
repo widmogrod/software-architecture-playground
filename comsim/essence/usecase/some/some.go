@@ -6,45 +6,6 @@ import (
 	"reflect"
 )
 
-func Do() {
-	flow := data.Transition{
-		T1: data.Activity{T1: data.AID("start"), T2: data.Start{}},
-		T2: data.Transition{
-			T1: data.Activity{
-				T1: data.AID("run-echo"),
-				T2: data.Invocation{
-					T1: data.Fid("echo"),
-				},
-			},
-			T2: data.Activity{
-				T1: data.AID("is-ok?"),
-				T2: data.Choose{
-					T1: data.Eq{
-						T1: data.Path([]string{"a"}),
-						T2: 1,
-					},
-					T2: data.Activity{
-						T1: data.AID("end"),
-						T2: data.End{T1: data.Ok{}},
-					},
-					T3: data.Activity{
-						T1: data.AID("error"),
-						T2: data.End{T1: data.Err{}},
-					},
-				},
-			},
-		},
-	}
-
-	state := ExecutionState{
-		Data: map[string]interface{}{"a": 1},
-		//Next: "start",
-	}
-
-	output := ExecuteWorkflow(flow, state)
-	fmt.Printf("result: %#v \n", output)
-}
-
 type ExecutionState struct {
 	Data Data
 	//Next data.AID
@@ -63,15 +24,15 @@ func ExecuteWorkflow(w data.Workflow, state ExecutionState) ExecutionState {
 
 	switch x := w.(type) {
 	case data.Activity:
-		switch y := x.T2.(type) {
+		switch y := x.Activity.(type) {
 		case data.End:
-			state.End = y.T1
+			state.End = y.Reason
 
 		case data.Choose:
-			if Match(y.T1, state.Data) {
-				return ExecuteWorkflow(y.T2, state)
+			if Match(y.If, state.Data) {
+				return ExecuteWorkflow(y.Then, state)
 			} else {
-				return ExecuteWorkflow(y.T3, state)
+				return ExecuteWorkflow(y.Else, state)
 			}
 
 		case data.Invocation:
@@ -87,8 +48,8 @@ func ExecuteWorkflow(w data.Workflow, state ExecutionState) ExecutionState {
 		panic(fmt.Sprintf("unknow type: %#v", x))
 
 	case data.Transition:
-		state = ExecuteWorkflow(x.T1, state)
-		state = ExecuteWorkflow(x.T2, state)
+		state = ExecuteWorkflow(x.From, state)
+		state = ExecuteWorkflow(x.To, state)
 	}
 
 	return state
@@ -99,13 +60,13 @@ type Data = map[string]interface{}
 func Match(p data.Predicate, d Data) bool {
 	switch x := p.(type) {
 	case data.Eq:
-		if v, ok := ValueFrom(x.T1, d); ok {
-			return reflect.DeepEqual(v, x.T2)
+		if v, ok := ValueFrom(x.Path, d); ok {
+			return reflect.DeepEqual(v, x.Value)
 		}
 		return false
 
 	case data.Exists:
-		_, found := ValueFrom(x.T1, d)
+		_, found := ValueFrom(x.Path, d)
 		return found
 
 	case data.And:
