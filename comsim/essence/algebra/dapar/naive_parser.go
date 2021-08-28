@@ -1,51 +1,23 @@
 package dapar
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
-	"strings"
 )
 
-func Parse(in []byte) (*Ast, error) {
-	p := &Parser{
+func NaiveParse(in []byte) (*Ast, error) {
+	p := &NaiveParser{
 		ast: &Ast{},
 	}
 	err := p.Parse(in)
 	return p.ast, err
 }
 
-func MustParse(in []byte) *Ast {
-	ast, err := Parse(in)
-	if err != nil {
-		panic(err)
-	}
-	return ast
-}
-
-type Ast struct {
-	DataTypes []DataType
-}
-
-type DataType struct {
-	Name string
-	Sum  []DataConstructor
-}
-
-type DataConstructor struct {
-	Name string
-	Args []Typ
-}
-
-type Typ struct {
-	Name string
-}
-
-type Parser struct {
+type NaiveParser struct {
 	ast *Ast
 }
 
-func (p *Parser) Parse(in []byte) error {
+func (p *NaiveParser) Parse(in []byte) error {
 	tok1, rest1 := p.Select(in)
 	switch t1 := tok1.(type) {
 	case *Ident:
@@ -73,7 +45,7 @@ func (p *Parser) Parse(in []byte) error {
 	return nil
 }
 
-func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
+func (p *NaiveParser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 	var res []DataConstructor
 
 	tok1, rest1 := p.Select(in)
@@ -101,20 +73,19 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 			res = append(res, dcs...)
 
 		case *POpen:
-			types, rest3, err := p.ParseArgs(rest2)
+			_, rest3, err := p.ParseArgs(rest2)
 			if err != nil {
 				panic(err)
 			}
 
 			dc := DataConstructor{
 				Name: t1.String(),
-				Args: types,
+				//Args: types,
 			}
 			res = append(res, dc)
 
 			dcs, err := p.ParseDataConstructors(rest3)
 			if err != nil {
-				panic(string(rest3))
 				panic(err)
 			}
 			res = append(res, dcs...)
@@ -136,7 +107,7 @@ func (p *Parser) ParseDataConstructors(in []byte) ([]DataConstructor, error) {
 	return res, nil
 }
 
-func (p *Parser) ParseArgs(in []byte) ([]Typ, []byte, error) {
+func (p *NaiveParser) ParseArgs(in []byte) ([]Typ, []byte, error) {
 	var res []Typ
 	var left []byte
 
@@ -206,7 +177,7 @@ func (i Ident) String() string {
 	return string(i.found)
 }
 
-func (p *Parser) Select(in []byte) (Token, []byte) {
+func (p *NaiveParser) Select(in []byte) (Token, []byte) {
 	if l := len(in); l == 0 {
 		return nil, nil
 	}
@@ -238,31 +209,4 @@ func (p *Parser) Select(in []byte) (Token, []byte) {
 	}
 
 	return nil, in
-}
-
-type Config struct {
-	PackageName string
-}
-
-func Generate(ast *Ast, c *Config) ([]byte, error) {
-	result := &bytes.Buffer{}
-
-	fmt.Fprintf(result, "// GENERATED do not edit!\n")
-	fmt.Fprintf(result, "package %s\n\n", c.PackageName)
-
-	for _, dt := range ast.DataTypes {
-		fmt.Fprintf(result, "type %s interface {\n", strings.Title(dt.Name))
-		fmt.Fprintf(result, "	%sDataType()\n", strings.Title(dt.Name))
-		fmt.Fprintf(result, "}\n")
-		for _, dc := range dt.Sum {
-			fmt.Fprintf(result, "\ntype %s struct {", strings.Title(dc.Name))
-			for _, t := range dc.Args {
-				fmt.Fprintf(result, "\n\t%s %s\n", strings.Title(t.Name), strings.Title(t.Name))
-			}
-			fmt.Fprintf(result, "}\n")
-			fmt.Fprintf(result, "\nfunc (_ %s) %sDataType() {}\n", strings.Title(dc.Name), strings.Title(dt.Name))
-		}
-	}
-
-	return result.Bytes(), nil
 }
