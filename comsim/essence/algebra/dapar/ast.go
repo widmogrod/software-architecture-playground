@@ -13,8 +13,13 @@ type (
 		Args *Typ   `@@*`
 	}
 	Typ struct {
-		Name  string `  @Ident`
-		List  *Typ   `| "[" @@ "]"`
-		Tuple []*Typ `| "(" @@ ("," @@)* ")"`
+		Name   string   `  @Ident`
+		List   *Typ     `| "[" @@ "]"`
+		Tuple  []*Typ   `| "(" @@ ("," @@)* ")"`
+		Record []Record `| "{" @@ ("," @@)* "}"`
+	}
+	Record struct {
+		Key   string `@Ident ":"`
+		Value *Typ   `@@`
 	}
 )

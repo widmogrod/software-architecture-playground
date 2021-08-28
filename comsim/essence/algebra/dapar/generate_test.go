@@ -29,6 +29,11 @@ func TestGenerate(t *testing.T) {
 			ast:  MustParse([]byte(`data = many([in]) | more [to]`)),
 			file: "_assets/complex_gen.go",
 		},
+		"should generate nothing on input = 'data = many{list:[in], tuple: }`'": {
+			c:    c,
+			ast:  MustParse([]byte(`den = r {list:[in], r: {tu:(a,[b],{k:c})}}`)),
+			file: "_assets/record_gen.go",
+		},
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
