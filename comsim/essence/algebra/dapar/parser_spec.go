@@ -56,18 +56,6 @@ other = out`),
 			},
 		},
 		"should return AST with data constructor that accept list": {
-			in: []byte(`data = many([in])`),
-			out: &Ast{
-				DataTypes: []DataType{
-					{Name: "data", Sum: []DataConstructor{
-						{Name: "many", Args: ref(tuple(
-							list("in"),
-						))},
-					}},
-				},
-			},
-		},
-		"should return AST with data constructor that accept list 2": {
 			in: []byte(`data = many([in]) | more [to]`),
 			out: &Ast{
 				DataTypes: []DataType{
@@ -82,7 +70,7 @@ other = out`),
 				},
 			},
 		},
-		"should return AST with data constructor that accept list 3": {
+		"should return AST with data constructor alias": {
 			in: []byte(`data = many = in | more [to]`),
 			out: &Ast{
 				DataTypes: []DataType{
@@ -90,6 +78,22 @@ other = out`),
 						{Name: "many", Alias: stringPtr("in")},
 						{Name: "more", Args: ref(
 							list("to"),
+						)},
+					}},
+				},
+			},
+		},
+		"should return AST with data constructor record ": {
+			in: []byte(`data = many {list: [to], one: to, two: (to,to)}`),
+			out: &Ast{
+				DataTypes: []DataType{
+					{Name: "data", Sum: []DataConstructor{
+						{Name: "many", Args: ref(
+							Typ{Record: []Record{
+								{Key: "list", Value: ref(list("to"))},
+								{Key: "one", Value: ref(typ("to"))},
+								{Key: "two", Value: ref(tuple(typ("to"), typ("to")))},
+							}},
 						)},
 					}},
 				},
