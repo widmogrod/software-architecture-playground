@@ -9,10 +9,6 @@ type Ok struct {}
 
 func (_ Ok) _unionErr() {}
 
-type Err struct {}
-
-func (_ Err) _unionErr() {}
-
 type Faults interface {
 	_unionFaults()
 }

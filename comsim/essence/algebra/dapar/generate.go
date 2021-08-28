@@ -25,6 +25,7 @@ func Generate(ast *Ast, c *Config) ([]byte, error) {
 		for _, dc := range dt.Sum {
 			if dc.Alias != nil {
 				isAliasToDataType[*dc.Alias] = dt.Name
+				continue
 			}
 			fmt.Fprintf(result, "\ntype %s ", strings.Title(dc.Name))
 			gentypes(result, dc.Args, 0)
