@@ -24,8 +24,8 @@ end
 ;
 
 reshape
- = Select {Path: path}
- |  ReMap [{Key: path, Value: path}]
+ =   Select {Path: path}
+ |    ReMap [{Key: path, Value: path}]
 ;
 
 

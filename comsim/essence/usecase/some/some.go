@@ -38,28 +38,11 @@ func ExecuteWorkflow(w data.Workflow, state *ExecutionState) *ExecutionState {
 			}
 
 		case data.Reshape:
-			switch z := y.(type) {
-			case data.Select:
-				if m, ok := ValueFrom(z.Path, state.Data); ok {
-					state.Data = m
-				} else {
-					panic(fmt.Sprintf("cannot match path: %v", z.Path))
-				}
-			case data.ReMap:
-				result := make(MapStrAny)
-				for i := range z {
-					mapping := z[i]
-					if value, ok := ValueFrom(mapping.Value, state.Data); ok {
-						result = ValueTo(mapping.Key, result, value)
-					} else {
-						panic(fmt.Sprintf("cannot map: %v on data: %v", mapping, state.Data))
-					}
-				}
-				state.Data = result
-
-			default:
-				panic(fmt.Sprintf("unknow Reshape type: %#v", y))
+			newData, err := DoReshape(y, state.Data)
+			if err != nil {
+				panic(err)
 			}
+			state.Data = newData
 
 		case data.Invocation:
 			switch y.T1 {
@@ -170,4 +153,52 @@ func ValueTo(path data.Path, result MapStrAny, value interface{}) MapStrAny {
 	}
 
 	return result
+}
+
+func DoReshape(shape data.Reshape, value interface{}) (interface{}, error) {
+	to := &simpleDataShaper{
+		data: value,
+	}
+
+	_ = data.MapReshape(shape, to)
+
+	if to.err != nil {
+		return nil, to.err
+	}
+
+	return to.data, nil
+}
+
+var _ data.ReshapeVisitor = &simpleDataShaper{}
+
+type simpleDataShaper struct {
+	data interface{}
+	err  error
+}
+
+func (m *simpleDataShaper) VisitSelect(x data.Select) interface{} {
+	if v, ok := ValueFrom(x.Path, m.data); ok {
+		m.data = v
+	} else {
+		m.err = fmt.Errorf("cannot match path: %v", x.Path)
+		return nil
+	}
+
+	return nil
+}
+
+func (m *simpleDataShaper) VisitReMap(x data.ReMap) interface{} {
+	result := make(MapStrAny)
+	for i := range x {
+		mapping := x[i]
+		if value, ok := ValueFrom(mapping.Value, m.data); ok {
+			result = ValueTo(mapping.Key, result, value)
+		} else {
+			m.err = fmt.Errorf("cannot map: %v", mapping)
+			return nil
+		}
+	}
+	m.data = result
+
+	return nil
 }
