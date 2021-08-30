@@ -1,4 +1,4 @@
-// build ignore
+// +build ignore
 package main
 
 import (
@@ -9,7 +9,6 @@ import (
 
 var path = flag.String("path", "-", "path name")
 
-//go:generate go run generate.go -path "data/spec.dpr"
 //go:generate go run generate.go -path "data/runtime.dpr"
 
 func main() {

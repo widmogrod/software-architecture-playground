@@ -25,10 +25,6 @@ func TestSome(t *testing.T) {
 						Value: 12,
 					},
 					Then: data.Transition{
-						//From: data.Activity{
-						//	Id:       "map",
-						//	Activity: data.Select{Path: []string{"echoed"}},
-						//},
 						From: data.Activity{
 							Id: "map",
 							Activity: data.ReMap([]data.ReMapRecord{
