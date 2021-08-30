@@ -33,11 +33,11 @@ func (i *Invoke) Get(name FunctionID) (error, Function) {
 	return i.fr.Get(name)
 }
 
-func (i *Invoke) Invoke(name FunctionID, input FunctionInput) (error, FunctionOutput) {
+func (i *Invoke) Invoke(name FunctionID, input FunctionInput) (FunctionOutput, error) {
 	err, f := i.Get(name)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
-	return nil, f.Call(input)
+	return f.Call(input), nil
 }

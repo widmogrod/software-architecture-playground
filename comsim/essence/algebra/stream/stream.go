@@ -77,6 +77,15 @@ func (c *ChannelStream) SelectOnce(s SelectOnceCMD) []*Message {
 	return <-ch
 }
 
+type (
+	ReduceCMD struct {
+	}
+)
+
+func (c *ChannelStream) Reduce(r ReduceCMD) {
+
+}
+
 func (c *ChannelStream) Work() {
 	results := make(map[SelectOnceCMD][]*Message)
 

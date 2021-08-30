@@ -14,7 +14,7 @@ func TestInvokeInMemory(t *testing.T) {
 	assert.NoError(t, err)
 
 	i := NewInvoker(fr)
-	err, res := i.Invoke("a", "World")
+	res, err := i.Invoke("a", "World")
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello World", res)
 }
@@ -25,7 +25,7 @@ func TestInvokeInDocker(t *testing.T) {
 	assert.NoError(t, err)
 
 	i := NewInvoker(fr)
-	err, res := i.Invoke("a", "World")
+	res, err := i.Invoke("a", "World")
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello World, from Docker!", res)
 }
