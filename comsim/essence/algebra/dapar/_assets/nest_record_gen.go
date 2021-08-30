@@ -6,15 +6,15 @@ type (
 		_unionNestrecord()
 	}
 	R struct {
-		A RecordRA
+		A RARecord
 	}
-	RecordRA struct {
-		B RecordRAB
+	RARecord struct {
+		B RABRecord
 	}
-	RecordRAB struct {
-		C RecordRABC
+	RABRecord struct {
+		C RABCRecord
 	}
-	RecordRABC struct {
+	RABCRecord struct {
 		A E
 	}
 )

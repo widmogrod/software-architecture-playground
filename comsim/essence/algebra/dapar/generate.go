@@ -83,19 +83,19 @@ func getLeafName(t *Typ) string {
 }
 
 func getNonLeafName(t *Typ, dcName string, path []*Typ) string {
-	prefix := ""
+	suffix := ""
 	if len(path) > 0 {
-		prefix = "Literal"
+		suffix = "Literal"
 		if t.Record != nil {
-			prefix = "Record"
+			suffix = "Record"
 		} else if t.List != nil {
-			prefix = "List"
+			suffix = "List"
 		} else if t.Tuple != nil {
-			prefix = "Tuple"
+			suffix = "Tuple"
 		}
 	}
 
-	return prefix + dcName + typeSuffix(path)
+	return dcName + typeSuffix(path) + suffix
 }
 
 func renderFlatType(dc DataConstructor) []byte {

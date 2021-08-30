@@ -5,20 +5,20 @@ type (
 	Den interface {
 		_unionDen()
 	}
-	R []RecordR // non-leaf
-	RecordR struct {
+	R []RRecord // non-leaf
+	RRecord struct {
 		Li []In
-		R RecordRLiR
+		R RLiRRecord
 	}
-	RecordRLiR struct {
-		Tu TupleRLiRTu
+	RLiRRecord struct {
+		Tu RLiRTuTuple
 	}
-	TupleRLiRTu struct {
+	RLiRTuTuple struct {
 		T1 A
 		T2 []B
-		T3 RecordRLiRTu
+		T3 RLiRTuRecord
 	}
-	RecordRLiRTu struct {
+	RLiRTuRecord struct {
 		K C
 	}
 )
