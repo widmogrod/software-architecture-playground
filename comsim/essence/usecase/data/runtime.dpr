@@ -12,20 +12,21 @@ workflow
 
 activityT
  =      Start
- |        End {Reason: endT}
- |     Choose {if: predicate, then: Activity, else: Activity}
- |    Reshape (reshapeT)
+ |        End = end
+ |     Choose {if: predicate, then: workflow, else: workflow}
+ |    Reshape = reshape
  | Invocation (fid)
 ;
 
-endT
+end
  = Ok
  | Err
 ;
 
-reshapeT
- = rpath [lit]
- | rlist [path]
- | rdict [(path, reshapeT)]
+reshape
+ = Select {Path: path}
+ |  ReMap [{Key: path, Value: path}]
 ;
+
+
 
