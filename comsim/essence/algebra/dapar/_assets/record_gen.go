@@ -23,3 +23,16 @@ type (
 	}
 )
 func (_ R) _unionDen() {}
+
+type DenVisitor interface {
+	VisitR(x R) interface{}
+}
+
+func MapDen(value Den, v DenVisitor) interface{} {
+	switch x := value.(type) {
+	case R:
+		return v.VisitR(x)
+	default:
+		panic(`unknown type`)
+	}
+}

@@ -38,6 +38,13 @@ func Generate(ast *Ast, c *Config) ([]byte, error) {
 		}
 		fmt.Fprintf(result, ")\n")
 		tags.WriteTo(result)
+
+		if dt.Sum != nil {
+			fmt.Fprintf(result, "\n")
+			result.Write(renderVisitor(dt))
+			fmt.Fprintf(result, "\n")
+			result.Write(renderVisitorMap(dt))
+		}
 	}
 
 	return result.Bytes(), nil
@@ -189,4 +196,37 @@ func BreathFirstSearch(typ *Typ, f VisitorFunc) {
 			queue = append(queue, typ.List)
 		}
 	}
+}
+
+func renderVisitor(dt DataType) []byte {
+	result := bytes.NewBuffer(nil)
+	dtName := strings.Title(dt.Name)
+
+	fmt.Fprintf(result, "type %sVisitor interface {\n", dtName)
+	for _, dc := range dt.Sum {
+		dcName := strings.Title(dc.Name)
+		fmt.Fprintf(result, "\tVisit%s(x %s) interface{}\n", dcName, dcName)
+	}
+	fmt.Fprintf(result, "}\n")
+
+	return result.Bytes()
+}
+
+func renderVisitorMap(dt DataType) []byte {
+	result := bytes.NewBuffer(nil)
+	dtName := strings.Title(dt.Name)
+
+	fmt.Fprintf(result, "func Map%s(value %s, v %sVisitor) interface{} {\n", dtName, dtName, dtName)
+	fmt.Fprintf(result, "\tswitch x := value.(type) {\n")
+	for _, dc := range dt.Sum {
+		dcName := strings.Title(dc.Name)
+		fmt.Fprintf(result, "\tcase %s:\n", dcName)
+		fmt.Fprintf(result, "\t\treturn v.Visit%s(x)\n", dcName)
+	}
+	fmt.Fprintf(result, "\tdefault:\n")
+	fmt.Fprintf(result, "\t\tpanic(`unknown type`)\n")
+	fmt.Fprintf(result, "\t}\n")
+	fmt.Fprintf(result, "}\n")
+
+	return result.Bytes()
 }

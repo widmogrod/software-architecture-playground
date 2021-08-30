@@ -19,3 +19,16 @@ type (
 	}
 )
 func (_ R) _unionNestrecord() {}
+
+type NestrecordVisitor interface {
+	VisitR(x R) interface{}
+}
+
+func MapNestrecord(value Nestrecord, v NestrecordVisitor) interface{} {
+	switch x := value.(type) {
+	case R:
+		return v.VisitR(x)
+	default:
+		panic(`unknown type`)
+	}
+}
