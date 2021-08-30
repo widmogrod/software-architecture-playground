@@ -1,16 +1,14 @@
 // GENERATED do not edit!
 package _assets
 
-type Maybe interface {
-	_unionMaybe()
-}
-
-type Just struct {
-	T1 Maybe
-}
-
+type (
+	Maybe interface {
+		_unionMaybe()
+	}
+	Just struct {
+		T1 Maybe
+	}
+	Nothing struct {}
+)
 func (_ Just) _unionMaybe() {}
-
-type Nothing struct {}
-
 func (_ Nothing) _unionMaybe() {}

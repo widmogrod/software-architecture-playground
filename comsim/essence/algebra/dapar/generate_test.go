@@ -1,7 +1,6 @@
 package dapar
 
 import (
-	"bytes"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
@@ -31,10 +30,15 @@ func TestGenerate(t *testing.T) {
 		},
 		"should generate = 'den = r {list:[in], r: {tu:(a,[b],{k:c})}}`'": {
 			c:    c,
-			ast:  MustParse([]byte(`den = r {list:[in], r: {tu:(a,[b],{k:c})}}`)),
+			ast:  MustParse([]byte(`den = r [{li:[in], r: {tu:(a,[b],{k:c})}}]`)),
 			file: "_assets/record_gen.go",
 		},
-		"should generate = 'a = r {list:[in], r: {tu:(a,[b],{k:c})}}`'": {
+		"should generate = 'nestrecord = r {a: {b: {c: {a: e}}}}`'": {
+			c:    c,
+			ast:  MustParse([]byte(`nestrecord = r {a: {b: {c: {a: e}}}}`)),
+			file: "_assets/nest_record_gen.go",
+		},
+		"should generate = 'err = Ok | Err = faults; faults...`'": {
 			c: c,
 			ast: MustParse([]byte(`
 err = Ok | Err = faults;
@@ -51,36 +55,6 @@ faults = IOFault | Unexpected
 			expected, err := ioutil.ReadFile(uc.file)
 			assert.NoError(t, err)
 			assert.Equal(t, string(expected), string(result))
-		})
-	}
-}
-
-func TestGenTypes(t *testing.T) {
-	useCases := map[string]struct {
-		typ      *Typ
-		expected []byte
-	}{
-		"a": {
-			typ:      ref(tuple(typ("a"))),
-			expected: []byte("struct {\n\tT1 A\n}\n"),
-		},
-		"b": {
-			typ:      ref(tuple(typ("a"), list("b"))),
-			expected: []byte("struct {\n\tT1 A\n\tT2 []B\n}\n"),
-		},
-		"c": {
-			typ: &Typ{List: &Typ{Tuple: []*Typ{
-				ref(list("a")),
-				ref(typ("b")),
-			}}},
-			expected: []byte("[]struct {\n\tT1 []A\n\tT2 B\n}\n"),
-		},
-	}
-	for name, uc := range useCases {
-		t.Run(name, func(t *testing.T) {
-			res := bytes.NewBuffer(nil)
-			gentypes(res, uc.typ, 0)
-			assert.Equal(t, string(uc.expected), string(res.Bytes()))
 		})
 	}
 }

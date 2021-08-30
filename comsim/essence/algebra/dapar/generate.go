@@ -3,7 +3,6 @@ package dapar
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -14,66 +13,180 @@ type Config struct {
 func Generate(ast *Ast, c *Config) ([]byte, error) {
 	isAliasToDataType := map[string]string{}
 	result := &bytes.Buffer{}
+	tags := &bytes.Buffer{}
 
 	fmt.Fprintf(result, "// GENERATED do not edit!\n")
 	fmt.Fprintf(result, "package %s\n", c.PackageName)
 
 	for _, dt := range ast.DataTypes {
-		fmt.Fprintf(result, "\ntype %s interface {\n", strings.Title(dt.Name))
-		fmt.Fprintf(result, "	_union%s()\n", strings.Title(dt.Name))
-		fmt.Fprintf(result, "}\n")
+		fmt.Fprintf(result, "\ntype (\n")
+		fmt.Fprintf(result, "\t%s interface {\n", strings.Title(dt.Name))
+		fmt.Fprintf(result, "\t	_union%s()\n", strings.Title(dt.Name))
+		fmt.Fprintf(result, "\t}\n")
 		for _, dc := range dt.Sum {
 			if dc.Alias != nil {
 				isAliasToDataType[*dc.Alias] = dt.Name
 				continue
 			}
-			fmt.Fprintf(result, "\ntype %s ", strings.Title(dc.Name))
-			gentypes(result, dc.Args, 0)
-			fmt.Fprintf(result, "\nfunc (_ %s) _union%s() {}\n", strings.Title(dc.Name), strings.Title(dt.Name))
+
+			result.Write(renderFlatType(dc))
+
+			fmt.Fprintf(tags, "func (_ %s) _union%s() {}\n", strings.Title(dc.Name), strings.Title(dt.Name))
 			if dataTypeAlias, ok := isAliasToDataType[dt.Name]; ok {
-				fmt.Fprintf(result, "\nfunc (_ %s) _union%s() {} // Alias\n", strings.Title(dc.Name), strings.Title(dataTypeAlias))
+				fmt.Fprintf(tags, "func (_ %s) _union%s() {} // Alias\n", strings.Title(dc.Name), strings.Title(dataTypeAlias))
 			}
 		}
+		fmt.Fprintf(result, ")\n")
+		tags.WriteTo(result)
 	}
 
 	return result.Bytes(), nil
 }
 
-func gentypes(result io.Writer, t *Typ, depth int) {
-	if t == nil {
-		fmt.Fprintf(result, "struct {}\n")
-		return
-	}
-
+func typeName(t *Typ) string {
 	if t.Record != nil {
-		fmt.Fprintf(result, "struct {\n")
+		result := strings.Builder{}
 		for _, record := range t.Record {
-			result.Write(bytes.Repeat([]byte("\t"), depth+1))
-			fmt.Fprintf(result, "%s ", strings.Title(record.Key))
-			gentypes(result, record.Value, depth+1)
+			result.WriteString(strings.Title(record.Key))
 		}
-		result.Write(bytes.Repeat([]byte("\t"), depth))
-		fmt.Fprintf(result, "}\n")
-		return
+		return result.String()
 	}
 
-	if t.Tuple != nil {
-		fmt.Fprintf(result, "struct {\n")
-		for i, t := range t.Tuple {
-			result.Write(bytes.Repeat([]byte("\t"), depth+1))
-			fmt.Fprintf(result, "T%d ", i+1)
-			gentypes(result, t, depth+1)
+	return strings.Title(t.Name)
+}
+
+func typeSuffix(path []*Typ) string {
+	result := strings.Builder{}
+	for i := range path {
+		result.WriteString(typeName(path[i]))
+	}
+	return result.String()
+}
+
+func isLeaf(t *Typ) bool {
+	if t.Name != "" {
+		return true
+	}
+	if t.List != nil && isLeaf(t.List) {
+		return true
+	}
+
+	return false
+}
+
+func getLeafName(t *Typ) string {
+	if t.Name != "" {
+		return strings.Title(t.Name)
+	}
+
+	return "[]" + getLeafName(t.List)
+}
+
+func getNonLeafName(t *Typ, dcName string, path []*Typ) string {
+	prefix := ""
+	if len(path) > 0 {
+		prefix = "Literal"
+		if t.Record != nil {
+			prefix = "Record"
+		} else if t.List != nil {
+			prefix = "List"
+		} else if t.Tuple != nil {
+			prefix = "Tuple"
 		}
-		result.Write(bytes.Repeat([]byte("\t"), depth))
-		fmt.Fprintf(result, "}\n")
-		return
 	}
 
-	if t.List != nil {
-		fmt.Fprintf(result, "[]")
-		gentypes(result, t.List, depth)
-		return
+	return prefix + dcName + typeSuffix(path)
+}
+
+func renderFlatType(dc DataConstructor) []byte {
+	result := bytes.NewBuffer(nil)
+	dcName := strings.Title(dc.Name)
+
+	if dc.Args == nil {
+		fmt.Fprintf(result, "\t%s struct {}\n", dcName)
+		return result.Bytes()
 	}
 
-	fmt.Fprintf(result, "%s\n", strings.Title(t.Name))
+	BreathFirstSearch(dc.Args, func(t *Typ, path []*Typ) {
+		// Top level list rendering
+		if t.List != nil && len(path) == 0 {
+			if isLeaf(t) {
+				fmt.Fprintf(result, "\t%s []%s // leaf\n", getNonLeafName(t, dcName, path), getLeafName(t.List))
+			} else {
+				fmt.Fprintf(result, "\t%s []%s // non-leaf\n", getNonLeafName(t, dcName, path), getNonLeafName(t.List, dcName, append(path, t)))
+			}
+		}
+
+		if t.Record != nil {
+			fmt.Fprintf(result, "\t%s struct {\n", getNonLeafName(t, dcName, path))
+			for _, record := range t.Record {
+				if isLeaf(record.Value) {
+					fmt.Fprintf(result, "\t\t%s %s\n", strings.Title(record.Key), getLeafName(record.Value))
+				} else {
+					fmt.Fprintf(result, "\t\t%s %s\n", strings.Title(record.Key), getNonLeafName(record.Value, dcName, append(path, t)))
+				}
+			}
+			fmt.Fprintf(result, "\t}\n")
+		}
+
+		if t.Tuple != nil {
+			fmt.Fprintf(result, "\t%s struct {\n", getNonLeafName(t, dcName, path))
+			for i := range t.Tuple {
+				tuple := t.Tuple[i]
+				if isLeaf(tuple) {
+					fmt.Fprintf(result, "\t\tT%d %s\n", i+1, getLeafName(tuple))
+				} else {
+					fmt.Fprintf(result, "\t\tT%d %s\n", i+1, getNonLeafName(tuple, dcName, append(path, t)))
+				}
+			}
+			fmt.Fprintf(result, "\t}\n")
+		}
+	})
+
+	return result.Bytes()
+}
+
+type VisitorFunc = func(typ *Typ, path []*Typ)
+
+func BreathFirstSearch(typ *Typ, f VisitorFunc) {
+	visited := make(map[*Typ]bool)
+	parent := make(map[*Typ]*Typ)
+
+	for queue := []*Typ{typ}; len(queue) > 0; {
+		typ := queue[0]
+		queue = queue[1:]
+
+		if _, ok := visited[typ]; ok {
+			continue
+		}
+
+		path := make([]*Typ, 0)
+		p := typ
+		for {
+			if p = parent[p]; p != nil {
+				path = append([]*Typ{p}, path...)
+			} else {
+				break
+			}
+		}
+
+		f(typ, path)
+		visited[typ] = true
+
+		if typ.Record != nil {
+			for _, record := range typ.Record {
+				parent[record.Value] = typ
+				queue = append(queue, record.Value)
+			}
+		} else if typ.Tuple != nil {
+			for i := range typ.Tuple {
+				tuple := typ.Tuple[i]
+				parent[tuple] = typ
+				queue = append(queue, tuple)
+			}
+		} else if typ.List != nil {
+			parent[typ.List] = typ
+			queue = append(queue, typ.List)
+		}
+	}
 }
