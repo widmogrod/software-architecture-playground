@@ -1,9 +1,10 @@
 package data
 
 type (
-	Lit   = interface{}
-	Fid   = string
-	Value = interface{}
-	Path  = []string
-	AID   = string
+	Any       = interface{}
+	Fid       = string
+	Path      = []string
+	AID       = string
+	String    = string
+	MapStrAny = map[string]interface{}
 )

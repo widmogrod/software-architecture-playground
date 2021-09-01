@@ -1,5 +1,5 @@
 predicate
- =     Eq {path: path, value: value}
+ =     Eq {path: path, value: any}
  | Exists {path: path}
  |    And (predicate, predicate)
  |     Or (predicate, predicate)
@@ -14,8 +14,9 @@ activityT
  =      Start
  |        End = end
  |     Choose {if: predicate, then: workflow, else: workflow}
+ |     Assign {Var: string, flow: workflow}
  |    Reshape = reshape
- | Invocation (fid)
+ | Invocation (fid, reshape)
 ;
 
 end
@@ -26,6 +27,7 @@ end
 reshape
  =   Select {Path: path}
  |    ReMap [{Key: path, Value: path}]
+ |    Set {Map: MapStrAny}
 ;
 
 

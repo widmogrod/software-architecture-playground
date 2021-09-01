@@ -8,8 +8,8 @@ import (
 
 type ExecutionState struct {
 	Data Data
-	//Next data.AID
-	End data.End
+	End   data.End
+	Scope MapStrAny
 }
 
 type TraverseResult struct {
@@ -31,24 +31,43 @@ func ExecuteWorkflow(w data.Workflow, state *ExecutionState) *ExecutionState {
 			state.End = y
 
 		case data.Choose:
-			if Match(y.If, state.Data) {
-				return ExecuteWorkflow(y.Then, state)
+			if Match(y.If, state.Scope) {
+				// Values in scope should not escape up
+				// TODO: refactor state from pointer to make sure it works
+				_ = ExecuteWorkflow(y.Then, state)
 			} else {
-				return ExecuteWorkflow(y.Else, state)
+				_ = ExecuteWorkflow(y.Else, state)
 			}
 
 		case data.Reshape:
-			newData, err := DoReshape(y, state.Data)
+			newData, err := DoReshape(y, state.Scope)
 			if err != nil {
 				panic(err)
 			}
 			state.Data = newData
 
+		case data.Assign:
+			result := ExecuteWorkflow(y.Flow, state)
+			if y.Var == "_" {
+				break
+			}
+			if _, exists := state.Scope[y.Var]; exists {
+				fmt.Println(y.Var)
+				fmt.Println(state.Scope)
+				panic(fmt.Sprintf("cannot resuse variable '%s'", y.Var))
+			}
+			state.Scope[y.Var] = result.Data
+
 		case data.Invocation:
+			value, err := DoReshape(y.T2, state.Scope)
+			if err != nil {
+				panic(fmt.Sprintf("cannot reshape value: %#v in invocation: %#v; err=%s", y.T2, y.T1, err))
+			}
+
 			switch y.T1 {
 			case "echo":
 				state.Data = MapStrAny{
-					"echoed": 12,
+					"echoed": value,
 				}
 			default:
 				panic(fmt.Sprintf("unknow invocation: %#v", y.T1))
@@ -174,6 +193,16 @@ var _ data.ReshapeVisitor = &simpleDataShaper{}
 type simpleDataShaper struct {
 	data interface{}
 	err  error
+}
+
+func (m *simpleDataShaper) VisitSet(x data.Set) interface{} {
+	if x.Map != nil {
+		m.data = x.Map
+		return nil
+	}
+
+	m.err = fmt.Errorf("cannot set nil value: %v", x)
+	return nil
 }
 
 func (m *simpleDataShaper) VisitSelect(x data.Select) interface{} {
