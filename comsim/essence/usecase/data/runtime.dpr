@@ -11,7 +11,7 @@ workflow
 ;
 
 activityT
- =      Start
+ =      Start {Var: string}
  |        End = end
  |     Choose {if: predicate, then: workflow, else: workflow}
  |     Assign {Var: string, flow: workflow}

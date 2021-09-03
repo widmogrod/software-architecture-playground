@@ -1,13 +1,14 @@
 package some
 
 import (
+	"errors"
 	"fmt"
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/usecase/data"
 	"reflect"
 )
 
 type ExecutionState struct {
-	Data Data
+	Data  Data
 	End   data.End
 	Scope MapStrAny
 }
@@ -230,4 +231,29 @@ func (m *simpleDataShaper) VisitReMap(x data.ReMap) interface{} {
 	m.data = result
 
 	return nil
+}
+
+var ErrInputVarNotFound = errors.New("input var name not found")
+
+func FindInputVar(flow data.Workflow) (string, error) {
+	switch x := flow.(type) {
+	case data.Activity:
+		// Because start must be first activity
+		// this is enough
+		switch y := x.Activity.(type) {
+		case data.Start:
+			return y.Var, nil
+		default:
+			return "", ErrInputVarNotFound
+		}
+
+	case data.Transition:
+		result, err := FindInputVar(x.From)
+		if err != nil {
+			result, err = FindInputVar(x.To)
+		}
+		return result, err
+	default:
+		panic(fmt.Sprintf("unknow Workflow type: %#v", x))
+	}
 }
