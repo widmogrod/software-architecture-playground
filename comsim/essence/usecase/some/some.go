@@ -7,10 +7,15 @@ import (
 	"reflect"
 )
 
+type Invoker interface {
+	Invoke(functionName string, input interface{}) (interface{}, error)
+}
+
 type ExecutionState struct {
-	Data  Data
-	End   data.End
-	Scope MapStrAny
+	Data    Data
+	End     data.End
+	Scope   MapStrAny
+	Invoker Invoker
 }
 
 type TraverseResult struct {
@@ -60,19 +65,19 @@ func ExecuteWorkflow(w data.Workflow, state *ExecutionState) *ExecutionState {
 			state.Scope[y.Var] = result.Data
 
 		case data.Invocation:
-			value, err := DoReshape(y.T2, state.Scope)
-			if err != nil {
-				panic(fmt.Sprintf("cannot reshape value: %#v in invocation: %#v; err=%s", y.T2, y.T1, err))
-			}
-
-			switch y.T1 {
-			case "echo":
-				state.Data = MapStrAny{
-					"echoed": value,
+			var value interface{}
+			if y.T2 != nil {
+				var err error
+				value, err = DoReshape(y.T2, state.Scope)
+				if err != nil {
+					panic(fmt.Sprintf("cannot reshape value: %#v in invocation: %#v; err=%s", y.T2, y.T1, err))
 				}
-			default:
-				panic(fmt.Sprintf("unknow invocation: %#v", y.T1))
 			}
+			result, err := state.Invoker.Invoke(y.T1, value)
+			if err != nil {
+				panic(fmt.Sprintf("invocation error: %s", err))
+			}
+			state.Data = result
 		default:
 			panic(fmt.Sprintf("unknow ActivityT type: %#v", y))
 		}

@@ -1,6 +1,7 @@
 package some
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -10,17 +11,62 @@ import (
 	"testing"
 )
 
+var _ Invoker = &jsonInvoker{}
+
+type FunctionID = string
+type FunctionInput = string
+type FunctionOutput = string
+
+type jsonInvoker struct {
+	Call func(name FunctionID, input FunctionInput) (FunctionOutput, error)
+}
+
+func (j *jsonInvoker) Invoke(functionName string, input interface{}) (interface{}, error) {
+	in, err := json.Marshal(input)
+	if err != nil {
+		return nil, fmt.Errorf("invoke. Cannot conver input to JSON: %w", err)
+	}
+
+	out, err := j.Call(functionName, string(in))
+	if err != nil {
+		return nil, err
+	}
+
+	var res interface{}
+	err = json.Unmarshal([]byte(out), &res)
+	if err != nil {
+		return nil, fmt.Errorf("invoke. Cannot conver output to JSON: %w", err)
+	}
+
+	return res, nil
+}
+
 func TestExecuteWorkflow(t *testing.T) {
 	fr := invoker.NewInMemoryFunctionRegistry()
 	fr.Register(stream.MkFunctionID("echo"), &invoker.FunctionInMemory{
 		F: func(input invoker.FunctionInput) invoker.FunctionOutput {
-			return fmt.Sprintf("echo-from-function with input %s", input)
+			var i int
+			err := json.Unmarshal([]byte(input), &i)
+			if err != nil {
+				panic(err)
+			}
+
+			result := MapStrAny{
+				"echoed": i,
+			}
+
+			output, err := json.Marshal(result)
+			if err != nil {
+				panic(err)
+			}
+			return string(output)
 		}})
 
 	// TODO create JSON invoker
 	invoke := invoker.NewInvoker(fr)
-	out, err := invoke.Invoke("echo", "input")
-	fmt.Println(out, err)
+	jsonInvoke := &jsonInvoker{
+		Call: invoke.Invoke,
+	}
 
 	flow := data.Transition{
 		From: data.Activity{
@@ -50,7 +96,7 @@ func TestExecuteWorkflow(t *testing.T) {
 				Activity: data.Choose{
 					If: data.Eq{
 						Path:  data.Path{"res1", "echoed"},
-						Value: 12,
+						Value: float64(12),
 					},
 					Then: data.Transition{
 						From: data.Activity{
@@ -83,14 +129,16 @@ func TestExecuteWorkflow(t *testing.T) {
 		//Data: 12,
 		Data: map[string]interface{}{
 			"my": map[string]interface{}{
-				"nested": 12,
+				"nested": float64(12),
 			},
 		},
 		Scope: MapStrAny{
 			"input": MapStrAny{"some": MapStrAny{"payload": 12}},
-			"res1":  MapStrAny{"echoed": 12},
+			"res1":  MapStrAny{"echoed": float64(12)},
 		},
 		End: data.Ok{},
+		// TODO remove from state
+		Invoker: jsonInvoke,
 	}
 
 	inputVar, err := FindInputVar(flow)
@@ -100,6 +148,8 @@ func TestExecuteWorkflow(t *testing.T) {
 		Scope: MapStrAny{
 			inputVar: MapStrAny{"some": MapStrAny{"payload": 12}},
 		},
+		// TODO remove from state
+		Invoker: jsonInvoke,
 	}
 
 	output := ExecuteWorkflow(flow, state)
