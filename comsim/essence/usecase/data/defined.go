@@ -7,4 +7,7 @@ type (
 	AID       = string
 	String    = string
 	MapStrAny = map[string]interface{}
+	Bool      = bool
+	Int64     = int
+	Float64   = float64
 )

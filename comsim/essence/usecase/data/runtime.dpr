@@ -1,5 +1,5 @@
 predicate
- =     Eq {path: path, value: any}
+ =     Eq {path: path, value: reshaper}
  | Exists {path: path}
  |    And (predicate, predicate)
  |     Or (predicate, predicate)
@@ -15,20 +15,27 @@ activityT
  |        End = end
  |     Choose {if: predicate, then: workflow, else: workflow}
  |     Assign {Var: string, flow: workflow}
- |    Reshape = reshape
- | Invocation (fid, reshape)
+ |    reshaper = reshaper
+ | Invocation (fid, reshaper)
 ;
 
 end
- = Ok
- | Err
+ =  Ok (reshaper)
+ | Err (reshaper)
 ;
 
-reshape
- =   Select {Path: path}
- |    ReMap [{Key: path, Value: path}]
- |    Set {Map: MapStrAny}
+reshaper
+ =  GetValue (path)
+ |  SetValue (values)
 ;
 
 
+values
+  = VFloat (float64)
+  | VInt (int64)
+  | VString (string)
+  | VBool (bool)
+  | VMap [{Key: reshaper, Value: reshaper}]
+  | VList [reshaper]
+;
 
