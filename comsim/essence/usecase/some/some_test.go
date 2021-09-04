@@ -95,8 +95,8 @@ func TestExecuteWorkflow(t *testing.T) {
 				Id: data.AID("is-ok?"),
 				Activity: data.Choose{
 					If: data.Eq{
-						Path:  data.Path{"res1", "echoed"},
-						Value: data.SetValue{T1: data.VFloat{T1: 12}},
+						Left:  data.GetValue{T1: data.Path{"res1", "echoed"}},
+						Right: data.SetValue{T1: data.VFloat{T1: 12}},
 					},
 					Then: data.Transition{
 						From: data.Activity{

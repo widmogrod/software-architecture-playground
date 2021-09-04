@@ -1,5 +1,5 @@
 predicate
- =     Eq {path: path, value: reshaper}
+ =     Eq {left: reshaper, right: reshaper}
  | Exists {path: path}
  |    And (predicate, predicate)
  |     Or (predicate, predicate)

@@ -58,7 +58,7 @@ func (r *ResultOfCreateUserIdentity) IsSuccess() bool {
 //
 //	res = dispatch.Invoke(ctx, KVSet{
 //		Key: input.EmailAddress,
-//		Value: UserIdentityAggregate{
+//		Right: UserIdentityAggregate{
 //			UUID:         input.UUID,
 //			EmailAddress: input.EmailAddress,
 //		},

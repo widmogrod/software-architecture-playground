@@ -112,19 +112,21 @@ type Data = MapAnyAny
 func Match(p data.Predicate, scope MapAnyAny) bool {
 	switch x := p.(type) {
 	case data.Eq:
-		if v, ok := ValueFrom(x.Path, scope); ok {
-			second, err := DoReshape(x.Value, scope)
-			//second, err := ValuesToGo(x.Value, scope)
-			if err != nil {
-				fmt.Println("Match:err(2)", err)
-				return false
-			}
-			eq := reflect.DeepEqual(v, second)
-			fmt.Printf("Match:equality eq(%t,%t)test = %v \n", v, second, eq)
-			return eq
+		left, err := DoReshape(x.Left, scope)
+		if err != nil {
+			fmt.Println("Match:err(1)", err)
+			return false
 		}
-		fmt.Printf("Match:not found scope(%#v) predicate(%#v)\n", scope, x)
-		return false
+
+		right, err := DoReshape(x.Right, scope)
+		if err != nil {
+			fmt.Println("Match:err(2)", err)
+			return false
+		}
+
+		eq := reflect.DeepEqual(left, right)
+		fmt.Printf("Match:equality eq(%t,%t)test = %v \n", left, right, eq)
+		return eq
 
 	case data.Exists:
 		_, found := ValueFrom(x.Path, scope)
