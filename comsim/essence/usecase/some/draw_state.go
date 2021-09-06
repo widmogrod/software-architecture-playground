@@ -41,8 +41,8 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 		case data.Start:
 			state.CurrentTask = x.Id
 			r := MapStrAny{
-				"Type":   "Pass",
-				"ResultPath": "$."+y.Var,
+				"Type":       "Pass",
+				"ResultPath": "$." + y.Var,
 			}
 
 			state.Spec["Comment"] = fmt.Sprintf("flow (%s)", y.Var)
@@ -58,9 +58,9 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				//state.CurrentTask = fmt.Sprintf("Ok%d", state.TaskNo)
 				if z.T1 != nil {
 					r := MapStrAny{
-						"Type":   "Pass",
+						"Type":                   "Pass",
 						RetrunResherperKey(z.T1): ReshaperToAWSDataFlow(z.T1),
-						"End":    true,
+						"End":                    true,
 					}
 					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
 				} else {
@@ -75,8 +75,8 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				//state.CurrentTask = fmt.Sprintf("Err%d", state.TaskNo)
 				if z.T1 != nil {
 					r := MapStrAny{
-						"Type": "Pass",
-						"End":    true,
+						"Type":                   "Pass",
+						"End":                    true,
 						RetrunResherperKey(z.T1): ReshaperToAWSDataFlow(z.T1),
 					}
 					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
@@ -101,7 +101,6 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				},
 			}
 
-			// TODO
 			if y.Else != nil {
 				state = FlowToAws(y.Else, state)
 				r["Default"] = state.CurrentTask
@@ -122,17 +121,21 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 		//if a, ok := x.From.(data.Activity); ok {
 		//	state.CurrentTask = a.Id
 		//}
-		propagateCurrentState(state)
+		propagateCurrentState(state, x.From)
 
 		state = FlowToAws(x.To, state)
-		propagateCurrentState(state)
+		propagateCurrentState(state, x.To)
 
 		if state.Spec["StartAt"] == "" {
 			state.Spec["StartAt"] = state.PrevTask
 		}
 
 		if state.PrevTask != "" && state.NextTask != "" {
-			state.Spec["States"].(MapStrAny)[state.PrevTask].(MapStrAny)["Next"] = state.NextTask
+			if state.Spec["States"].(MapStrAny)[state.PrevTask].(MapStrAny)["Type"] == "Choice" {
+
+			} else {
+				state.Spec["States"].(MapStrAny)[state.PrevTask].(MapStrAny)["Next"] = state.NextTask
+			}
 			state.PrevTask = state.NextTask
 			state.NextTask = ""
 		}
@@ -168,14 +171,16 @@ func ResherperKey(t1 data.Reshaper) string {
 	return "Result"
 }
 
-func propagateCurrentState(state *FlowToAwsState) {
+func propagateCurrentState(state *FlowToAwsState, a data.Workflow) {
 	if state.CurrentTask != "" {
 		if state.PrevTask == "" {
 			state.PrevTask = state.CurrentTask
 		} else if state.NextTask == "" {
 			state.NextTask = state.CurrentTask
 		} else {
-			panic("should never reach this state")
+			panic(fmt.Sprintf("node cannot be reached in computation graph: %#v", a))
+
+			//panic(fmt.Sprintf("should never reach this state: %#v", state))
 		}
 	}
 }
@@ -189,6 +194,15 @@ func ReshaperToAWSDataFlow(shape data.Reshaper) interface{} {
 
 	default:
 		panic(fmt.Sprintf("unhandled Reshaper: %#v", shape))
+	}
+}
+
+func isScalar(values data.Values) bool {
+	switch values.(type) {
+	case data.VInt, data.VFloat, data.VBool, data.VString:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -256,26 +270,68 @@ func hasGetter(value data.Reshaper) bool {
 
 func MapPredicateToAWS(predicate data.Predicate) MapStrAny {
 	switch x := predicate.(type) {
+	case data.Or:
+		return MapStrAny{
+			"Or": []MapStrAny{
+				MapPredicateToAWS(x.T1),
+				MapPredicateToAWS(x.T2),
+			},
+		}
+	case data.And:
+		return MapStrAny{
+			"And": []MapStrAny{
+				MapPredicateToAWS(x.T1),
+				MapPredicateToAWS(x.T2),
+			},
+		}
 	case data.Eq:
+		types := []string{"Boolean", "Numeric", "String", "Timestamp"}
+		if _, ok := x.Left.(data.SetValue); ok {
+			x = data.Eq{
+				Left:  x.Right,
+				Right: x.Left,
+			}
+		}
+
 		if _, ok := x.Left.(data.GetValue); ok {
-			if _, ok := x.Right.(data.SetValue); ok {
-				// Here I could do type detection,
-				// since value is created, it still can reference
-				return MapStrAny{
-					"Variable":      ReshaperToAWSDataFlow(x.Left),
-					"NumericEquals": ReshaperToAWSDataFlow(x.Right),
+			if set, ok := x.Right.(data.SetValue); ok {
+				// Here for linter’s sake I must detect type to compare
+				// but I can only support types that step function supports
+				switch set.T1.(type) {
+				case data.VInt, data.VFloat:
+					return MapStrAny{
+						"Variable":      ReshaperToAWSDataFlow(x.Left),
+						"NumericEquals": ReshaperToAWSDataFlow(x.Right),
+					}
+				case data.VBool:
+					return MapStrAny{
+						"Variable":      ReshaperToAWSDataFlow(x.Left),
+						"BooleanEquals": ReshaperToAWSDataFlow(x.Right),
+					}
+				case data.VString:
+					return MapStrAny{
+						"Variable":     ReshaperToAWSDataFlow(x.Left),
+						"StringEquals": ReshaperToAWSDataFlow(x.Right),
+					}
+				default:
+					panic(fmt.Sprintf("not possible comparison of variable: %#v with value: %#v", x.Right, ReshaperToAWSDataFlow(x.Right)))
 				}
 			} else {
 				// Here should be list of ors, since at this point of time
 				// I cannot infer type of value to compare
+				var ors []MapStrAny
+				for _, typ := range types {
+					ors = append(ors, MapStrAny{
+						"Variable":                       ReshaperToAWSDataFlow(x.Left),
+						fmt.Sprintf("%sEqualsPath", typ): ReshaperToAWSDataFlow(x.Right),
+					})
+				}
 				return MapStrAny{
-					"Variable":          ReshaperToAWSDataFlow(x.Left),
-					"NumericEqualsPath": ReshaperToAWSDataFlow(x.Right),
+					"Or": ors,
 				}
 			}
 		}
-		panic(fmt.Sprintf("unhandled Eq!: %#v", predicate))
-	default:
-		panic(fmt.Sprintf("unhandled Predicate: %#v", predicate))
 	}
+
+	panic(fmt.Sprintf("unhandled Predicate: %#v", predicate))
 }

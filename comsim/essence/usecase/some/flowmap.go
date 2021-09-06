@@ -84,12 +84,18 @@ func MapAstToWorkflow(in interface{}, state *WState) data.Workflow {
 			},
 		}
 	case wokpar.Choose:
+
+		var elseFlow data.Workflow
+		if len(x.Else) > 0 {
+			elseFlow = MapAstToWorkflow(x.Else, state)
+		}
+
 		return data.Activity{
 			Id: fmt.Sprintf("Choose%d", state.No),
 			Activity: data.Choose{
 				If:   MapPredicateToPredicate(x.Predicate),
 				Then: MapAstToWorkflow(x.Then, state),
-				Else: MapAstToWorkflow(x.Else, state),
+				Else: elseFlow,
 			},
 		}
 	case wokpar.End:

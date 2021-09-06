@@ -79,13 +79,146 @@ func TestDraw(t *testing.T) {
   }
 }`,
 		},
-		"returns chose": {
+		"returns chose equal to scalar": {
 			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
-	if eq(input.Id, 7) {		
+	if or(eq(input.Id, 0.3), and(eq(input.Name, "Prometheus"), eq(input.Alive, true))) {		
 		return({"ok": true})
 	} else {
 		fail({"ok": false})
 	}
+}`)),
+			stateMachine: `{
+  "Comment": "flow (input)",
+  "StartAt": "Start1",
+  "States": {
+    "Choose7": {
+      "Choices": [
+        {
+          "Next": "Ok10",
+          "Or": [
+            {
+              "NumericEquals": 0.3,
+              "Variable": "$.input.Id"
+            },
+            {
+              "And": [
+                {
+                  "StringEquals": "Prometheus",
+                  "Variable": "$.input.Name"
+                },
+                {
+                  "BooleanEquals": true,
+                  "Variable": "$.input.Alive"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "Default": "Err7",
+      "Type": "Choice"
+    },
+    "Err7": {
+      "End": true,
+      "Parameters": {
+        "ok": false
+      },
+      "Type": "Pass"
+    },
+    "Ok10": {
+      "End": true,
+      "Parameters": {
+        "ok": true
+      },
+      "Type": "Pass"
+    },
+    "Start1": {
+      "Next": "Choose7",
+      "ResultPath": "$.input",
+      "Type": "Pass"
+    }
+  }
+}`,
+
+		},
+		"returns choose dynamic values": {
+			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
+	if eq(input.Id, input.Id2) {		
+		return({"ok": true})
+	} else {
+		fail({"ok": false})
+	}
+}`)),
+			stateMachine: `{
+  "Comment": "flow (input)",
+  "StartAt": "Start1",
+  "States": {
+    "Choose7": {
+      "Choices": [
+        {
+          "Next": "Ok10",
+          "Or": [
+            {
+              "BooleanEqualsPath": "$.input.Id2",
+              "Variable": "$.input.Id"
+            },
+            {
+              "NumericEqualsPath": "$.input.Id2",
+              "Variable": "$.input.Id"
+            },
+            {
+              "StringEqualsPath": "$.input.Id2",
+              "Variable": "$.input.Id"
+            },
+            {
+              "TimestampEqualsPath": "$.input.Id2",
+              "Variable": "$.input.Id"
+            }
+          ]
+        }
+      ],
+      "Default": "Err7",
+      "Type": "Choice"
+    },
+    "Err7": {
+      "End": true,
+      "Parameters": {
+        "ok": false
+      },
+      "Type": "Pass"
+    },
+    "Ok10": {
+      "End": true,
+      "Parameters": {
+        "ok": true
+      },
+      "Type": "Pass"
+    },
+    "Start1": {
+      "Next": "Choose7",
+      "ResultPath": "$.input",
+      "Type": "Pass"
+    }
+  }
+}`,
+
+		},
+		"returns nested chose": {
+			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
+	if eq(input.Id, 7) {		
+		if eq(input.Id, 9) {		
+			return({"ok1": true})
+		} else {
+			fail({"ok1": false})
+		}
+	} else {
+		if eq(input.Id, 10) {		
+			return({"ok2": true})
+		} else {
+			fail({"ok2": false})
+		}
+	}
+	fail({"ok3": false})
 }`)),
 			stateMachine: `{
   "Comment": "flow (input)",
