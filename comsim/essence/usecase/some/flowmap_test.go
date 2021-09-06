@@ -43,7 +43,6 @@ func TestWorkparToWorkflow(t *testing.T) {
 
 	flow := WorkparToWorkflow([]byte(`flow start(input) {
 	a = ReserveAvailability(input.Id)
-
 	if eq(input.do, 7) {
 		b = ProcessPayment(input.Id)
 		return({"b": b, "ok": true})

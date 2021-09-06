@@ -9,51 +9,57 @@ import (
 
 func WorkparToWorkflow(in []byte) data.Workflow {
 	ast := wokpar.MustParse(in)
-	return MapAstToWorkflow(*ast)
+	state := &WState{No: 0}
+	return MapAstToWorkflow(*ast, state)
 }
 
 type ReduceState struct {
 	workflow data.Workflow
 }
 
-func MapAstToWorkflow(in interface{}) data.Workflow {
+type WState struct {
+	No int
+}
+
+func MapAstToWorkflow(in interface{}, state *WState) data.Workflow {
+	state.No++
 	switch x := in.(type) {
 	case wokpar.Ast:
 		var result data.Workflow = data.Activity{
-			Id: "start",
+			Id: fmt.Sprintf("Start%d", state.No),
 			Activity: data.Start{
 				Var: x.Input,
 			},
 		}
 		result = data.Transition{
 			From: result,
-			To:   MapAstToWorkflow(x.Body),
+			To:   MapAstToWorkflow(x.Body, state),
 		}
 		return result
 
 	case []wokpar.Expr:
-		result := MapAstToWorkflow(x[0])
+		result := MapAstToWorkflow(x[0], state)
 		for i := 1; i < len(x); i++ {
 			expr := x[i]
 			result = data.Transition{
 				From: result,
-				To:   MapAstToWorkflow(expr),
+				To:   MapAstToWorkflow(expr, state),
 			}
 		}
 		return result
 
 	case wokpar.Expr:
 		if x.Apply != nil {
-			return MapAstToWorkflow(*x.Apply)
+			return MapAstToWorkflow(*x.Apply, state)
 		}
 		if x.Choose != nil {
-			return MapAstToWorkflow(*x.Choose)
+			return MapAstToWorkflow(*x.Choose, state)
 		}
 		if x.Assign != nil {
-			return MapAstToWorkflow(*x.Assign)
+			return MapAstToWorkflow(*x.Assign, state)
 		}
 		if x.End != nil {
-			return MapAstToWorkflow(*x.End)
+			return MapAstToWorkflow(*x.End, state)
 		}
 
 	case wokpar.Assign:
@@ -63,15 +69,15 @@ func MapAstToWorkflow(in interface{}) data.Workflow {
 		}
 
 		return data.Activity{
-			Id: "",
+			Id: fmt.Sprintf("Assign%d", state.No),
 			Activity: data.Assign{
 				Var:  name,
-				Flow: MapAstToWorkflow(x.Expr),
+				Flow: MapAstToWorkflow(x.Expr, state),
 			},
 		}
 	case wokpar.Apply:
 		return data.Activity{
-			Id: "",
+			Id: fmt.Sprintf("Apply%d", state.No),
 			Activity: data.Invocation{
 				T1: x.Name,
 				T2: MapSelectToReshape(x.Args),
@@ -79,17 +85,17 @@ func MapAstToWorkflow(in interface{}) data.Workflow {
 		}
 	case wokpar.Choose:
 		return data.Activity{
-			Id: "",
+			Id: fmt.Sprintf("Choose%d", state.No),
 			Activity: data.Choose{
 				If:   MapPredicateToPredicate(x.Predicate),
-				Then: MapAstToWorkflow(x.Then),
-				Else: MapAstToWorkflow(x.Else),
+				Then: MapAstToWorkflow(x.Then, state),
+				Else: MapAstToWorkflow(x.Else, state),
 			},
 		}
 	case wokpar.End:
 		if x.Result != nil {
 			return data.Activity{
-				Id: "",
+				Id: fmt.Sprintf("Ok%d", state.No),
 				Activity: data.Ok{
 					T1: MapSelectToReshape(x.Result.Args),
 				},
@@ -97,7 +103,7 @@ func MapAstToWorkflow(in interface{}) data.Workflow {
 		}
 		if x.Fail != nil {
 			return data.Activity{
-				Id: "",
+				Id: fmt.Sprintf("Err%d", state.No),
 				Activity: data.Err{
 					T1: MapSelectToReshape(x.Fail.Args),
 				},
