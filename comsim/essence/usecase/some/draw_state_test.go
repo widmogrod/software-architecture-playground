@@ -139,7 +139,6 @@ func TestDraw(t *testing.T) {
     }
   }
 }`,
-
 		},
 		"returns choose dynamic values": {
 			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
@@ -201,56 +200,90 @@ func TestDraw(t *testing.T) {
     }
   }
 }`,
-
 		},
 		"returns nested chose": {
 			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
 	if eq(input.Id, 7) {		
-		if eq(input.Id, 9) {		
+	   if eq(input.Alive, true) {		
 			return({"ok1": true})
 		} else {
-			fail({"ok1": false})
+		   fail({"ok1": false})
 		}
 	} else {
 		if eq(input.Id, 10) {		
 			return({"ok2": true})
 		} else {
-			fail({"ok2": false})
+		   fail({"ok2": false})
 		}
 	}
-	fail({"ok3": false})
 }`)),
 			stateMachine: `{
   "Comment": "flow (input)",
   "StartAt": "Start1",
   "States": {
-    "Choose4": {
+    "Choose10": {
       "Choices": [
         {
-          "Next": "Ok7",
-          "NumericEquals": 7,
+          "Next": "Ok13",
+          "NumericEquals": 10,
           "Variable": "$.input.Id"
         }
       ],
       "Default": "Err10",
       "Type": "Choice"
     },
+    "Choose13": {
+      "Choices": [
+        {
+          "Next": "Choose19",
+          "NumericEquals": 7,
+          "Variable": "$.input.Id"
+        }
+      ],
+      "Default": "Choose10",
+      "Type": "Choice"
+    },
+    "Choose19": {
+      "Choices": [
+        {
+          "BooleanEquals": true,
+          "Next": "Ok22",
+          "Variable": "$.input.Alive"
+        }
+      ],
+      "Default": "Err19",
+      "Type": "Choice"
+    },
     "Err10": {
       "End": true,
       "Parameters": {
-        "ok": false
+        "ok2": false
       },
       "Type": "Pass"
     },
-    "Ok7": {
+    "Err19": {
       "End": true,
       "Parameters": {
-        "ok": true
+        "ok1": false
+      },
+      "Type": "Pass"
+    },
+    "Ok13": {
+      "End": true,
+      "Parameters": {
+        "ok2": true
+      },
+      "Type": "Pass"
+    },
+    "Ok22": {
+      "End": true,
+      "Parameters": {
+        "ok1": true
       },
       "Type": "Pass"
     },
     "Start1": {
-      "Next": "Choose4",
+      "Next": "Choose13",
       "ResultPath": "$.input",
       "Type": "Pass"
     }

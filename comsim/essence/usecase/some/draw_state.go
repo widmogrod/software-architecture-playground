@@ -9,7 +9,6 @@ import (
 
 func WorkflowToAWSStateMachine(flow data.Workflow) (string, error) {
 	state := &FlowToAwsState{
-		TaskNo: 0,
 		Spec: MapStrAny{
 			"Comment": "",
 			"StartAt": "",
@@ -24,75 +23,81 @@ func WorkflowToAWSStateMachine(flow data.Workflow) (string, error) {
 }
 
 type FlowToAwsState struct {
-	TaskNo      int
-	Spec        MapStrAny
-	CurrentTask string
-	NextTask    string
-	PrevTask    string
+	Spec           MapStrAny
+	NextPrefetched *string
 }
 
 func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
-	state.CurrentTask = ""
-	state.TaskNo++
-
 	switch x := flow.(type) {
 	case data.Activity:
 		switch y := x.Activity.(type) {
 		case data.Start:
-			state.CurrentTask = x.Id
 			r := MapStrAny{
 				"Type":       "Pass",
 				"ResultPath": "$." + y.Var,
+				"Next":       *state.NextPrefetched,
 			}
 
 			state.Spec["Comment"] = fmt.Sprintf("flow (%s)", y.Var)
-			state.Spec["StartAt"] = state.CurrentTask
-			state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+			state.Spec["StartAt"] = x.Id
+			state.Spec["States"].(MapStrAny)[x.Id] = r
 
 			return state
 
 		case data.End:
 			switch z := y.(type) {
 			case data.Ok:
-				state.CurrentTask = x.Id
-				//state.CurrentTask = fmt.Sprintf("Ok%d", state.TaskNo)
+				//taskID := fmt.Sprintf("Ok%d", state.TaskNo)
 				if z.T1 != nil {
 					r := MapStrAny{
 						"Type":                   "Pass",
 						RetrunResherperKey(z.T1): ReshaperToAWSDataFlow(z.T1),
 						"End":                    true,
 					}
-					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+					state.Spec["States"].(MapStrAny)[x.Id] = r
 				} else {
 					r := MapStrAny{
 						"Type": "Succeed",
 					}
-					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+					state.Spec["States"].(MapStrAny)[x.Id] = r
 				}
 
 			case data.Err:
-				state.CurrentTask = x.Id
-				//state.CurrentTask = fmt.Sprintf("Err%d", state.TaskNo)
 				if z.T1 != nil {
 					r := MapStrAny{
 						"Type":                   "Pass",
 						"End":                    true,
 						RetrunResherperKey(z.T1): ReshaperToAWSDataFlow(z.T1),
 					}
-					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+					state.Spec["States"].(MapStrAny)[x.Id] = r
 				} else {
 					r := MapStrAny{
 						"Type": "Fail",
 					}
-					state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+					state.Spec["States"].(MapStrAny)[x.Id] = r
 				}
+			default:
+				panic(fmt.Sprintf("unhandled End: %#v", flow))
 			}
 			return state
 
 		case data.Choose:
-			state = FlowToAws(y.Then, state)
+			// (1) IF else and then branch terminate then every transition after branch will never happen
+			// (2) But if any of branches don't terminate, then
+			//   "Next" for last Activity in IF-THEN. branch
+			//  		should be next activity outside scope of if-then-else
+			//   "Default" for last Activity in ELSE. branch
+			// 		    should be next activity outside scope of if-then-else
+			// To handle those situations, first should one-Evaluate activity after to retrieve its ID
+
 			choise := MapPredicateToAWS(y.If)
-			choise["Next"] = state.CurrentTask
+			if doesTerminate(y.Then) {
+				choise["Next"] = *getNextActivityId(y.Then)
+			} else if state.NextPrefetched != nil {
+				choise["Next"] = *state.NextPrefetched
+			} else {
+				panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
+			}
 
 			r := MapStrAny{
 				"Type": "Choice",
@@ -102,13 +107,33 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 			}
 
 			if y.Else != nil {
-				state = FlowToAws(y.Else, state)
-				r["Default"] = state.CurrentTask
+				if doesTerminate(y.Else) {
+					r["Default"] = *getNextActivityId(y.Else)
+				} else if state.NextPrefetched != nil {
+					r["Default"] = *state.NextPrefetched
+				} else {
+					panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
+				}
+			} else if state.NextPrefetched != nil {
+				r["Default"] = *state.NextPrefetched
+			} else {
+				// TODO looks like flow can terminate un unknown state or in AWS lingo Cancelled!
+				// What to do with this?
+				// (1) I can leave it as it in hands of programmer, or or potential linter
+				//		that can catch such situations
+				// (2) or because I create a language that detect inconsistencies
+				// 	   I should prompt programmer that something is wrong, like in this example
+				//	   if statement handles only IF-THEN branch, but not ELSE and this is end of program!
+				//		Function does not terminate for all cases!
+				panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
 			}
 
-			state.CurrentTask = x.Id
-			//state.CurrentTask = fmt.Sprintf("Choise%d", state.TaskNo)
-			state.Spec["States"].(MapStrAny)[state.CurrentTask] = r
+			state.Spec["States"].(MapStrAny)[x.Id] = r
+
+			state = FlowToAws(y.Then, state)
+			if y.Else != nil {
+				state = FlowToAws(y.Else, state)
+			}
 			return state
 		default:
 			panic(fmt.Sprintf("unhandled Activity: %#v", x))
@@ -117,34 +142,56 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 	case data.Transition:
 		// TODO currently state returns mutated value
 		// figure out whenever we should simplify it
+		state.NextPrefetched = getNextActivityId(x.To)
 		state = FlowToAws(x.From, state)
-		//if a, ok := x.From.(data.Activity); ok {
-		//	state.CurrentTask = a.Id
-		//}
-		propagateCurrentState(state, x.From)
 
+		state.NextPrefetched = nil
 		state = FlowToAws(x.To, state)
-		propagateCurrentState(state, x.To)
-
-		if state.Spec["StartAt"] == "" {
-			state.Spec["StartAt"] = state.PrevTask
-		}
-
-		if state.PrevTask != "" && state.NextTask != "" {
-			if state.Spec["States"].(MapStrAny)[state.PrevTask].(MapStrAny)["Type"] == "Choice" {
-
-			} else {
-				state.Spec["States"].(MapStrAny)[state.PrevTask].(MapStrAny)["Next"] = state.NextTask
-			}
-			state.PrevTask = state.NextTask
-			state.NextTask = ""
-		}
 
 		return state
 
 	default:
 		panic(fmt.Sprintf("unhandled Workflow: %#v", flow))
 	}
+}
+
+func doesTerminate(flow data.Workflow) bool {
+	switch x := flow.(type) {
+	case data.Activity:
+		switch y := x.Activity.(type) {
+		case data.End:
+			return true
+		case data.Choose:
+			if doesTerminate(y.Then) || (y.Else != nil && doesTerminate(y.Else)) {
+				return true
+			}
+		}
+	case data.Transition:
+		if doesTerminate(x.From) || doesTerminate(x.To) {
+			return true
+		}
+	default:
+		panic(fmt.Sprintf("unhandled Workflow: %#v", flow))
+	}
+
+	return false
+}
+
+func getNextActivityId(flow data.Workflow) *string {
+	switch x := flow.(type) {
+	case data.Activity:
+		return &x.Id
+	case data.Transition:
+		id := getNextActivityId(x.From)
+		if id != nil {
+			return id
+		}
+		return getNextActivityId(x.To)
+	default:
+		panic(fmt.Sprintf("unhandled Workflow: %#v", flow))
+	}
+
+	return nil
 }
 
 func RetrunResherperKey(t1 data.Reshaper) string {
@@ -159,32 +206,6 @@ func RetrunResherperKey(t1 data.Reshaper) string {
 	return "Parameters"
 }
 
-func ResherperKey(t1 data.Reshaper) string {
-	if isGetter(t1) {
-		return "InputPath"
-	}
-
-	if hasGetter(t1) {
-		return "Parameters"
-	}
-
-	return "Result"
-}
-
-func propagateCurrentState(state *FlowToAwsState, a data.Workflow) {
-	if state.CurrentTask != "" {
-		if state.PrevTask == "" {
-			state.PrevTask = state.CurrentTask
-		} else if state.NextTask == "" {
-			state.NextTask = state.CurrentTask
-		} else {
-			panic(fmt.Sprintf("node cannot be reached in computation graph: %#v", a))
-
-			//panic(fmt.Sprintf("should never reach this state: %#v", state))
-		}
-	}
-}
-
 func ReshaperToAWSDataFlow(shape data.Reshaper) interface{} {
 	switch x := shape.(type) {
 	case data.SetValue:
@@ -194,15 +215,6 @@ func ReshaperToAWSDataFlow(shape data.Reshaper) interface{} {
 
 	default:
 		panic(fmt.Sprintf("unhandled Reshaper: %#v", shape))
-	}
-}
-
-func isScalar(values data.Values) bool {
-	switch values.(type) {
-	case data.VInt, data.VFloat, data.VBool, data.VString:
-		return true
-	default:
-		return false
 	}
 }
 
