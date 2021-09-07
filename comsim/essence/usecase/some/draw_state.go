@@ -34,7 +34,7 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 		case data.Start:
 			r := MapStrAny{
 				"Type":       "Pass",
-				"ResultPath": "$." + y.Var,
+				"ResultPath": "$.__vars__." + y.Var + ".var_value",
 				"Next":       *state.NextPrefetched,
 			}
 
@@ -47,7 +47,6 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 		case data.End:
 			switch z := y.(type) {
 			case data.Ok:
-				//taskID := fmt.Sprintf("Ok%d", state.TaskNo)
 				if z.T1 != nil {
 					r := MapStrAny{
 						"Type":                   "Pass",
@@ -96,7 +95,7 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 			} else if state.NextPrefetched != nil {
 				choise["Next"] = *state.NextPrefetched
 			} else {
-				panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
+				panic(fmt.Sprintf("if-then-x does not terminate efter else statment in condition: %#v", y))
 			}
 
 			r := MapStrAny{
@@ -112,7 +111,7 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				} else if state.NextPrefetched != nil {
 					r["Default"] = *state.NextPrefetched
 				} else {
-					panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
+					panic(fmt.Sprintf("x-else does not terminate efter else statment in condition: %#v", y))
 				}
 			} else if state.NextPrefetched != nil {
 				r["Default"] = *state.NextPrefetched
@@ -125,7 +124,7 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				// 	   I should prompt programmer that something is wrong, like in this example
 				//	   if statement handles only IF-THEN branch, but not ELSE and this is end of program!
 				//		Function does not terminate for all cases!
-				panic(fmt.Sprintf("function does not terminate efter else statment in condition: %#v", y))
+				panic(fmt.Sprintf("if-then-else does not terminate efter else statment in condition: %#v", y))
 			}
 
 			state.Spec["States"].(MapStrAny)[x.Id] = r
@@ -135,17 +134,46 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 				state = FlowToAws(y.Else, state)
 			}
 			return state
+
+		case data.Assign:
+			if a, ok := y.Flow.(data.Activity); ok {
+				if i, ok := a.Activity.(data.Invocation); ok {
+					next := getNextActivityId(y.Flow)
+					if next != nil {
+						r := buildInvocation(i)
+						r["ResultPath"] = "$.__vars__." + y.Var
+						r["ResultSelector"] = MapStrAny{
+							"var_value.$": "$.Payload",
+						}
+
+						if state.NextPrefetched != nil {
+							r["Next"] = *state.NextPrefetched
+						} else {
+							r["End"] = true
+						}
+
+						state.Spec["States"].(MapStrAny)[x.Id] = r
+						return state
+					} else {
+						panic(fmt.Sprintf("nil nex-prefetch! but given: %#v", y))
+					}
+				}
+			}
+
+			panic(fmt.Sprintf("you can assing only result of function invocation, but given: %#v", y))
+
 		default:
-			panic(fmt.Sprintf("unhandled Activity: %#v", x))
+			panic(fmt.Sprintf("unhandled Activity: %#v", x.Activity))
 		}
 
 	case data.Transition:
-		// TODO currently state returns mutated value
-		// figure out whenever we should simplify it
+		// In case of nested transitions, that are quite common
+		prevPrefetch := state.NextPrefetched
+
 		state.NextPrefetched = getNextActivityId(x.To)
 		state = FlowToAws(x.From, state)
 
-		state.NextPrefetched = nil
+		state.NextPrefetched = prevPrefetch
 		state = FlowToAws(x.To, state)
 
 		return state
@@ -153,6 +181,37 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 	default:
 		panic(fmt.Sprintf("unhandled Workflow: %#v", flow))
 	}
+}
+
+func buildInvocation(y data.Invocation) MapStrAny {
+	// TODO make it dynamic
+	parameters := MapStrAny{
+		"FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:" + y.T1,
+	}
+
+	if y.T2 != nil {
+		parameters["Payload"] = ReshaperToAWSDataFlow(y.T2)
+	}
+
+	r := MapStrAny{
+		"Type":       "Task",
+		"Resource":   "arn:aws:states:::lambda:invoke",
+		"Parameters": parameters,
+		"Retry": []interface{}{
+			MapStrAny{
+				"ErrorEquals": []interface{}{
+					"Lambda.ServiceException",
+					"Lambda.AWSLambdaException",
+					"Lambda.SdkClientException",
+				},
+				"IntervalSeconds": 2,
+				"MaxAttempts":     1,
+				"BackoffRate":     2,
+			},
+		},
+	}
+
+	return r
 }
 
 func doesTerminate(flow data.Workflow) bool {
@@ -211,7 +270,7 @@ func ReshaperToAWSDataFlow(shape data.Reshaper) interface{} {
 	case data.SetValue:
 		return ValuesToAWSDataFlow(x.T1)
 	case data.GetValue:
-		return "$." + strings.Join(x.T1, ".")
+		return strings.TrimRight("$.__vars__."+x.T1[0]+".var_value."+strings.Join(x.T1[1:], "."), ".")
 
 	default:
 		panic(fmt.Sprintf("unhandled Reshaper: %#v", shape))

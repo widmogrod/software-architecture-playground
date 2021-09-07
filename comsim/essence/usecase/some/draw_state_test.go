@@ -1,7 +1,6 @@
 package some
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/usecase/data"
 	"testing"
@@ -22,12 +21,12 @@ func TestDraw(t *testing.T) {
   "States": {
     "Ok4": {
       "End": true,
-      "OutputPath": "$.input",
+      "OutputPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     },
     "Start1": {
       "Next": "Ok4",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -50,7 +49,7 @@ func TestDraw(t *testing.T) {
     },
     "Start1": {
       "Next": "Ok4",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -67,13 +66,13 @@ func TestDraw(t *testing.T) {
     "Ok4": {
       "End": true,
       "Parameters": {
-        "ok.$": "$.input.Id"
+        "ok.$": "$.__vars__.input.var_value.Id"
       },
       "Type": "Pass"
     },
     "Start1": {
       "Next": "Ok4",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -98,17 +97,17 @@ func TestDraw(t *testing.T) {
           "Or": [
             {
               "NumericEquals": 0.3,
-              "Variable": "$.input.Id"
+              "Variable": "$.__vars__.input.var_value.Id"
             },
             {
               "And": [
                 {
                   "StringEquals": "Prometheus",
-                  "Variable": "$.input.Name"
+                  "Variable": "$.__vars__.input.var_value.Name"
                 },
                 {
                   "BooleanEquals": true,
-                  "Variable": "$.input.Alive"
+                  "Variable": "$.__vars__.input.var_value.Alive"
                 }
               ]
             }
@@ -134,7 +133,7 @@ func TestDraw(t *testing.T) {
     },
     "Start1": {
       "Next": "Choose7",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -158,20 +157,20 @@ func TestDraw(t *testing.T) {
           "Next": "Ok10",
           "Or": [
             {
-              "BooleanEqualsPath": "$.input.Id2",
-              "Variable": "$.input.Id"
+              "BooleanEqualsPath": "$.__vars__.input.var_value.Id2",
+              "Variable": "$.__vars__.input.var_value.Id"
             },
             {
-              "NumericEqualsPath": "$.input.Id2",
-              "Variable": "$.input.Id"
+              "NumericEqualsPath": "$.__vars__.input.var_value.Id2",
+              "Variable": "$.__vars__.input.var_value.Id"
             },
             {
-              "StringEqualsPath": "$.input.Id2",
-              "Variable": "$.input.Id"
+              "StringEqualsPath": "$.__vars__.input.var_value.Id2",
+              "Variable": "$.__vars__.input.var_value.Id"
             },
             {
-              "TimestampEqualsPath": "$.input.Id2",
-              "Variable": "$.input.Id"
+              "TimestampEqualsPath": "$.__vars__.input.var_value.Id2",
+              "Variable": "$.__vars__.input.var_value.Id"
             }
           ]
         }
@@ -195,7 +194,7 @@ func TestDraw(t *testing.T) {
     },
     "Start1": {
       "Next": "Choose7",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -226,7 +225,7 @@ func TestDraw(t *testing.T) {
         {
           "Next": "Ok13",
           "NumericEquals": 10,
-          "Variable": "$.input.Id"
+          "Variable": "$.__vars__.input.var_value.Id"
         }
       ],
       "Default": "Err10",
@@ -237,7 +236,7 @@ func TestDraw(t *testing.T) {
         {
           "Next": "Choose19",
           "NumericEquals": 7,
-          "Variable": "$.input.Id"
+          "Variable": "$.__vars__.input.var_value.Id"
         }
       ],
       "Default": "Choose10",
@@ -248,7 +247,7 @@ func TestDraw(t *testing.T) {
         {
           "BooleanEquals": true,
           "Next": "Ok22",
-          "Variable": "$.input.Alive"
+          "Variable": "$.__vars__.input.var_value.Alive"
         }
       ],
       "Default": "Err19",
@@ -284,7 +283,85 @@ func TestDraw(t *testing.T) {
     },
     "Start1": {
       "Next": "Choose13",
-      "ResultPath": "$.input",
+      "ResultPath": "$.__vars__.input.var_value",
+      "Type": "Pass"
+    }
+  }
+}`,
+		},
+		"returns assigment": {
+			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
+	a = EchoChamber({"Name": input.Name})
+	b = EchoChamber({"Name": input.Name, "Other": a.body})
+	return(b)
+}`)),
+			stateMachine: `{
+  "Comment": "flow (input)",
+  "StartAt": "Start1",
+  "States": {
+    "Assign4": {
+      "Next": "Assign8",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:EchoChamber",
+        "Payload": {
+          "Name.$": "$.__vars__.input.var_value.Name"
+        }
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__.a",
+      "ResultSelector": {
+        "var_value.$": "$.Payload"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign8": {
+      "Next": "Ok12",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:EchoChamber",
+        "Payload": {
+          "Name.$": "$.__vars__.input.var_value.Name",
+          "Other.$": "$.__vars__.a.var_value.body"
+        }
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__.b",
+      "ResultSelector": {
+        "var_value.$": "$.Payload"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Ok12": {
+      "End": true,
+      "OutputPath": "$.__vars__.b.var_value",
+      "Type": "Pass"
+    },
+    "Start1": {
+      "Next": "Assign4",
+      "ResultPath": "$.__vars__.input.var_value",
       "Type": "Pass"
     }
   }
@@ -294,7 +371,7 @@ func TestDraw(t *testing.T) {
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			result, err := WorkflowToAWSStateMachine(uc.workflow)
-			fmt.Println(result)
+			t.Log(result)
 			assert.NoError(t, err)
 			assert.JSONEq(t, uc.stateMachine, result)
 		})
