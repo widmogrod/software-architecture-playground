@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/usecase/data"
 	"reflect"
+	"strings"
 )
 
 type Invoker interface {
@@ -386,4 +387,136 @@ func (v *valuesT) VisitVList(x data.VList) interface{} {
 	}
 
 	return result
+}
+
+func ToString(value interface{}) string {
+	switch x := value.(type) {
+	case data.End:
+		return data.MapEnd(x, &toString{}).(string)
+	case data.Reshaper:
+		return data.MapReshaper(x, &toString{}).(string)
+	case data.Values:
+		return data.MapValues(x, &toString{}).(string)
+	case data.ActivityT:
+		return data.MapActivityT(x, &toString{}).(string)
+	case data.Predicate:
+		return data.MapPredicate(x, &toString{}).(string)
+	case data.Workflow:
+		return data.MapWorkflow(x, &toString{}).(string)
+	}
+
+	return fmt.Sprintf("unknown(%v)", value)
+}
+
+var _ data.ActivityTVisitor = &toString{}
+var _ data.EndVisitor = &toString{}
+var _ data.ReshaperVisitor = &toString{}
+var _ data.ValuesVisitor = &toString{}
+var _ data.PredicateVisitor = &toString{}
+var _ data.WorkflowVisitor = &toString{}
+
+type toString struct{}
+
+func (t *toString) VisitActivity(x data.Activity) interface{} {
+	return fmt.Sprintf("%s", data.MapActivityT(x.Activity, t))
+}
+
+func (t *toString) VisitTransition(x data.Transition) interface{} {
+	return fmt.Sprintf("%s; %s;", data.MapWorkflow(x.From, t), data.MapWorkflow(x.To, t))
+}
+
+func (t *toString) VisitEq(x data.Eq) interface{} {
+	return fmt.Sprintf("eq(%s,%s)", data.MapReshaper(x.Left, t), data.MapReshaper(x.Right, t))
+}
+
+func (t *toString) VisitExists(x data.Exists) interface{} {
+	return fmt.Sprintf("exists(%s)", fmt.Sprintf("$.%s", strings.Join(x.Path, ".")))
+}
+
+func (t *toString) VisitAnd(x data.And) interface{} {
+	return fmt.Sprintf("and(%s,%s)", data.MapPredicate(x.T1, t), data.MapPredicate(x.T2, t))
+}
+
+func (t *toString) VisitOr(x data.Or) interface{} {
+	return fmt.Sprintf("or(%s,%s)", data.MapPredicate(x.T1, t), data.MapPredicate(x.T2, t))
+}
+
+func (t *toString) VisitVFloat(x data.VFloat) interface{} {
+	return fmt.Sprintf("%f", x.T1)
+}
+
+func (t *toString) VisitVInt(x data.VInt) interface{} {
+	return fmt.Sprintf("%d", x.T1)
+}
+
+func (t *toString) VisitVString(x data.VString) interface{} {
+	return x.T1
+}
+
+func (t *toString) VisitVBool(x data.VBool) interface{} {
+	return fmt.Sprintf("%t", x.T1)
+}
+
+func (t *toString) VisitVMap(x data.VMap) interface{} {
+	result := "{"
+	for i := range x {
+		result += fmt.Sprintf(`%s: %s, `, ToString(x[i].Key), ToString(x[i].Value))
+	}
+	result += "}"
+
+	return result
+}
+
+func (t *toString) VisitVList(x data.VList) interface{} {
+	result := "["
+	for i := range x {
+		result += ToString(x[i])
+		result += ", "
+	}
+	result += "]"
+
+	return result
+}
+
+func (t *toString) VisitGetValue(x data.GetValue) interface{} {
+	return fmt.Sprintf("$.%s", strings.Join(x.T1, "."))
+}
+
+func (t *toString) VisitSetValue(x data.SetValue) interface{} {
+	return fmt.Sprintf("Ok(%s)", data.MapValues(x.T1, t))
+}
+
+func (t *toString) VisitOk(x data.Ok) interface{} {
+	return fmt.Sprintf("Ok(%s)", data.MapReshaper(x.T1, t))
+}
+
+func (t *toString) VisitErr(x data.Err) interface{} {
+	return fmt.Sprintf("Err(%s)", data.MapReshaper(x.T1, t))
+}
+
+func (t *toString) VisitStart(x data.Start) interface{} {
+	return fmt.Sprintf("Start(%s)", x.Var)
+}
+
+func (t *toString) VisitEnd(x data.End) interface{} {
+	return data.MapEnd(x, t)
+}
+
+func (t *toString) VisitChoose(x data.Choose) interface{} {
+	return fmt.Sprintf("IF(%s)", data.MapPredicate(x.If, t))
+}
+
+func (t *toString) VisitAssign(x data.Assign) interface{} {
+	return fmt.Sprintf("Assign(%s,%s)", x.Var, data.MapWorkflow(x.Flow, t))
+}
+
+func (t *toString) VisitReshaper(x data.Reshaper) interface{} {
+	return data.MapReshaper(x, t)
+}
+
+func (t *toString) VisitInvocation(x data.Invocation) interface{} {
+	if x.T2 != nil {
+		return fmt.Sprintf("%s(%s)", x.T1, data.MapReshaper(x.T2, t))
+	}
+	return fmt.Sprintf("%s()", x.T1)
 }
