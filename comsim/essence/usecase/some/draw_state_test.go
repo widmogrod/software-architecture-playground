@@ -289,7 +289,7 @@ func TestDraw(t *testing.T) {
   }
 }`,
 		},
-		"returns assigment": {
+		"returns result of function invocation": {
 			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
 	a = EchoChamber({"Name": input.Name})
 	b = EchoChamber({"Name": input.Name, "Other": a.body})
@@ -357,6 +357,313 @@ func TestDraw(t *testing.T) {
     "Ok12": {
       "End": true,
       "OutputPath": "$.__vars__.b.var_value",
+      "Type": "Pass"
+    },
+    "Start1": {
+      "Next": "Assign4",
+      "ResultPath": "$.__vars__.input.var_value",
+      "Type": "Pass"
+    }
+  }
+}`,
+		},
+		"returns result of more complex computation": {
+			workflow: WorkparToWorkflow([]byte(`flow HelloWorld(input) {
+	res1 = ReserveAvailability(input)
+	if eq(res1.ok, false) {
+		_ = CancelReservation()
+		return({"status": "ReservationCancelled"})
+	}
+	
+	res2 = ProcessPayment(res1.echoed)
+	if eq(res1.ok, false) {
+		_ = RefundPayment()
+		_ = CancelReservation()
+		return({"status": "ReservationCancelled"})
+	}
+
+	res3 = ConfirmAvailability(res1.echoed)
+	if eq(res3.ok, false) {
+		_ = RefundPayment()
+		_ = CancelReservation()
+		return({"status": "ReservationCancelled"})
+	}
+
+	_ = SendNotification(res1.echoed)
+
+	return({"status": "ReservationSuccessful"})
+}`)),
+			stateMachine: `{
+  "Comment": "flow (input)",
+  "StartAt": "Start1",
+  "States": {
+    "Assign11": {
+      "Next": "Ok15",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:CancelReservation"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign17": {
+      "Next": "Choose21",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:ProcessPayment",
+        "Payload": "$.__vars__.res1.var_value.echoed"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__.res2",
+      "ResultSelector": {
+        "var_value.$": "$.Payload"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign24": {
+      "Next": "Assign28",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:RefundPayment"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign28": {
+      "Next": "Ok32",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:CancelReservation"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign34": {
+      "Next": "Choose38",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:ConfirmAvailability",
+        "Payload": "$.__vars__.res1.var_value.echoed"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__.res3",
+      "ResultSelector": {
+        "var_value.$": "$.Payload"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign4": {
+      "Next": "Choose8",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:ReserveAvailability",
+        "Payload": "$.__vars__.input.var_value"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__.res1",
+      "ResultSelector": {
+        "var_value.$": "$.Payload"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign41": {
+      "Next": "Assign45",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:RefundPayment"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign45": {
+      "Next": "Ok49",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:CancelReservation"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Assign51": {
+      "Next": "Ok55",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:eu-west-1:483648412454:function:SendNotification",
+        "Payload": "$.__vars__.res1.var_value.echoed"
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.__vars__._",
+      "ResultSelector": {},
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 1
+        }
+      ],
+      "Type": "Task"
+    },
+    "Choose21": {
+      "Choices": [
+        {
+          "BooleanEquals": false,
+          "Next": "Assign24",
+          "Variable": "$.__vars__.res1.var_value.ok"
+        }
+      ],
+      "Default": "Assign34",
+      "Type": "Choice"
+    },
+    "Choose38": {
+      "Choices": [
+        {
+          "BooleanEquals": false,
+          "Next": "Assign41",
+          "Variable": "$.__vars__.res3.var_value.ok"
+        }
+      ],
+      "Default": "Assign51",
+      "Type": "Choice"
+    },
+    "Choose8": {
+      "Choices": [
+        {
+          "BooleanEquals": false,
+          "Next": "Assign11",
+          "Variable": "$.__vars__.res1.var_value.ok"
+        }
+      ],
+      "Default": "Assign17",
+      "Type": "Choice"
+    },
+    "Ok15": {
+      "End": true,
+      "Parameters": {
+        "status": "ReservationCancelled"
+      },
+      "Type": "Pass"
+    },
+    "Ok32": {
+      "End": true,
+      "Parameters": {
+        "status": "ReservationCancelled"
+      },
+      "Type": "Pass"
+    },
+    "Ok49": {
+      "End": true,
+      "Parameters": {
+        "status": "ReservationCancelled"
+      },
+      "Type": "Pass"
+    },
+    "Ok55": {
+      "End": true,
+      "Parameters": {
+        "status": "ReservationSuccessful"
+      },
       "Type": "Pass"
     },
     "Start1": {

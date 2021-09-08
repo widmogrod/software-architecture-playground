@@ -90,8 +90,8 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 			// To handle those situations, first should one-Evaluate activity after to retrieve its ID
 
 			choise := MapPredicateToAWS(y.If)
-			if doesTerminate(y.Then) {
-				choise["Next"] = *getNextActivityId(y.Then)
+			if next := getNextActivityId(y.Then); next != nil {
+				choise["Next"] = *next
 			} else if state.NextPrefetched != nil {
 				choise["Next"] = *state.NextPrefetched
 			} else {
@@ -106,8 +106,8 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 			}
 
 			if y.Else != nil {
-				if doesTerminate(y.Else) {
-					r["Default"] = *getNextActivityId(y.Else)
+				if next := getNextActivityId(y.Else); next != nil {
+					r["Default"] = *next
 				} else if state.NextPrefetched != nil {
 					r["Default"] = *state.NextPrefetched
 				} else {
@@ -136,14 +136,29 @@ func FlowToAws(flow data.Workflow, state *FlowToAwsState) *FlowToAwsState {
 			return state
 
 		case data.Assign:
+			// TODO add here check of uniqueness of assignments,
+			// or to WorkparToWorkflow function
 			if a, ok := y.Flow.(data.Activity); ok {
 				if i, ok := a.Activity.(data.Invocation); ok {
 					next := getNextActivityId(y.Flow)
 					if next != nil {
 						r := buildInvocation(i)
-						r["ResultPath"] = "$.__vars__." + y.Var
-						r["ResultSelector"] = MapStrAny{
-							"var_value.$": "$.Payload",
+
+						//r["Comment"] = ToString(x)
+
+						//  When variable is "_" then ignore result
+						// TODO Because it's implicit and not express in AST
+						// as well _ is valid value in paths, that means there can be "bugs"
+						// that you can return(_) which should be equivalent to return()
+						// I should rethink an move it to AST
+						if y.Var != "_" {
+							r["ResultPath"] = "$.__vars__." + y.Var
+							r["ResultSelector"] = MapStrAny{
+								"var_value.$": "$.Payload",
+							}
+						} else {
+							r["ResultPath"] = "$.__vars__." + y.Var
+							r["ResultSelector"] = MapStrAny{}
 						}
 
 						if state.NextPrefetched != nil {
@@ -212,28 +227,6 @@ func buildInvocation(y data.Invocation) MapStrAny {
 	}
 
 	return r
-}
-
-func doesTerminate(flow data.Workflow) bool {
-	switch x := flow.(type) {
-	case data.Activity:
-		switch y := x.Activity.(type) {
-		case data.End:
-			return true
-		case data.Choose:
-			if doesTerminate(y.Then) || (y.Else != nil && doesTerminate(y.Else)) {
-				return true
-			}
-		}
-	case data.Transition:
-		if doesTerminate(x.From) || doesTerminate(x.To) {
-			return true
-		}
-	default:
-		panic(fmt.Sprintf("unhandled Workflow: %#v", flow))
-	}
-
-	return false
 }
 
 func getNextActivityId(flow data.Workflow) *string {
