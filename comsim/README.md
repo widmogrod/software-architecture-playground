@@ -126,4 +126,8 @@ From this exercise I notice that there is potential in further research in:
   - introduce collocated deployments of functions
 - type of such functions may have additional properties to indicate consistency, like write your own reads, 
   - type inference and checking may leverage consistency information to validate workflow structure
+- intermediary non-turing complete language that I created give possibility to adapt other languages to write workflows,
+  - potentially similar capability can be achieved in WASM and I should look into this more
 
+Other things that I learn:
+- golang code generation can be well integrated in daily workflow just: `go generate; go test; go build`
