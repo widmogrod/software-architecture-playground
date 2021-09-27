@@ -18,7 +18,7 @@
     "@aws-cdk/yaml-cfn": "^1.87.1",
     "@types/aws-lambda": "^8.10.68",
     "@types/jest": "^26.0.19",
-    "@types/node": "14.14.6",
+    "@types/node": "16.10.1",
     "aws-cdk": "^1.87.1",
     "cdk-assets": "^1.87.1",
     "fs-extra": "^9.0.1",
