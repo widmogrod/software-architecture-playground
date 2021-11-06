@@ -100,9 +100,15 @@ func (c *ChannelStream) Work() {
 
 				if match(m, s) {
 					results[s] = append(results[s], m)
-					if len(results[s]) >= s.MaxFetchSize {
+
+					maxFetch := s.MaxFetchSize
+					if s.MaxFetchSize == 0 {
+						maxFetch = 1
+					}
+
+					if len(results[s]) >= maxFetch {
 						select {
-						case res <- results[s]:
+						case res <- results[s][0:maxFetch]:
 						default:
 						}
 
