@@ -22,8 +22,8 @@ jobs:
       - run: cd continuations; go test -v ./...
       - run: cd comsim; go get -v -t -d ./...
       - run: cd comsim; go generate
-      - run: cd comsim; ls -la essence/usecasse/data
-      - run: cd comsim; cat essence/usecasse/data/runtime.dpr.go
+      - run: cd comsim; ls -la ./essence/usecase/data
+      - run: cd comsim; cat ./essence/usecase/data/runtime.dpr.go
       - run: cd comsim; go test -v ./...
 
   test-cdk:
