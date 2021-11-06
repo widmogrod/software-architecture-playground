@@ -99,6 +99,7 @@ func (i *StreamInvoke) Work() {
 				Kind: "InvocationResult",
 				Data: toBytes(&irk),
 			}
+			fmt.Printf("\n\ti.s.Push(InvocationResult)=iid=%s data=%s\n", mm.IID, me.Data)
 			i.s.Push(me)
 
 			// Fetch message needs to be ACK, otherwise when i.s.Push fails, it may not be retried
