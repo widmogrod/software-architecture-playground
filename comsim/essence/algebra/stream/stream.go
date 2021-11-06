@@ -25,8 +25,9 @@ type (
 	MessageData = []byte
 
 	Message struct {
-		Data MessageData
-		Kind MessageKind
+		Data   MessageData
+		Kind   MessageKind
+		Cursor *Cursor
 		//ID   MessageID
 	}
 )
@@ -67,8 +68,16 @@ type (
 		Kind         MessageKind
 		Selector     *SelectConditions
 		MaxFetchSize int
+
+		// Position oriented traversing of logO
+		From *Cursor
+		Skip int
 	}
 )
+
+type Cursor struct {
+	Position int
+}
 
 func (c *ChannelStream) SelectOnce(s SelectOnceCMD) []*Message {
 	ch := make(chan []*Message)
@@ -92,45 +101,49 @@ func (c *ChannelStream) Reduce(r ReduceCMD) {
 }
 
 func (c *ChannelStream) Work() {
-	results := make(map[SelectOnceCMD][]*Message)
-
+	tick := time.NewTicker(time.Millisecond * 50)
 	for {
 		select {
 		case <-c.next:
-		case <-time.After(time.Second):
+		case <-tick.C:
 		}
 
-		for i := c.cursor; i < len(c.log); i++ {
-			m := c.log[i]
+		c.selectors.Range(func(key, value interface{}) bool {
+			s := key.(SelectOnceCMD)
+			res := value.(chan []*Message)
 
-			c.selectors.Range(func(key, value interface{}) bool {
-				s := key.(SelectOnceCMD)
-				res := value.(chan []*Message)
+			maxFetch := s.MaxFetchSize
+			if s.MaxFetchSize == 0 {
+				maxFetch = 1
+			}
+
+			cursor := 0
+			if s.From != nil {
+				cursor = s.From.Position + s.Skip
+			}
+
+			results := make([]*Message, 0, 0)
+			for i := cursor; i < len(c.log); i++ {
+				m := c.log[i]
 
 				if match(m, s) {
-					results[s] = append(results[s], m)
+					results = append(results, m)
 
-					maxFetch := s.MaxFetchSize
-					if s.MaxFetchSize == 0 {
-						maxFetch = 1
-					}
-
-					if len(results[s]) >= maxFetch {
+					if len(results) >= maxFetch {
 						select {
-						case res <- results[s][0:maxFetch]:
+						case res <- results[0:maxFetch]:
 						default:
 						}
 
 						// Clear
-						delete(results, s)
 						c.selectors.Delete(key)
+						break
 					}
 				}
+			}
 
-				return true
-			})
-			c.cursor += 1
-		}
+			return true
+		})
 	}
 }
 
@@ -205,7 +218,12 @@ func (c *ChannelStream) Fetch(size int) []*Message {
 }
 
 func (c *ChannelStream) Push(message Message) {
-	c.log = append(c.log, &message)
+	m := &Message{
+		Data:   message.Data,
+		Kind:   message.Kind,
+		Cursor: &Cursor{Position: len(c.log)},
+	}
+	c.log = append(c.log, m)
 
 	c.nextIteration()
 }

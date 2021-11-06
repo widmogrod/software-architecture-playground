@@ -139,7 +139,11 @@ func TestChannelStream_SelectOnce(t *testing.T) {
 			}()
 
 			result := s.SelectOnce(uc.selectOnce)
-			assert.ElementsMatch(t, uc.expectResult, result)
+			assert.Len(t, result, len(uc.expectResult))
+			for i, m1 := range uc.expectResult {
+				assert.Equal(t, m1.Kind, result[i].Kind)
+				assert.Equal(t, m1.Data, result[i].Data)
+			}
 		})
 	}
 }

@@ -40,6 +40,7 @@ func (i *StreamInvoke) Invoke(name invoker.FunctionID, input invoker.FunctionInp
 }
 
 func (i *StreamInvoke) Work() {
+	var cursor *Cursor
 	for {
 		// Here is assumption that fetch guarantees order, but don't guarantee only-once delivery
 		// (1) When worker will be in the same process as invoker, that simplify few things
@@ -65,7 +66,11 @@ func (i *StreamInvoke) Work() {
 		for _, m := range i.s.SelectOnce(SelectOnceCMD{
 			Kind:         "Invocation",
 			MaxFetchSize: 1,
+			From:         cursor,
+			Skip:         1,
 		}) {
+			cursor = m.Cursor
+
 			var mm Invocation
 			err := json.Unmarshal(m.Data, &mm)
 			if err != nil {
