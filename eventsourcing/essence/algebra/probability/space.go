@@ -45,7 +45,7 @@ func (p *probabilitySpace) P(x Variable) Probability {
 }
 
 func (p *probabilitySpace) P_and(x, y Variable) Probability {
-	// TODO most likely this IF is pointless
+	// TODO most likely this If is pointless
 	if _, ok := p.mutuallyExclusive[x]; ok {
 		if _, ok := p.mutuallyExclusive[x][y]; ok {
 			// When event A and B cannot occur simultaneously

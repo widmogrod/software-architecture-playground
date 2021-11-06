@@ -5,11 +5,11 @@ import "fmt"
 var _ Function = &FunctionInMemory{}
 
 type FunctionInMemory struct {
-	fun func(input FunctionInput) FunctionOutput
+	F func(input FunctionInput) FunctionOutput
 }
 
 func (f *FunctionInMemory) Call(input FunctionInput) FunctionOutput {
-	return f.fun(input)
+	return f.F(input)
 }
 
 var _ FunctionRegistry = &InMemoryFunctionRegistry{}
