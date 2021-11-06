@@ -71,10 +71,10 @@ func TestStreamOfInvocation(t *testing.T) {
 func AssertLogContains(t *testing.T, log, contains []*Message) {
 	if !assert.Equal(t, len(contains), len(log), "Log lengths don't match") {
 		for i, v := range log {
-			t.Logf("log(%d)=%#v\n", i, v)
+			t.Logf("log(%d)=%s; %s\n", i, v.Kind, v.Data)
 		}
 		for i, v := range contains {
-			t.Logf("con(%d)=%#v\n", i, v)
+			t.Logf("con(%d)=%s; %s\n", i, v.Kind, v.Data)
 		}
 		return
 	}
