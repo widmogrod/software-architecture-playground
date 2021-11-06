@@ -96,7 +96,7 @@ func TestSubscriber(t *testing.T) {
 	})))
 	assert.NoError(t, err)
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second)
 
 	AssertLogContains(t, s.Log(), []*Message{
 		{
