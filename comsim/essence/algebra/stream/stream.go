@@ -6,6 +6,7 @@ import (
 	"github.com/widmogrod/software-architecture-playground/comsim/essence/algebra/invoker"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 type Streamer interface {
@@ -36,6 +37,7 @@ func NewChannelStream() *ChannelStream {
 	return &ChannelStream{
 		ch:                      make(chan *Message),
 		log:                     make([]*Message, 0, 0),
+		next:                    make(chan struct{}),
 		probabilityOfRedelivery: 0.5,
 	}
 }
@@ -43,6 +45,7 @@ func NewChannelStream() *ChannelStream {
 type ChannelStream struct {
 	ch     chan *Message
 	log    []*Message
+	next   chan struct{}
 	cursor int
 
 	selectors sync.Map
@@ -74,6 +77,8 @@ func (c *ChannelStream) SelectOnce(s SelectOnceCMD) []*Message {
 	c.selectors.Store(s, ch)
 	defer c.selectors.Delete(s)
 
+	c.nextIteration()
+
 	return <-ch
 }
 
@@ -90,9 +95,13 @@ func (c *ChannelStream) Work() {
 	results := make(map[SelectOnceCMD][]*Message)
 
 	for {
+		select {
+		case <-c.next:
+		case <-time.After(time.Second):
+		}
+
 		for i := c.cursor; i < len(c.log); i++ {
 			m := c.log[i]
-			c.cursor = i
 
 			c.selectors.Range(func(key, value interface{}) bool {
 				s := key.(SelectOnceCMD)
@@ -120,6 +129,7 @@ func (c *ChannelStream) Work() {
 
 				return true
 			})
+			c.cursor += 1
 		}
 	}
 }
@@ -196,6 +206,15 @@ func (c *ChannelStream) Fetch(size int) []*Message {
 
 func (c *ChannelStream) Push(message Message) {
 	c.log = append(c.log, &message)
+
+	c.nextIteration()
+}
+
+func (c *ChannelStream) nextIteration() {
+	select {
+	case c.next <- struct{}{}:
+	default:
+	}
 }
 
 func (c *ChannelStream) Log() []*Message {
