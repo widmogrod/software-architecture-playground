@@ -1,0 +1,50 @@
+version: '3.3'
+services:
+  postgres:
+    image: library/postgres:10-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+
+#  couchbase:
+#    image: couchbase
+#    ports:
+#      - 11210:11210
+#      - 11211:11211
+
+  migration:
+    image: migrate/migrate
+    volumes:
+      - ./migration:/migration
+    command: -path /migration -database postgres://postgres:password@postgres:5432/postgres?sslmode=disable up
+    #    command: -path /migration -database postgres://postgres:password@postgres:5432/postgres?sslmode=disable drop -f
+    depends_on:
+      - postgres
+
+  grafana:
+    restart: always
+    image: grafana/grafana-oss
+    environment:
+      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
+    volumes:
+      - ./distraction/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - 3000:3000
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    volumes:
+      - ./distraction/prometheus:/etc/prometheus
+
+  export_psql:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    ports:
+      - 9187:9187
+    environment:
+      DATA_SOURCE_NAME: "postgres://postgres:password@postgres:5432/postgres?sslmode=disable"

@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: 'gh-dashboards'
+    type: file
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true
