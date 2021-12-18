@@ -40,8 +40,6 @@ type (
 )
 
 
-// package _examples
-
 
 
 func MkNothing() *Maybe {
@@ -96,4 +94,93 @@ func MkLeaf(a0 interface{}) *Tree {
 	}
 }
 
+
+
+
+func BFS_Maybe(f1 func(*Just),l *Maybe) {
+	visited := map[*Maybe]bool{}
+	queue := []*Maybe{l}
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		if visited[i] {
+			continue
+		}
+		visited[i] = true
+
+		
+		if i.Nothing0 != nil {
+
+			continue
+		}
+		
+		if i.Just1 != nil {
+			f1(i.Just1)
+
+			continue
+		}
+		
+
+		panic("non-exhaustive")
+	}
+}
+
+func BFS_List(f0 func(*Cons),l *List) {
+	visited := map[*List]bool{}
+	queue := []*List{l}
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		if visited[i] {
+			continue
+		}
+		visited[i] = true
+
+		
+		if i.Cons0 != nil {
+			f0(i.Cons0)
+			queue = append(queue, i.Cons0.List1)
+
+			continue
+		}
+		
+		if i.Nil1 != nil {
+
+			continue
+		}
+		
+
+		panic("non-exhaustive")
+	}
+}
+
+func BFS_Tree(f1 func(*Leaf),l *Tree) {
+	visited := map[*Tree]bool{}
+	queue := []*Tree{l}
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		if visited[i] {
+			continue
+		}
+		visited[i] = true
+
+		
+		if i.Branch0 != nil {
+			queue = append(queue, i.Branch0.Tree0)
+			queue = append(queue, i.Branch0.Tree1)
+
+			continue
+		}
+		
+		if i.Leaf1 != nil {
+			f1(i.Leaf1)
+
+			continue
+		}
+		
+
+		panic("non-exhaustive")
+	}
+}
 

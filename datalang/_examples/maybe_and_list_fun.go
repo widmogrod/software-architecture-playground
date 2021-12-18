@@ -3,10 +3,13 @@ package _examples
 // tr :: (a -> b) ->
 func DFS(c func(*Cons), n func(*Nil), l *List) {
 	if l.Cons0 != nil {
+		// has value to emit?
 		c(l.Cons0)
+		// has reference to type?
 		DFS(c, n, l.Cons0.List1)
 	} else if l.Nil1 != nil {
-		n(l.Nil1)
+		// is terminal object?
+		//n(l.Nil1)
 	} else {
 		panic("non-exhaustive")
 	}
@@ -49,36 +52,38 @@ func BFS(c func(*Cons), n func(*Nil), l *List) {
 
 // tr :: (a -> b) ->
 func DFS_Tree(n func(*Leaf), t *Tree) {
+
 	if t.Branch0 != nil {
+		// has reference to type?
 		DFS_Tree(n, t.Branch0.Tree0)
 		DFS_Tree(n, t.Branch0.Tree1)
 	} else if t.Leaf1 != nil {
+		// has value to emit?
 		n(t.Leaf1)
 	} else {
 		panic("non-exhaustive")
 	}
 }
-
-func BFS_Tree(n func(*Leaf), l *Tree) {
-	visited := map[*Tree]bool{}
-	queue := []*Tree{l}
-	for len(queue) > 0 {
-		i := queue[0]
-		queue = queue[1:]
-
-		if visited[i] {
-			continue
-		}
-
-		visited[i] = true
-
-		if i.Branch0 != nil {
-			queue = append(queue, i.Branch0.Tree0)
-			queue = append(queue, i.Branch0.Tree1)
-		} else if i.Leaf1 != nil {
-			n(i.Leaf1)
-		} else {
-			panic("non-exhaustive")
-		}
-	}
-}
+//
+//func BFS_Tree(n func(*Leaf), l *Tree) {
+//	visited := map[*Tree]bool{}
+//	queue := []*Tree{l}
+//	for len(queue) > 0 {
+//		i := queue[0]
+//		queue = queue[1:]
+//		if visited[i] {
+//			continue
+//		}
+//
+//		visited[i] = true
+//
+//		if i.Branch0 != nil {
+//			queue = append(queue, i.Branch0.Tree0)
+//			queue = append(queue, i.Branch0.Tree1)
+//		} else if i.Leaf1 != nil {
+//			n(i.Leaf1)
+//		} else {
+//			panic("non-exhaustive")
+//		}
+//	}
+//}

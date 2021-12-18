@@ -14,10 +14,8 @@ func TestTraversingList(t *testing.T) {
 	//		List1: &List{Cons0: &Cons{
 	//			A0: "b", List1: &List{Nil1: &Nil{}}}}}}
 
-	BFS(func(cons *Cons) {
+	BFS_List(func(cons *Cons) {
 		fmt.Printf("BFS:Cons=%v\n", cons.A0)
-	}, func(n *Nil) {
-		fmt.Printf("BFS:Nil\n")
 	}, list)
 
 	DFS(func(cons *Cons) {

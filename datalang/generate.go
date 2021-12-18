@@ -2,6 +2,7 @@ package datalang
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"text/template"
 )
@@ -28,8 +29,6 @@ type (
 `
 
 	tmplMake = `
-// package {{ .PackageName }}
-
 {{range $i, $data := .Ast.Datas}}
 {{range $no, $constructor := .Body}}
 func Mk{{fieldName $constructor.Name -}}(
@@ -54,15 +53,79 @@ func Mk{{fieldName $constructor.Name -}}(
 {{end}}
 `
 
+	tmplBFS = `
+{{range $i, $data := .Ast.Datas}}
+func BFS_{{typeName $data.Name}}(
+	{{- range $no, $constructor := .Body}}
+	{{- if hasValue $data $constructor -}}
+	f{{$no}} func(*{{fieldName $constructor.Name}}), 
+	{{- end -}}
+	{{- end -}}
+	l *{{typeName $data.Name -}}
+) {
+	visited := map[*{{typeName $data.Name}}]bool{}
+	queue := []*{{typeName $data.Name}}{l}
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		if visited[i] {
+			continue
+		}
+		visited[i] = true
+
+		{{range $no, $constructor := .Body}}
+		if i.{{fieldName $constructor.Name}}{{$no}} != nil {
+			{{- if hasValue $data $constructor}}
+			f{{$no}}(i.{{fieldName $constructor.Name}}{{$no}})
+			{{- end}}
+
+			{{- range referenceTypes $data $constructor}}
+			queue = append(queue, i.{{fieldName $constructor.Name}}{{$no}}.{{.}})
+			{{- end}}
+
+			continue
+		}
+		{{end}}
+
+		panic("non-exhaustive")
+	}
+}
+{{end}}
+`
+
 	funMap = template.FuncMap{
 		"typeName":  strings.Title,
 		"fieldName": strings.Title,
 		"argName":   strings.ToLower,
 		"isPoli":    IsPoli,
+		"referenceTypes": func(d Data, c Constructor) []string {
+			var result []string
+			for no, s := range c.Value {
+				if s == d.Name {
+					result = append(result, fmt.Sprintf("%s%d", strings.Title(s), no))
+				}
+			}
+			return result
+		},
+		"hasValue": func(d Data, c Constructor) bool {
+			isPoli := map[string]bool{}
+			for _, s := range d.Poli {
+				isPoli[s] = true
+			}
+
+			for _, s := range c.Value {
+				if isPoli[s] {
+					return true
+				}
+			}
+
+			return false
+		},
 	}
 
-	render   = template.Must(template.New("main").Funcs(funMap).Parse(tmpl))
-	renderMk = template.Must(template.New("main").Funcs(funMap).Parse(tmplMake))
+	render    = template.Must(template.New("main").Funcs(funMap).Parse(tmpl))
+	renderMk  = template.Must(template.New("main").Funcs(funMap).Parse(tmplMake))
+	renderBFS = template.Must(template.New("main").Funcs(funMap).Parse(tmplBFS))
 )
 
 type (
@@ -117,6 +180,10 @@ func GenerateGo(ast *Ast, options ...OptionBuilder) ([]byte, error) {
 	}
 
 	err = renderMk.ExecuteTemplate(result, "main", data)
+	if err != nil {
+		return nil, err
+	}
+	err = renderBFS.ExecuteTemplate(result, "main", data)
 	if err != nil {
 		return nil, err
 	}
