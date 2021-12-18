@@ -5,3 +5,7 @@ data maybe(a)
 data list(a)
     | Cons(a, list)
     | Nil
+
+data tree(a)
+    | Branch(tree, tree)
+    | Leaf(a)

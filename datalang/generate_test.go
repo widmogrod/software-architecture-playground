@@ -9,7 +9,7 @@ import (
 func TestGenerateGo(t *testing.T) {
 	// use generated code, as expected and update source code
 	// should be set as "true" only during development code generation
-	updateSource := false
+	updateSource := true
 	useCases := map[string]struct {
 		in  string
 		out string

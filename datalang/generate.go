@@ -10,27 +10,59 @@ var (
 	tmpl = `package {{ .PackageName }}
 {{range $i, $data := .Ast.Datas}}
 type (
-	{{typeName .Name }} struct { {{/* hack to remove empty first line*/ -}}
-		{{- range .Body}}
-		{{fieldName .Name }} *{{typeName .Name}}{{end}}
+	{{typeName .Name }} struct { {{/* no-new-line */ -}}
+		{{- range $no, $constructor := .Body}}
+		{{fieldName .Name }}{{$no}} *{{typeName .Name}}{{end}}
 	}{{/* no-new-line */ -}}
 
 {{- range .Body}}
-	{{typeName .Name}} struct { {{/* hack to remove empty first line*/ -}}
-		{{- range .Value -}}
+	{{typeName .Name}} struct { {{/* no-new-line */ -}}
+		{{- range $no, $value := .Value -}}
 		{{- if isPoli . $data}}
-		{{fieldName .}} interface{} 
+		{{fieldName .}}{{$no}} interface{} 
 		{{- else}}
-		{{fieldName .}} {{typeName .}}{{end}}{{end}}
+		{{fieldName .}}{{$no}} *{{typeName .}}{{end}}{{end}}
 	}{{end}}
 )
 {{ end}}
 `
-	render = template.Must(template.New("main").Funcs(template.FuncMap{
+
+	tmplMake = `
+// package {{ .PackageName }}
+
+{{range $i, $data := .Ast.Datas}}
+{{range $no, $constructor := .Body}}
+func Mk{{fieldName $constructor.Name -}}(
+	{{- range $no, $value := $constructor.Value}}
+		{{- if gt $no 0}}, {{end}}
+		{{- if isPoli . $data -}}
+		{{- argName .}}{{$no}} interface{}
+		{{- else -}}
+		{{- argName .}}{{$no}} *{{typeName .}}
+		{{- end -}}
+	{{- end -}}
+
+) *{{typeName $data.Name}} {
+	return &{{typeName $data.Name}} {
+		{{fieldName $constructor.Name }}{{$no}}: &{{typeName .Name}} { {{/* no-new-line */ -}}
+		{{- range $no, $value := .Value}}
+			{{fieldName .}}{{$no}}: {{argName .}}{{$no}},{{end}}
+		},
+	}
+}
+{{end}}
+{{end}}
+`
+
+	funMap = template.FuncMap{
 		"typeName":  strings.Title,
 		"fieldName": strings.Title,
+		"argName":   strings.ToLower,
 		"isPoli":    IsPoli,
-	}).Parse(tmpl))
+	}
+
+	render   = template.Must(template.New("main").Funcs(funMap).Parse(tmpl))
+	renderMk = template.Must(template.New("main").Funcs(funMap).Parse(tmplMake))
 )
 
 type (
@@ -80,6 +112,11 @@ func GenerateGo(ast *Ast, options ...OptionBuilder) ([]byte, error) {
 
 	result := &bytes.Buffer{}
 	err := render.ExecuteTemplate(result, "main", data)
+	if err != nil {
+		return nil, err
+	}
+
+	err = renderMk.ExecuteTemplate(result, "main", data)
 	if err != nil {
 		return nil, err
 	}
