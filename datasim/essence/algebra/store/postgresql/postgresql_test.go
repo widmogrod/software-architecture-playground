@@ -80,13 +80,6 @@ func TestInitiateStoreShape(t *testing.T) {
 	fmt.Printf("res=%#v", res)
 }
 
-func cleanUpDatabase(t *testing.T, db *sql.DB) {
-	_, err := db.Exec(`TRUNCATE TABLE activation_tokens`)
-	failOn(t, err)
-	_, err = db.Exec(`TRUNCATE TABLE user_identity`)
-	failOn(t, err)
-}
-
 func failOn(t *testing.T, err error) {
 	if err != nil {
 		t.Fatalf("coudn't complete action: %s", err)

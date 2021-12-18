@@ -1,13 +1,6 @@
 operations
-   =         Initiate {Relation: relation}
-//   |          Destroy (RelationRef)
-   |   SetPrimaryAttr (EntityRef, AttributeName, AttributeValue)
-   | SetSecondaryAttr (EntityRef, EntityRef, AttributeName, AttributeValue)
-;
-
-ref
-   =   EntityRef (EntityName, EntityID)
-//   | RelationRef (RelationId)
+   =         Initiate {relation: relation}
+   |   SetPrimaryAttr {entityID: EntityID, attrs: [Attribute]}
 ;
 
 relation
@@ -15,7 +8,7 @@ relation
 ;
 
 shape
-    = Entity {Name: Name, Attributes: [attr]}
+    = Entity {entityID: EntityID, attrs: [Attribute]}
 ;
 
 attr
