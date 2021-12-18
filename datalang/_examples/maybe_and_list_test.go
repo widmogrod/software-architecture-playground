@@ -18,10 +18,8 @@ func TestTraversingList(t *testing.T) {
 		fmt.Printf("BFS:Cons=%v\n", cons.A0)
 	}, list)
 
-	DFS(func(cons *Cons) {
+	DFS_List(func(cons *Cons) {
 		fmt.Printf("DFS:Cons=%v\n", cons.A0)
-	}, func(n *Nil) {
-		fmt.Printf("DFS:Nil\n")
 	}, list)
 
 	res, err := json.Marshal(list)

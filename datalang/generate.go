@@ -82,13 +82,45 @@ func BFS_{{typeName $data.Name}}(
 			{{- range referenceTypes $data $constructor}}
 			queue = append(queue, i.{{fieldName $constructor.Name}}{{$no}}.{{.}})
 			{{- end}}
-
 			continue
 		}
 		{{end}}
-
 		panic("non-exhaustive")
 	}
+}
+{{end}}
+`
+
+	tmplDFS = `
+{{range $i, $data := .Ast.Datas}}
+func DFS_{{typeName $data.Name}}(
+	{{- range $no, $constructor := $data.Body}}
+	{{- if hasValue $data $constructor -}}
+	f{{$no}} func(*{{fieldName $constructor.Name}}), 
+	{{- end -}}
+	{{- end -}}
+	i *{{typeName $data.Name -}}
+) {
+	{{- range $no, $constructor := $data.Body}}
+	if i.{{fieldName $constructor.Name}}{{$no}} != nil {
+		{{- if hasValue $data $constructor}}
+		f{{$no}}(i.{{fieldName $constructor.Name}}{{$no}})
+		{{- end}}
+
+		{{- range referenceTypes $data $constructor}}
+		DFS_{{typeName $data.Name}}(
+			{{- range $no, $constructor := $data.Body}}
+			{{- if hasValue $data $constructor -}}
+			f{{$no}},
+			{{- end -}}
+			{{- end -}}
+			i.{{fieldName $constructor.Name}}{{$no}}.{{. -}}
+		)
+		{{- end}}
+		return	
+	}
+	{{end}}
+	panic("non-exhaustive")
 }
 {{end}}
 `
@@ -126,6 +158,7 @@ func BFS_{{typeName $data.Name}}(
 	render    = template.Must(template.New("main").Funcs(funMap).Parse(tmpl))
 	renderMk  = template.Must(template.New("main").Funcs(funMap).Parse(tmplMake))
 	renderBFS = template.Must(template.New("main").Funcs(funMap).Parse(tmplBFS))
+	renderDFS = template.Must(template.New("main").Funcs(funMap).Parse(tmplDFS))
 )
 
 type (
@@ -184,6 +217,10 @@ func GenerateGo(ast *Ast, options ...OptionBuilder) ([]byte, error) {
 		return nil, err
 	}
 	err = renderBFS.ExecuteTemplate(result, "main", data)
+	if err != nil {
+		return nil, err
+	}
+	err = renderDFS.ExecuteTemplate(result, "main", data)
 	if err != nil {
 		return nil, err
 	}

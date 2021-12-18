@@ -110,17 +110,14 @@ func BFS_Maybe(f1 func(*Just),l *Maybe) {
 
 		
 		if i.Nothing0 != nil {
-
 			continue
 		}
 		
 		if i.Just1 != nil {
 			f1(i.Just1)
-
 			continue
 		}
 		
-
 		panic("non-exhaustive")
 	}
 }
@@ -140,16 +137,13 @@ func BFS_List(f0 func(*Cons),l *List) {
 		if i.Cons0 != nil {
 			f0(i.Cons0)
 			queue = append(queue, i.Cons0.List1)
-
 			continue
 		}
 		
 		if i.Nil1 != nil {
-
 			continue
 		}
 		
-
 		panic("non-exhaustive")
 	}
 }
@@ -169,18 +163,59 @@ func BFS_Tree(f1 func(*Leaf),l *Tree) {
 		if i.Branch0 != nil {
 			queue = append(queue, i.Branch0.Tree0)
 			queue = append(queue, i.Branch0.Tree1)
-
 			continue
 		}
 		
 		if i.Leaf1 != nil {
 			f1(i.Leaf1)
-
 			continue
 		}
 		
-
 		panic("non-exhaustive")
 	}
+}
+
+
+
+func DFS_Maybe(f1 func(*Just),i *Maybe) {
+	if i.Nothing0 != nil {
+		return	
+	}
+	
+	if i.Just1 != nil {
+		f1(i.Just1)
+		return	
+	}
+	
+	panic("non-exhaustive")
+}
+
+func DFS_List(f0 func(*Cons),i *List) {
+	if i.Cons0 != nil {
+		f0(i.Cons0)
+		DFS_List(f0,i.Cons0.List1)
+		return	
+	}
+	
+	if i.Nil1 != nil {
+		return	
+	}
+	
+	panic("non-exhaustive")
+}
+
+func DFS_Tree(f1 func(*Leaf),i *Tree) {
+	if i.Branch0 != nil {
+		DFS_Tree(f1,i.Branch0.Tree0)
+		DFS_Tree(f1,i.Branch0.Tree1)
+		return	
+	}
+	
+	if i.Leaf1 != nil {
+		f1(i.Leaf1)
+		return	
+	}
+	
+	panic("non-exhaustive")
 }
 
