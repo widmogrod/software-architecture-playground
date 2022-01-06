@@ -8,6 +8,7 @@ import (
 	db "github.com/widmogrod/software-architecture-playground/hypo/prisma-go/sdk"
 )
 
+//go:generate go run github.com/prisma/prisma-client-go generate
 func main() {
 	if err := run(); err != nil {
 		panic(err)
