@@ -18,4 +18,14 @@ model Post {
     title     String
     published Boolean
     desc      String?
+    comments Comment[]
+}
+
+model Comment {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    content   String
+
+    post   Post   @relation(fields: [postID], references: [id])
+    postID String
 }
