@@ -1,0 +1,20 @@
+FROM golang:1.17-buster AS builder
+
+WORKDIR /app
+COPY migrations .
+COPY main.go ./
+COPY dev.db ./
+COPY schema.prisma ./
+COPY go.mod go.sum ./
+
+RUN go mod download
+RUN go run github.com/prisma/prisma-client-go prefetch
+
+ENV APP_PORT=8080
+ENV GOARCH=arm64
+ENV GOOS=linux
+
+RUN go run github.com/prisma/prisma-client-go generate
+RUN go run github.com/prisma/prisma-client-go migrate deploy
+CMD ["go", "run", "main.go"]
+

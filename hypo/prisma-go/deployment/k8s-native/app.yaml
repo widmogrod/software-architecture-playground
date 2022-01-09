@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gh-app
+  name: gh-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gh-app
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: gh-app
+    spec:
+      containers:
+        - image: docker.io/nginx/nginx-ingress
+          name: nginix
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - mountPath: /val/local/gh-db
+              name: gh-app-db
+      volumes:
+        - name: gh-app-db
+          persistentVolumeClaim:
+            claimName: gh-app-local-pv-claim
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-persistent-volume
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /tmp
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - minikube
+#  hostPath:
+#    path: /opt/volume/gh-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-claim
+spec:
+  storageClassName: local-storage
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+
+

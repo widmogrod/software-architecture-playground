@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	db "github.com/widmogrod/software-architecture-playground/hypo/prisma-go/sdk"
+	"log"
+	"net/http"
+	"os"
 )
 
-//go:generate go run github.com/prisma/prisma-client-go generate
 func main() {
 	if err := run(); err != nil {
 		panic(err)
@@ -29,41 +30,86 @@ func run() error {
 
 	ctx := context.Background()
 
-	// create a post
-	createdPost, err := client.Post.CreateOne(
-		db.Post.Title.Set("Hi from Prisma!"),
-		db.Post.Published.Set(true),
-		db.Post.Desc.Set("Prisma is a database toolkit and makes databases easy."),
-	).Exec(ctx)
-	if err != nil {
-		return err
-	}
+	http.HandleFunc("/create", func(r http.ResponseWriter, rq *http.Request) {
+		// create a post
+		createdPost, err := client.Post.CreateOne(
+			db.Post.Title.Set("Hi from Prisma2!"),
+			db.Post.Published.Set(true),
+			db.Post.Desc.Set("Prisma is a database toolkit and makes databases easy."),
+		).Exec(ctx)
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
 
-	result, _ := json.MarshalIndent(createdPost, "", "  ")
-	fmt.Printf("created post: %s\n", result)
+		result, err := json.MarshalIndent(createdPost, "", "  ")
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
+
+		r.Header().Set("Content-Type", "application/json")
+		r.WriteHeader(http.StatusOK)
+		r.Write(result)
+	})
+
+	http.HandleFunc("/", func(r http.ResponseWriter, rq *http.Request) {
+		// create a post
+		createdPost, err := client.Post.FindMany().Exec(ctx)
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
+
+		result, err := json.MarshalIndent(createdPost, "", "  ")
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
+
+		r.Header().Set("Content-Type", "application/json")
+		r.WriteHeader(http.StatusOK)
+		r.Write(result)
+	})
 
 	// find a single post
-	post, err := client.Post.FindUnique(
-		db.Post.ID.Equals(createdPost.ID),
-	).Exec(ctx)
-	if err != nil {
-		return err
-	}
+	http.HandleFunc("/get", func(r http.ResponseWriter, rq *http.Request) {
+		postID := rq.URL.Query().Get("id")
+		post, err := client.Post.FindUnique(
+			db.Post.ID.Equals(postID),
+		).Exec(ctx)
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
 
-	result, _ = json.MarshalIndent(post, "", "  ")
-	fmt.Printf("post: %s\n", result)
+		result, err := json.MarshalIndent(post, "", "  ")
+		if err != nil {
+			reportErr(r, err)
+			return
+		}
 
-	// for optional/nullable values, you need to check the function and create two return values
-	// `desc` is a string, and `ok` is a bool whether the record is null or not. If it's null,
-	// `ok` is false, and `desc` will default to Go's default values; in this case an empty string (""). Otherwise,
-	// `ok` is true and `desc` will be "my description".
-	desc, ok := post.Desc()
-	if !ok {
-		return fmt.Errorf("post's description is null")
-	}
+		r.Header().Set("Content-Type", "application/json")
+		r.WriteHeader(http.StatusOK)
+		r.Write(result)
+	})
 
-	fmt.Printf("The posts's description is: %s\n", desc)
-
+	log.Println("port: " + port())
+	http.ListenAndServe(port(), http.DefaultServeMux)
 
 	return nil
+}
+
+func port() string {
+	r, found := os.LookupEnv("APP_PORT")
+	if found {
+		return ":" + r
+	}
+
+	return ":8080"
+}
+
+func reportErr(r http.ResponseWriter, err error) {
+	r.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(r, "err=%v", err)
 }
