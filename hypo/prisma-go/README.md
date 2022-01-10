@@ -47,9 +47,15 @@ Devspace has quite interesting capabilities that make local workflow fantastic:
 - ssh to pod just right after `devspace dev`
 - sync files with the pod
 - port-forward services
+- auto-restart pod process
 
 Such workflow is fast when you develop application, instead of k8s configuration
 
+## Skaffold vs devspace.sh
+- Syncing and reloading application seams faster for devspace, but sill in case of golang it takes time :/
+- Devspace can open terminal and start forwarding after runing `devspace dev` command, Skaffold requires to provide --port-forward flag, and ssh to pod are next two steps
+- Skaffold use buildpacks.io (Devspace don't have it, bit can be addedd as custom build option) and ability of just 
+  building project without writing dockerfile manually push more things to runtime
 
 # Using prisma
 - Using prisma is quite strength forward, generation of SDK with types gives autocomplete that makes typing queries fast
@@ -63,3 +69,5 @@ but it will result in two technologies not leveraging information about types.
 
 There is also other contender, GraphQL. GQL defines data model like `prisma`, but it also defines queries, mutations, subscriptions, that `gRPC gives`, 
 but thanks to everything being same `intermediate mode` give possibility to have end-to-end types.
+
+https://fauna.com/ is closes that I found to making

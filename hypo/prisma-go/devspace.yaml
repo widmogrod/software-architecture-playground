@@ -16,6 +16,11 @@ deployments:
 images:
   backend:
     image: localhost/ghapp
+    injectRestartHelper: true
+#    build:
+#      buildKit:
+#        preferMinikube: true
+#        args: ["--platform", "linux/amd64"]
     dockerfile: ./Dockerfile.dev
     build:
       docker:
@@ -40,8 +45,17 @@ dev:
   # `dev.sync` configures a file sync between our Pods in k8s and your local project files
   sync:
   - imageSelector: ${IMAGE} # Select the Pod that runs our `${IMAGE}`
+    onUpload:
+      restartContainer: true
     excludePaths:
     - .git/
+    - .devspace/
+    - deployment/
+
+  autoReload:
+    paths:
+      - devspace.yaml
+      - /deployment/*
 
 #  logs:
 #    showLast: 10

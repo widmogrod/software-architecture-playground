@@ -33,7 +33,7 @@ func run() error {
 	http.HandleFunc("/create", func(r http.ResponseWriter, rq *http.Request) {
 		// create a post
 		createdPost, err := client.Post.CreateOne(
-			db.Post.Title.Set("Hi from Prisma2!"),
+			db.Post.Title.Set("Hi from Prisma!"),
 			db.Post.Published.Set(true),
 			db.Post.Desc.Set("Prisma is a database toolkit and makes databases easy."),
 		).Exec(ctx)
