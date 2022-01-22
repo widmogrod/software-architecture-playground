@@ -40,7 +40,7 @@ skaffold dev --port-forward
 
 ## devspace.sh
 ```
-devspaces dev
+devspace dev
 ```
 
 Devspace has quite interesting capabilities that make local workflow fantastic:
