@@ -24,3 +24,6 @@ Currently, you can find those experiments, some of them are not connected to tho
 - [Experiment with EventSourcing in Golang](./eventsourcing/README.md)
 - [Church encoding in Golang](./churchencoding/README.md)
 - [McCarthy's Ambiguous Operator & SatSolver in Golang](./continuations/README.md)
+
+## Other links
+- [Latency Numbers Every Programmer Should Know](https://colin-scott.github.io/personal_website/research/interactive_latency.html)
