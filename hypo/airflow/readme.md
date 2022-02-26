@@ -1,6 +1,8 @@
 # Airflow
 ## Introduction
-Having fun with Apache Airflow
+Having fun with Apache Airflow.
+
+Hub of operators and examples https://registry.astronomer.io/
 
 ## Setup
 
