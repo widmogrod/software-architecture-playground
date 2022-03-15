@@ -24,3 +24,16 @@ Currently, you can find those experiments, some of them are not connected to tho
 - [Experiment with EventSourcing in Golang](./eventsourcing/README.md)
 - [Church encoding in Golang](./churchencoding/README.md)
 - [McCarthy's Ambiguous Operator & SatSolver in Golang](./continuations/README.md)
+
+## Other thoughts
+### [Latency Numbers Every Programmer Should Know](https://colin-scott.github.io/personal_website/research/interactive_latency.html)
+DISCLAIMER: Unverified.
+Latency between network and SSD and CPU improve massively over the years. 
+I look at origin of data, and I don't see clear hardware specs, so I assume those numbers don't tak NVMe SSD into account. 
+- Reading 1,000,000 bytes from memory is:
+  - ~6x faster than sending it over network
+  - ~16x faster than reading same amount from SSD
+
+There are also articles stating that [The Network is the New Storage Bottleneck](https://www.datanami.com/2016/11/10/network-new-storage-bottleneck/) when use NVMe SSD (but is from 2016).
+Reading [Overview of the standard platform for NVMe drives](https://systemadminspro.com/7-bottlenecks-of-the-nvme-server-platform/) 
+allure that it's the case, since more than one SSD can be read in parallel witch increase bandwidth.

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+go run github.com/prisma/prisma-client-go migrate dev --name init
+
+go run github.com/prisma/prisma-client-go generate
+
+go run github.com/prisma/prisma-client-go migrate dev --name add_comment_model

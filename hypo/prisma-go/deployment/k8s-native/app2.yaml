@@ -1,0 +1,70 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gh-app-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: g.local
+      http:
+        paths:
+          - path: "/"
+            pathType: Prefix
+            backend:
+              service:
+                name: gh-app-svc
+                port:
+                  number: 9999
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gh-app-svc
+  labels:
+    app: gh-app
+spec:
+  ports:
+    - port: 9999
+      targetPort: 9999
+      protocol: TCP
+  selector:
+    app: gh-app
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gh-app
+  labels:
+    app: gh-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gh-app
+  template:
+    metadata:
+      labels:
+        app: gh-app
+    spec:
+      containers:
+        - name: gh-app
+          image: localhost/ghapp:0.0.3
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          ports:
+            - containerPort: 9999
+          env:
+            - name: APP_PORT
+              value: "9999"
+#          volumeMounts:
+#            - mountPath: /val/local/gh-db
+#              name: gh-app-db
+#      volumes:
+#        - name: gh-app-db
+#          persistentVolumeClaim:
+#            claimName: gh-app-local-pv-claim

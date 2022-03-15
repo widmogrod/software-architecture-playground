@@ -1,0 +1,25 @@
+apiVersion: skaffold/v2beta26
+kind: Config
+metadata:
+  name: prisma-go
+build:
+  artifacts:
+#  - image: localhost/ghapp
+#    sync:
+#      infer:
+#    docker:
+#      dockerfile: Dockerfile
+  - image: localhost/ghapp
+    sync:
+      auto: true
+    buildpacks:
+      builder: "gcr.io/buildpacks/builder:v1"
+      dependencies:
+        paths:
+          - "*.go"
+deploy:
+  kubeContext: minikube
+  kubectl:
+    manifests:
+    - deployment/k8s-native/app2.yaml
+

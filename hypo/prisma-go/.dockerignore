@@ -1,0 +1,9 @@
+.gitignore
+.devspace
+
+devspace.yaml
+skaffold.yaml
+
+sdk/
+script/
+deployment/
