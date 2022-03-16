@@ -54,6 +54,8 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, m, p.Map(Identity[int]))
 
 	// composition: fmap (f . g)  ==  fmap f . fmap g
-
-	//assert.Equal(t, p.Map(Compose(f, g)), p.Map(f).Map(g)))
+	assert.Equal(t,
+		p.Map(Compose(f, g)),
+		ProxyF[int, Functor[int], int]{v: p.Map(f)}.Map(g),
+	)
 }
