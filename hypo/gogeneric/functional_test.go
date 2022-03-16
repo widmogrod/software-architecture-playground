@@ -2,7 +2,7 @@ package gogeneric
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/hypo/gogeneric/x/lists"
+	"strconv"
 	"testing"
 )
 
@@ -29,21 +29,18 @@ func TestCurry(t *testing.T) {
 //}
 
 func TestMap(t *testing.T) {
-	var l lists.List[int]
-	l.Push(1)
-
-	//f := func(x int) string {
-	//	return strconv.Itoa(x) + "+ 2"
-	//}
-	//g := func(x string) string {
-	//	return x + "4"
-	//}
-	f := func(x int) int {
-		return x + 2
+	f := func(x int) string {
+		return strconv.Itoa(x) + "+ 2"
 	}
-	g := func(x int) int {
-		return x + 4
+	g := func(x string) float64 {
+		return float64(len(x)) + 0.2
 	}
+	//f := func(x int) int {
+	//	return x + 2
+	//}
+	//g := func(x int) int {
+	//	return x + 4
+	//}
 
 	Compose(f, g)(1)
 
@@ -51,11 +48,13 @@ func TestMap(t *testing.T) {
 	p := ProxyF[int, *IdentityM[int], int]{v: m}
 	// identity: fmap id  ==  id
 
-	assert.Equal(t, m, p.Map(Identity[int]))
+	assert.Equal(t, m, p.Map(func(x int) int {
+		return x
+	}))
 
 	// composition: fmap (f . g)  ==  fmap f . fmap g
 	assert.Equal(t,
-		p.Map(Compose(f, g)),
-		ProxyF[int, Functor[int], int]{v: p.Map(f)}.Map(g),
+		ProxyF[int, Functor[int], float64]{v: m}.Map(Compose(f, g)),
+		ProxyF[string, Functor[string], float64]{v: ProxyF[int, *IdentityM[int], string]{m}.Map(f)}.Map(g),
 	)
 }

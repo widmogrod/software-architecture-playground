@@ -24,6 +24,11 @@ func Identity[T any](x T) T {
 	return x
 }
 
+// cannot convert x (variable of type T1 constrained by any) to type T2
+//func Identity2[T1, T2 any](x T1) T2 {
+//	return T2(x)
+//}
+
 type Container[T any] interface {
 	*T
 }
