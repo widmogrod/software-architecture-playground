@@ -34,8 +34,19 @@ w = messagesubscriber.New()
 w.When(domA.Change, r.Invoke(state.TransitionA))
 w.When(domB.Change, r.Invoke(state.TransitionB))
 
-// When(event, handler(event, state) => Either(Ok,KO)) =>
-// When(KO, handler(KO))
+// Joining states is also need, but there are challenges
+// - when one of events from a domain will arrive late or our of order?
+//   (this is dependent on type of computation, whenever it's necessary to worry about such things,
+//    most likely it needs to become part of contract.)
+// - when processing needs to be close to real time (1min window is acceptable)
+// - when processing needs to happen from the beginning of each domain - batch 
+//   and then catch up to the latest changes
+
+w = messagesubscriber.New()
+w.Join(domA.Change, domB.Change).<Algebra> // https://github.com/apache/beam, spark dataframe,... I wonder what subset of https://reactivex.io would also fit
+
+
+// Scaling such process with increased number of data is also important. 
 ```
 
 Stream of consciousness, beware:
