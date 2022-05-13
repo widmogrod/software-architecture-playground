@@ -33,7 +33,7 @@
     "@aws-cdk/aws-apigatewayv2-integrations": "^1.87.1",
     "@aws-cdk/aws-appconfig": "^1.87.1",
     "@aws-cdk/aws-codebuild": "^1.87.1",
-    "@aws-cdk/aws-codepipeline": "^1.87.1",
+    "@aws-cdk/aws-codepipeline": "^1.156.1",
     "@aws-cdk/aws-codepipeline-actions": "^1.87.1",
     "@aws-cdk/aws-lambda": "^1.87.1",
     "@aws-cdk/core": "^1.87.1",
