@@ -6,8 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"flag"
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/opensearch-project/opensearch-go"
+	"github.com/opensearch-project/opensearch-go/opensearchapi"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"io/ioutil"
@@ -18,7 +18,7 @@ import (
 
 const indexName = "fun-index"
 
-var isIntegration = flag.Bool("i-exec-docker-compose-up", false, "Integration that tests require `docker-compose up`")
+var isIntegration = flag.Bool("i-exec-docker-compose-up", true, "Integration that tests require `docker-compose up`")
 
 func TestFun(t *testing.T) {
 	if !*isIntegration {
@@ -28,15 +28,15 @@ func TestFun(t *testing.T) {
 	ctx := context.Background()
 	es := mkESClient(t)
 
-	cleanES(t, es)
-	mkIndex(t, es)
+	//cleanES(t, es)
+	//mkIndex(t, es)
 
 	for i := 0; i < 10; i++ {
 		doc := GenFun()
 		body, err := json.Marshal(&doc)
 		assert.NoError(t, err)
 
-		req := esapi.IndexRequest{
+		req := opensearchapi.IndexRequest{
 			Index:      indexName,
 			DocumentID: doc.ID,
 			Body:       bytes.NewReader(body),
@@ -57,10 +57,10 @@ func TestFun(t *testing.T) {
 	}
 }
 
-func mkESClient(t *testing.T) *elasticsearch.Client {
-	es, err := elasticsearch.NewClient(elasticsearch.Config{
+func mkESClient(t *testing.T) *opensearch.Client {
+	es, err := opensearch.NewClient(opensearch.Config{
 		Addresses: []string{
-			"https://localhost:9200",
+			"http://localhost:9200",
 		},
 		Username: "admin",
 		Password: "admin",
@@ -86,20 +86,23 @@ func loadFile(t *testing.T, file string) io.Reader {
 	return f
 }
 
-func cleanES(t *testing.T, es *elasticsearch.Client) {
+func cleanES(t *testing.T, es *opensearch.Client) {
 	ctx := context.Background()
-	_, err := esapi.IndicesDeleteRequest{
-		Index:  []string{indexName},
-		Pretty: true,
+	_, err := opensearchapi.IndicesDeleteRequest{
+		Index:          []string{indexName},
+		Pretty:         true,
+		AllowNoIndices: opensearchapi.BoolPtr(true),
 	}.Do(ctx, es)
 
 	if err != nil {
-		t.Fatalf("cleanES: %v", err)
+		//if err.Error() != "EOF" {
+		t.Fatalf("cleanES: %#v", err)
+		//}
 	}
 }
 
-func mkIndex(t *testing.T, es *elasticsearch.Client) {
-	req := esapi.IndicesCreateRequest{
+func mkIndex(t *testing.T, es *opensearch.Client) {
+	req := opensearchapi.IndicesCreateRequest{
 		Index:  indexName,
 		Pretty: true,
 		Body:   loadFile(t, "./create-index.json"),
@@ -107,7 +110,6 @@ func mkIndex(t *testing.T, es *elasticsearch.Client) {
 
 	res, err := req.Do(context.Background(), es)
 	assert.NoError(t, err)
-
 	assert.False(t, res.IsError())
 
 	rbody, err := ioutil.ReadAll(res.Body)
