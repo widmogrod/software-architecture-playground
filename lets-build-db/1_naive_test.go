@@ -18,19 +18,36 @@ func TestNaiveDB(t *testing.T) {
 	//   then it's important to know on which segment key exists
 	appendLog := [][][2]string{
 		{
-			{"question:3:content", "content that I want to store"},
+			{"question:3:content", "content that I want to store 1"},
 			{"question:3:creationDate", "2022-10-10"},
 		},
 	}
+	assert.Len(t, appendLog, 1)
 
-	Set(appendLog, [][2]string{
-		{"question:3:content", "content that I want to store"},
+	appendLog = Set(appendLog, [][2]string{
+		{"question:3:content", "content that I want to store 2"},
 		{"question:3:author", "Gabriel"},
 	})
+	assert.Len(t, appendLog, 2)
 
 	res := Get(appendLog, []string{"question:3:content", "question:3:creationDate"})
 	assert.Equal(t, [][2]string{
-		{"question:3:content", "content that I want to store"},
+		{"question:3:content", "content that I want to store 2"},
+		{"question:3:creationDate", "2022-10-10"},
+	}, res)
+
+	compacted := Compact(Segment{}, appendLog)
+	assert.Equal(t, []KVSortedSet{
+		{
+			{"question:3:content", "content that I want to store 2"},
+			{"question:3:author", "Gabriel"},
+			{"question:3:creationDate", "2022-10-10"},
+		},
+	}, compacted)
+
+	res = Get(compacted, []string{"question:3:content", "question:3:creationDate"})
+	assert.Equal(t, [][2]string{
+		{"question:3:content", "content that I want to store 2"},
 		{"question:3:creationDate", "2022-10-10"},
 	}, res)
 

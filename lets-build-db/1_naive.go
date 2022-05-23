@@ -1,7 +1,15 @@
 package lets_build_db
 
-func Set(appendLog [][][2]string, set [][2]string) {
-	appendLog = append(appendLog, set)
+type (
+	KV          = [2]string
+	KVSortedSet = []KV
+	AppendLog   = []KVSortedSet
+	Segment     = []KVSortedSet
+)
+
+func Set(appendLog AppendLog, kvSet KVSortedSet) AppendLog {
+	appendLog = append(appendLog, kvSet)
+	return appendLog
 }
 
 // Get
@@ -30,32 +38,70 @@ func Set(appendLog [][][2]string, set [][2]string) {
 //
 // Now question what is difference between such database system and
 // - federated query - AWS Athena + S3, Hive + Hadoop, GraphQL + μservice
-//
 
-func Get(appendLog [][][2]string, keys []string) (res [][2]string) {
+func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
 	found := map[string]struct{}{}
-	for i := len(appendLog) - 1; i >= 0; i-- {
-		set := appendLog[i]
-
-		for is := 0; is < len(set); is++ {
-			key := set[is][0]
-			if _, ok := found[key]; ok {
-				continue
-			}
-
-			var newKeys []string
-			for _, k := range keys {
-				if k == key {
-					res = append(res, set[is])
-					found[key] = struct{}{}
-				} else {
-					newKeys = append(newKeys, k)
-				}
-			}
-
-			keys = newKeys
+	eachSegmentKV(appendLog, func(kv KV) {
+		key := kv[0]
+		if _, ok := found[key]; ok {
+			return
 		}
-	}
+
+		var newKeys []string
+		for _, k := range keys {
+			if k == key {
+				res = append(res, kv)
+				found[key] = struct{}{}
+			} else {
+				newKeys = append(newKeys, k)
+			}
+		}
+
+		keys = newKeys
+	})
 
 	return res
+}
+
+// Compact function aims to reduce size of append log by removing key-value pairs that are overwritten by newer values
+// Because appendLog can be in use, compacting function should work on flushed & immutable segments.
+// - Segments sizes are not guaranteed to be the same.
+//   Mostly because they can be flushed when max-size is reach or max-time for segment to leave in memory.
+//   Which means that order in which segments will be merged should improve performance and use in implementation [√]
+// - When two segment don't share a key, then it needs to be decided either
+//   - don't modify two segments
+//   - always create new segments - this option make sence when segments are uneven and created as time-snapshot rather than max-segment-data
+// - Segment "a' is older than segment "b" that is created later, time wise
+func Compact(a, b Segment) Segment {
+	c := &collect{
+		kvSet:  KVSortedSet{},
+		unique: map[string]struct{}{},
+	}
+	eachSegmentKV(b, collectUnique(c))
+	eachSegmentKV(a, collectUnique(c))
+	return Segment{c.kvSet}
+}
+
+type collect struct {
+	kvSet  KVSortedSet
+	unique map[string]struct{}
+}
+
+func collectUnique(c *collect) func(kv KV) {
+	return func(kv KV) {
+		key := kv[0]
+		if _, ok := c.unique[key]; !ok {
+			c.unique[key] = struct{}{}
+			c.kvSet = append(c.kvSet, kv)
+		}
+	}
+}
+
+func eachSegmentKV(s Segment, f func(kv KV)) {
+	for i := len(s) - 1; i >= 0; i-- {
+		kvSet := s[i]
+		for j := 0; j < len(kvSet); j++ {
+			f(kvSet[j])
+		}
+	}
 }
