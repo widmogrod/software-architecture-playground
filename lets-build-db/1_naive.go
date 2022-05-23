@@ -70,7 +70,11 @@ func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
 //   Which means that order in which segments will be merged should improve performance and use in implementation [√]
 // - When two segment don't share a key, then it needs to be decided either
 //   - don't modify two segments
-//   - always create new segments - this option make sence when segments are uneven and created as time-snapshot rather than max-segment-data
+//   - always create new segments
+//      - this option make sence when segments are uneven and created as time-snapshot
+//        rather than max-segment-data,
+//      - but for time service data, or append data, compaction won't bring many benefits
+// 		  so compaction should be configurable
 // - Segment "a' is older than segment "b" that is created later, time wise
 func Compact(a, b Segment) Segment {
 	c := &collect{
