@@ -51,9 +51,14 @@ func TestNaiveDB(t *testing.T) {
 		{"question:3:creationDate", "2022-10-10"},
 	}, res)
 
-	//Find(appendLog, [][3]string{
-	//	{`/question:\d+:content/`, "has", "store"},
-	//	{`/question:\d+:creationDate/`, "lt", "2023"},
+	res = Find(appendLog, func(kv KV) bool {
+		return kv[VAL] == "Gabriel"
+	}, 2)
+	assert.Equal(t, res, [][2]string{
+		{"question:3:author", "Gabriel"},
+	}, res)
+	//{`/question:\d+:content/`, "has", "store"},
+	//{`/question:\d+:creationDate/`, "lt", "2023"},
 	//}, 2) // Group operations would make sense
 
 	//result := Find(schema, appendLog, "select * from schema where asd_asd_asd_ADs = '123'")

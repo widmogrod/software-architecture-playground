@@ -1,5 +1,10 @@
 package lets_build_db
 
+const (
+	KEY = 0
+	VAL = 1
+)
+
 type (
 	KV          = [2]string
 	KVSortedSet = []KV
@@ -42,7 +47,7 @@ func Set(appendLog AppendLog, kvSet KVSortedSet) AppendLog {
 func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
 	found := map[string]struct{}{}
 	eachSegmentKV(appendLog, func(kv KV) {
-		key := kv[0]
+		key := kv[KEY]
 		if _, ok := found[key]; ok {
 			return
 		}
@@ -93,7 +98,7 @@ type collect struct {
 
 func collectUnique(c *collect) func(kv KV) {
 	return func(kv KV) {
-		key := kv[0]
+		key := kv[KEY]
 		if _, ok := c.unique[key]; !ok {
 			c.unique[key] = struct{}{}
 			c.kvSet = append(c.kvSet, kv)
@@ -108,4 +113,25 @@ func eachSegmentKV(s Segment, f func(kv KV)) {
 			f(kvSet[j])
 		}
 	}
+}
+
+// Find return key sets that match testFn criteria.
+// Interestingly, from one perspective such scanning and filtering may be suboptimal
+// Some "find" operations, can have optimise indices to perform faster lookup operations
+// In this case I make simplification to start moving forward
+func Find(s Segment, testFn func(KV) bool, limit uint) KVSortedSet {
+	var res KVSortedSet
+	eachSegmentKV(s, func(kv KV) {
+		if limit == 0 {
+			// TODO eachSegment should have limit
+			return
+		}
+		if testFn(kv) {
+			res = append(res, kv)
+			limit--
+		}
+	})
+
+	// TODO sort results?
+	return res
 }
