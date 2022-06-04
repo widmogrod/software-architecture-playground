@@ -3,9 +3,12 @@ package lets_build_db
 const (
 	KEY = 0
 	VAL = 1
+
+	TOMBSTONE = "**TODO**TOMBSTONE**"
 )
 
 type (
+	KList       = []string
 	KV          = [2]string
 	KVSortedSet = []KV
 	AppendLog   = []KVSortedSet
@@ -46,7 +49,7 @@ func Set(appendLog AppendLog, kvSet KVSortedSet) AppendLog {
 
 func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
 	found := map[string]struct{}{}
-	eachSegmentKV(appendLog, func(kv KV) {
+	eachSegmentKV(appendLog, nonDeleted(func(kv KV) {
 		key := kv[KEY]
 		if _, ok := found[key]; ok {
 			return
@@ -63,9 +66,21 @@ func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
 		}
 
 		keys = newKeys
-	})
+	}))
 
 	return res
+}
+
+// Delete works in the same manner as Set
+// just a value that is set is tombstone
+// that will be physically removed during compaction
+// and during Get or Find operations, such values will be threaded as deleted
+func Delete(s Segment, keys KList) Segment {
+	kvs := make(KVSortedSet, len(keys))
+	for i, key := range keys {
+		kvs[i] = KV{key, TOMBSTONE}
+	}
+	return Set(s, kvs)
 }
 
 // Compact function aims to reduce size of append log by removing key-value pairs that are overwritten by newer values
@@ -86,15 +101,17 @@ func Compact(a, b Segment) Segment {
 		kvSet:  KVSortedSet{},
 		unique: map[string]struct{}{},
 	}
-	eachSegmentKV(b, collectUnique(c))
-	eachSegmentKV(a, collectUnique(c))
+	eachSegmentKV(b, nonDeleted(collectUnique(c)))
+	eachSegmentKV(a, nonDeleted(collectUnique(c)))
 	return Segment{c.kvSet}
 }
 
-type collect struct {
-	kvSet  KVSortedSet
-	unique map[string]struct{}
-}
+type (
+	collect struct {
+		kvSet  KVSortedSet
+		unique map[string]struct{}
+	}
+)
 
 func collectUnique(c *collect) func(kv KV) {
 	return func(kv KV) {
@@ -115,22 +132,42 @@ func eachSegmentKV(s Segment, f func(kv KV)) {
 	}
 }
 
+func nonDeleted(fn func(kv KV)) func(kv KV) {
+	deleted := make(map[string]struct{})
+	return func(kv KV) {
+		key := kv[KEY]
+		if _, ok := deleted[key]; ok {
+			return
+		}
+
+		isDeleted := kv[VAL] == TOMBSTONE
+		if isDeleted {
+			deleted[key] = struct{}{}
+			return
+		}
+
+		fn(kv)
+	}
+}
+
 // Find return key sets that match testFn criteria.
 // Interestingly, from one perspective such scanning and filtering may be suboptimal
 // Some "find" operations, can have optimise indices to perform faster lookup operations
 // In this case I make simplification to start moving forward
 func Find(s Segment, testFn func(KV) bool, limit uint) KVSortedSet {
 	var res KVSortedSet
-	eachSegmentKV(s, func(kv KV) {
+	eachSegmentKV(s, nonDeleted(func(kv KV) {
 		if limit == 0 {
-			// TODO eachSegment should have limit
+			// TODO `eachSegment` should have limit to stop computation
+			// like maybe return false, without it this early termination
+			// will continue till the end of segment
 			return
 		}
 		if testFn(kv) {
 			res = append(res, kv)
 			limit--
 		}
-	})
+	}))
 
 	// TODO sort results?
 	return res

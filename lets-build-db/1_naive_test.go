@@ -54,12 +54,41 @@ func TestNaiveDB(t *testing.T) {
 	res = Find(appendLog, func(kv KV) bool {
 		return kv[VAL] == "Gabriel"
 	}, 2)
-	assert.Equal(t, res, [][2]string{
+	assert.Equal(t, [][2]string{
 		{"question:3:author", "Gabriel"},
 	}, res)
 	//{`/question:\d+:content/`, "has", "store"},
 	//{`/question:\d+:creationDate/`, "lt", "2023"},
 	//}, 2) // Group operations would make sense
 
-	//result := Find(schema, appendLog, "select * from schema where asd_asd_asd_ADs = '123'")
+	t.Run("delete contract", func(t *testing.T) {
+		appendLog = Delete(appendLog, []string{"question:3:content"})
+
+		// deleted key MUST not be retrievable
+		t.Run("deleted key MUST not be retrievable", func(t *testing.T) {
+			res = Get(appendLog, []string{"question:3:content", "question:3:creationDate"})
+			assert.Equal(t, [][2]string{
+				{"question:3:creationDate", "2022-10-10"},
+			}, res)
+		})
+
+		// deleted key MUST be comparable
+		t.Run("deleted key MUST be comparable", func(t *testing.T) {
+			compacted = Compact(Segment{}, appendLog)
+			assert.Equal(t, []KVSortedSet{
+				{
+					{"question:3:author", "Gabriel"},
+					{"question:3:creationDate", "2022-10-10"},
+				},
+			}, compacted)
+		})
+
+		// deleted key MUST not be findable
+		t.Run("deleted key MUST not be findable", func(t *testing.T) {
+			res = Find(appendLog, func(kv KV) bool {
+				return kv[KEY] == "question:3:content"
+			}, 2)
+			assert.Equal(t, [][2]string(nil), res)
+		})
+	})
 }
