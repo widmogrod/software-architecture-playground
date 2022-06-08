@@ -48,25 +48,19 @@ func Set(appendLog AppendLog, kvSet KVSortedSet) AppendLog {
 // - federated query - AWS Athena + S3, Hive + Hadoop, GraphQL + μservice
 
 func Get(appendLog AppendLog, keys []string) (res KVSortedSet) {
-	found := map[string]struct{}{}
-	eachSegmentKV(appendLog, nonDeleted(func(kv KV) {
+	eachSegmentKV(appendLog, latestOnly(nonDeleted(func(kv KV) {
 		key := kv[KEY]
-		if _, ok := found[key]; ok {
-			return
-		}
-
 		var newKeys []string
 		for _, k := range keys {
 			if k == key {
 				res = append(res, kv)
-				found[key] = struct{}{}
 			} else {
 				newKeys = append(newKeys, k)
 			}
 		}
 
 		keys = newKeys
-	}))
+	})))
 
 	return res
 }
@@ -150,13 +144,28 @@ func nonDeleted(fn func(kv KV)) func(kv KV) {
 	}
 }
 
+func latestOnly(fn func(kv KV)) func(kv KV) {
+	latest := make(map[string]struct{})
+	return func(kv KV) {
+		key := kv[KEY]
+		if _, ok := latest[key]; ok {
+			// don't process same keys twice
+			return
+		}
+
+		latest[key] = struct{}{}
+
+		fn(kv)
+	}
+}
+
 // Find return key sets that match testFn criteria.
 // Interestingly, from one perspective such scanning and filtering may be suboptimal
 // Some "find" operations, can have optimise indices to perform faster lookup operations
 // In this case I make simplification to start moving forward
 func Find(s Segment, testFn func(KV) bool, limit uint) KVSortedSet {
 	var res KVSortedSet
-	eachSegmentKV(s, nonDeleted(func(kv KV) {
+	eachSegmentKV(s, latestOnly(nonDeleted(func(kv KV) {
 		if limit == 0 {
 			// TODO `eachSegment` should have limit to stop computation
 			// like maybe return false, without it this early termination
@@ -167,7 +176,7 @@ func Find(s Segment, testFn func(KV) bool, limit uint) KVSortedSet {
 			res = append(res, kv)
 			limit--
 		}
-	}))
+	})))
 
 	// TODO sort results?
 	return res
