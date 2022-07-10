@@ -122,11 +122,24 @@ func collectUnique(c *collect) func(kv KV) {
 	}
 }
 
+func eachKV(kvSet KVSortedSet, f func(kv KV)) {
+	for i := 0; i < len(kvSet); i++ {
+		f(kvSet[i])
+	}
+}
+
 func eachSegmentKV(s Segment, f func(kv KV)) {
 	for i := len(s) - 1; i >= 0; i-- {
 		kvSet := s[i]
+		eachKV(kvSet, f)
+	}
+}
+
+func eachSegmentKVI(s Segment, f func(kv KV, segmentIdx int)) {
+	for i := len(s) - 1; i >= 0; i-- {
+		kvSet := s[i]
 		for j := 0; j < len(kvSet); j++ {
-			f(kvSet[j])
+			f(kvSet[j], i)
 		}
 	}
 }
@@ -206,17 +219,21 @@ func (a *KeyPrefix) String() string {
 
 func (a *KeyPrefix) Pack(parts ...string) *KeyPrefix {
 	result := a.String()
+	if a.IsEmpty() {
+		return KP(parts...)
+	}
+
 	for i := range parts {
 		result += separator + parts[i]
 	}
 	return KP(result)
 }
 
-func (a *KeyPrefix) Begin() btree.Item {
+func (a *KeyPrefix) Begin() *KeyPrefix {
 	return KP(a.String(), "\x00")
 }
 
-func (a *KeyPrefix) End() btree.Item {
+func (a *KeyPrefix) End() *KeyPrefix {
 	return KP(a.String(), "\xff")
 }
 
@@ -224,8 +241,66 @@ func (a *KeyPrefix) Unpack() []string {
 	return strings.Split(string(*a), separator)
 }
 
-func Range(begin, end KeyPrefix, limit int) KVSortedSet {
-	_ = btree.New(2)
-	//bt.Has()
-	return nil
+func (a *KeyPrefix) IsEmpty() bool {
+	return a.String() == ""
+}
+
+func KPRaw(packed string) *KeyPrefix {
+	return KP(strings.Split(packed, separator)...)
+}
+
+type KSegments struct {
+	KeyPrefix *KeyPrefix
+	Segments  []int
+}
+
+func (a *KSegments) Less(b btree.Item) bool {
+	return a.KeyPrefix.Less(b.(*KSegments).KeyPrefix)
+}
+
+func Range(appendLog AppendLog, begin, end *KeyPrefix) (_ KVSortedSet) {
+	bt := btree.New(2)
+
+	// FIX below operations needs to be build as appendLong and db is build
+	// this place is not good for this
+	eachSegmentKVI(appendLog, func(kv KV, segmentIdx int) {
+		key := &KSegments{
+			KeyPrefix: KP(kv[KEY]),
+			Segments:  []int{segmentIdx},
+		}
+
+		if prev := bt.Get(key); prev != nil {
+			// First segment is latest
+			key.Segments = append(key.Segments, prev.(*KSegments).Segments...)
+		}
+
+		bt.ReplaceOrInsert(key)
+	})
+
+	var keys []*KSegments
+
+	bt.AscendRange(
+		&KSegments{KeyPrefix: begin},
+		&KSegments{KeyPrefix: end},
+		func(item btree.Item) bool {
+			keys = append(keys, item.(*KSegments))
+			return true
+		},
+	)
+
+	var res KVSortedSet
+
+	// read keys from segments
+	for _, ks := range keys {
+		segmentIdx := ks.Segments[0]
+
+		// fetch segment
+		eachKV(appendLog[segmentIdx], func(kv KV) {
+			if kv[KEY] == ks.KeyPrefix.String() {
+				res = append(res, kv)
+			}
+		})
+	}
+
+	return res
 }
