@@ -2,7 +2,10 @@ module github.com/widmogrod/software-architecture-playground/lets-build-db
 
 go 1.18
 
-require github.com/stretchr/testify v1.7.1
+require (
+	github.com/google/btree v1.1.2
+	github.com/stretchr/testify v1.7.1
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.0 // indirect

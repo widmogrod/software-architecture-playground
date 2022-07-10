@@ -1,6 +1,7 @@
 package lets_build_db
 
 import (
+	"github.com/google/btree"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -91,4 +92,45 @@ func TestNaiveDB(t *testing.T) {
 			assert.Equal(t, [][2]string(nil), res)
 		})
 	})
+}
+
+func TestRange(t *testing.T) {
+	k := KP("a", "b", "c")
+	assert.Equal(t, []string{"a", "b", "c"}, k.Unpack())
+
+	bt := btree.New(2)
+	assert.False(t, bt.Has(k))
+
+	i := bt.ReplaceOrInsert(k)
+	assert.Nil(t, i)
+	assert.True(t, bt.Has(k))
+
+	j := bt.ReplaceOrInsert(k)
+	assert.NotNil(t, j)
+	assert.True(t, bt.Has(k))
+
+	assert.Equal(t, bt.Get(k), j)
+
+	bt.ReplaceOrInsert(KP("b", "1"))
+	bt.ReplaceOrInsert(KP("b", "1", "x"))
+	bt.ReplaceOrInsert(KP("b", "1", "y"))
+	bt.ReplaceOrInsert(KP("b", "1", "z"))
+	bt.ReplaceOrInsert(KP("b", "10"))
+	bt.ReplaceOrInsert(KP("b", "2"))
+
+	actual := []btree.Item{}
+	expected := []btree.Item{
+		KP("b", "1", "x"),
+		KP("b", "1", "y"),
+		KP("b", "1", "z"),
+	}
+	bt.AscendRange(
+		KP("b", "1").Begin(),
+		KP("b", "1").End(),
+		func(i btree.Item) bool {
+			actual = append(actual, i)
+			return true
+		},
+	)
+	assert.Equal(t, expected, actual)
 }

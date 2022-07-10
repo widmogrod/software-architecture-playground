@@ -1,5 +1,10 @@
 package lets_build_db
 
+import (
+	"github.com/google/btree"
+	"strings"
+)
+
 const (
 	KEY = 0
 	VAL = 1
@@ -180,4 +185,47 @@ func Find(s Segment, testFn func(KV) bool, limit uint) KVSortedSet {
 
 	// TODO sort results?
 	return res
+}
+
+type KeyPrefix string
+
+const separator = "\x00"
+
+func KP(parts ...string) *KeyPrefix {
+	r := KeyPrefix(strings.Join(parts, separator))
+	return &r
+}
+
+func (a *KeyPrefix) Less(b btree.Item) bool {
+	return string(*a) < string(*b.(*KeyPrefix))
+}
+
+func (a *KeyPrefix) String() string {
+	return string(*a)
+}
+
+func (a *KeyPrefix) Pack(parts ...string) *KeyPrefix {
+	result := a.String()
+	for i := range parts {
+		result += separator + parts[i]
+	}
+	return KP(result)
+}
+
+func (a *KeyPrefix) Begin() btree.Item {
+	return KP(a.String(), "\x00")
+}
+
+func (a *KeyPrefix) End() btree.Item {
+	return KP(a.String(), "\xff")
+}
+
+func (a *KeyPrefix) Unpack() []string {
+	return strings.Split(string(*a), separator)
+}
+
+func Range(begin, end KeyPrefix, limit int) KVSortedSet {
+	_ = btree.New(2)
+	//bt.Has()
+	return nil
 }
