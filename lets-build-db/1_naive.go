@@ -204,7 +204,7 @@ type KeyPrefix string
 
 const separator = "\x00"
 
-func KP(parts ...string) *KeyPrefix {
+func Pack(parts ...string) *KeyPrefix {
 	r := KeyPrefix(strings.Join(parts, separator))
 	return &r
 }
@@ -219,34 +219,34 @@ func (a *KeyPrefix) String() string {
 
 func (a *KeyPrefix) Pack(parts ...string) *KeyPrefix {
 	result := a.String()
-	if a.IsEmpty() {
-		return KP(parts...)
+	if a.isEmpty() {
+		return Pack(parts...)
 	}
 
 	for i := range parts {
 		result += separator + parts[i]
 	}
-	return KP(result)
+	return Pack(result)
 }
 
 func (a *KeyPrefix) Begin() *KeyPrefix {
-	return KP(a.String(), "\x00")
+	return Pack(a.String(), "\x00")
 }
 
 func (a *KeyPrefix) End() *KeyPrefix {
-	return KP(a.String(), "\xff")
+	return Pack(a.String(), "\xff")
 }
 
 func (a *KeyPrefix) Unpack() []string {
 	return strings.Split(string(*a), separator)
 }
 
-func (a *KeyPrefix) IsEmpty() bool {
+func (a *KeyPrefix) isEmpty() bool {
 	return a.String() == ""
 }
 
-func KPRaw(packed string) *KeyPrefix {
-	return KP(strings.Split(packed, separator)...)
+func Unpack(packed string) *KeyPrefix {
+	return Pack(strings.Split(packed, separator)...)
 }
 
 type KSegments struct {
@@ -265,7 +265,7 @@ func Range(appendLog AppendLog, begin, end *KeyPrefix) (_ KVSortedSet) {
 	// this place is not good for this
 	eachSegmentKVI(appendLog, func(kv KV, segmentIdx int) {
 		key := &KSegments{
-			KeyPrefix: KP(kv[KEY]),
+			KeyPrefix: Pack(kv[KEY]),
 			Segments:  []int{segmentIdx},
 		}
 

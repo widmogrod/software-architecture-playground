@@ -25,7 +25,7 @@ func TestDocDB(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Println(string(json1))
 
-	json2, err := json.Marshal(Unflatten(Flatten(doc, KP())))
+	json2, err := json.Marshal(Unflatten(Flatten(doc, Pack())))
 	assert.NoError(t, err)
 	fmt.Println(string(json2))
 

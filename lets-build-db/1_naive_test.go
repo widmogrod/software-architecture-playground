@@ -95,7 +95,7 @@ func TestNaiveDB(t *testing.T) {
 }
 
 func TestRange(t *testing.T) {
-	k := KP("a", "b", "c")
+	k := Pack("a", "b", "c")
 	assert.Equal(t, []string{"a", "b", "c"}, k.Unpack())
 
 	bt := btree.New(2)
@@ -111,22 +111,22 @@ func TestRange(t *testing.T) {
 
 	assert.Equal(t, bt.Get(k), j)
 
-	bt.ReplaceOrInsert(KP("b", "1"))
-	bt.ReplaceOrInsert(KP("b", "1", "x"))
-	bt.ReplaceOrInsert(KP("b", "1", "y"))
-	bt.ReplaceOrInsert(KP("b", "1", "z"))
-	bt.ReplaceOrInsert(KP("b", "10"))
-	bt.ReplaceOrInsert(KP("b", "2"))
+	bt.ReplaceOrInsert(Pack("b", "1"))
+	bt.ReplaceOrInsert(Pack("b", "1", "x"))
+	bt.ReplaceOrInsert(Pack("b", "1", "y"))
+	bt.ReplaceOrInsert(Pack("b", "1", "z"))
+	bt.ReplaceOrInsert(Pack("b", "10"))
+	bt.ReplaceOrInsert(Pack("b", "2"))
 
 	actual := []btree.Item{}
 	expected := []btree.Item{
-		KP("b", "1", "x"),
-		KP("b", "1", "y"),
-		KP("b", "1", "z"),
+		Pack("b", "1", "x"),
+		Pack("b", "1", "y"),
+		Pack("b", "1", "z"),
 	}
 	bt.AscendRange(
-		KP("b", "1").Begin(),
-		KP("b", "1").End(),
+		Pack("b", "1").Begin(),
+		Pack("b", "1").End(),
 		func(i btree.Item) bool {
 			actual = append(actual, i)
 			return true

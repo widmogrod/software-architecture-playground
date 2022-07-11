@@ -33,12 +33,12 @@ func (d *DocDB) Save(doc MapAny) (_ MapAny, _ error) {
 		doc["$docId"] = d.nextRowId()
 	}
 
-	d.appendLog = Set(d.appendLog, Flatten(doc, KP("D", doc["$docId"].(string))))
+	d.appendLog = Set(d.appendLog, Flatten(doc, Pack("D", doc["$docId"].(string))))
 	return doc, nil
 }
 
 func (d *DocDB) Get(docId string) (_ MapAny, _ error) {
-	keyPrefix := KP("D", docId)
+	keyPrefix := Pack("D", docId)
 	kvSet := Range(d.appendLog, keyPrefix.Begin(), keyPrefix.End())
 	result := Unflatten(kvSet)
 	return result["D"].(MapAny)[docId].(MapAny), nil
@@ -83,7 +83,7 @@ func Unflatten(kvSet KVSortedSet) (_ MapAny) {
 		var doc interface{}
 		doc = result
 
-		parts := KPRaw(kv[KEY]).Unpack()
+		parts := Unpack(kv[KEY]).Unpack()
 		l := len(parts)
 		for i := 0; i < l; i++ {
 			key := parts[i]
