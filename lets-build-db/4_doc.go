@@ -86,8 +86,6 @@ func Unflatten(kvSet KVSortedSet) (_ interface{}) {
 		parts := Unpack(kv[KEY]).Unpack()
 		doc = unflatten(parts, 0, doc, kv[VAL])
 	})
-
-	// Optimistic, but it can also be a ListAny
 	return doc
 }
 

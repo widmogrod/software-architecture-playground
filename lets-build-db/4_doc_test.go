@@ -44,4 +44,18 @@ func TestDocDB(t *testing.T) {
 	json4, err := json.Marshal(result)
 	assert.NoError(t, err)
 	assert.JSONEq(t, string(json1), string(json4))
+
+	for i := 0; i < 100; i++ {
+		delete(doc, "$docId")
+		result1, err := db.Save(doc)
+		assert.NoError(t, err)
+		result2, err := db.Get(result1["$docId"].(string))
+		assert.NoError(t, err)
+
+		json1, err := json.Marshal(result1)
+		assert.NoError(t, err)
+		json2, err := json.Marshal(result2)
+		assert.NoError(t, err)
+		assert.JSONEq(t, string(json1), string(json2))
+	}
 }
