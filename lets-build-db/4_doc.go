@@ -40,8 +40,7 @@ func (d *DocDB) Save(doc MapAny) (_ MapAny, _ error) {
 func (d *DocDB) Get(docId string) (_ MapAny, _ error) {
 	keyPrefix := Pack("$M", "D", "$M", docId)
 	kvSet := Range(d.appendLog, keyPrefix.Begin(), keyPrefix.End())
-	result := Unflatten(kvSet)
-	fmt.Println(result)
+	result := Unflatten(kvSet).(MapAny)
 	return result["D"].(MapAny)[docId].(MapAny), nil
 }
 
@@ -81,7 +80,7 @@ func flatten(prefix *KeyPrefix, in interface{}, result KVSortedSet) KVSortedSet 
 	return result
 }
 
-func Unflatten(kvSet KVSortedSet) (_ MapAny) {
+func Unflatten(kvSet KVSortedSet) (_ interface{}) {
 	var doc interface{}
 	eachKV(kvSet, func(kv KV) {
 		parts := Unpack(kv[KEY]).Unpack()
@@ -89,7 +88,7 @@ func Unflatten(kvSet KVSortedSet) (_ MapAny) {
 	})
 
 	// Optimistic, but it can also be a ListAny
-	return doc.(MapAny)
+	return doc
 }
 
 func unflatten(parts []string, index int, prev interface{}, val string) (_ interface{}) {
@@ -155,9 +154,6 @@ func unflatten(parts []string, index int, prev interface{}, val string) (_ inter
 		return v
 	case "$B":
 		return val == "y"
-		//default:
-		//	search next token
-		//	return unflatten(parts, index+1, prev, val)
 	}
 
 	panic(fmt.Errorf("you should NEVER reach this place. \n"+
