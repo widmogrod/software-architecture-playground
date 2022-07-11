@@ -33,116 +33,136 @@ func (d *DocDB) Save(doc MapAny) (_ MapAny, _ error) {
 		doc["$docId"] = d.nextRowId()
 	}
 
-	d.appendLog = Set(d.appendLog, Flatten(doc, Pack("D", doc["$docId"].(string))))
+	d.appendLog = Set(d.appendLog, Flatten(doc, Pack("$M", "D", "$M", doc["$docId"].(string))))
 	return doc, nil
 }
 
 func (d *DocDB) Get(docId string) (_ MapAny, _ error) {
-	keyPrefix := Pack("D", docId)
+	keyPrefix := Pack("$M", "D", "$M", docId)
 	kvSet := Range(d.appendLog, keyPrefix.Begin(), keyPrefix.End())
 	result := Unflatten(kvSet)
+	fmt.Println(result)
 	return result["D"].(MapAny)[docId].(MapAny), nil
 }
 
 func Flatten(in interface{}, prefix *KeyPrefix) (_ KVSortedSet) {
 	var result KVSortedSet
+	return flatten(prefix, in, result)
+}
 
+func flatten(prefix *KeyPrefix, in interface{}, result KVSortedSet) KVSortedSet {
 	switch x := in.(type) {
 	case MapAny:
 		for k := range x {
 			v := x[k]
-			result = funcName(prefix.Pack(k), v, result)
+			result = flatten(prefix.Pack("$M", k), v, result)
 		}
 	case ListAny:
 		for k := range x {
 			v := x[k]
-			result = funcName(prefix.Pack(strconv.Itoa(k)), v, result)
+			result = flatten(prefix.Pack("$L", strconv.Itoa(k)), v, result)
 		}
-
+	case string:
+		result = append(result, KV{prefix.Pack("$S").String(), x})
+	case int:
+		result = append(result, KV{prefix.Pack("$I").String(), strconv.Itoa(x)})
+	case float64:
+		result = append(result, KV{prefix.Pack("$F").String(), fmt.Sprintf("%f", x)})
+	case bool:
+		if x {
+			result = append(result, KV{prefix.Pack("$B").String(), "y"})
+		} else {
+			result = append(result, KV{prefix.Pack("$B").String(), "n"})
+		}
 	default:
-		panic(fmt.Errorf("%v, is not iterable", in))
+		panic(fmt.Errorf("unsupported type %v", x))
 	}
 
-	return result
-}
-
-func funcName(prefix *KeyPrefix, v interface{}, result KVSortedSet) KVSortedSet {
-	switch v.(type) {
-	case MapAny, ListAny:
-		result = append(result, Flatten(v, prefix)...)
-	default:
-		// TODO encode type of value
-		result = append(result, KV{prefix.String(), fmt.Sprintf("%s", v)})
-	}
 	return result
 }
 
 func Unflatten(kvSet KVSortedSet) (_ MapAny) {
-	result := make(MapAny)
+	var doc interface{}
 	eachKV(kvSet, func(kv KV) {
-		var doc interface{}
-		doc = result
-
 		parts := Unpack(kv[KEY]).Unpack()
-		l := len(parts)
-		for i := 0; i < l; i++ {
-			key := parts[i]
-			isLast := l == i+1
-
-			switch d := doc.(type) {
-			case MapAny:
-				if isLast {
-					d[key] = kv[VAL]
-					return
-				}
-				if _, ok := d[key]; !ok {
-					next := parts[i+1]
-					// FIX: this type of heuristic don't allow map keys to be numeric! add value types
-					_, err := strconv.Atoi(next)
-					if err != nil {
-						d[key] = make(MapAny)
-					} else {
-						d[key] = new(ListAny)
-					}
-				}
-				doc = d[key]
-			case *ListAny:
-				if isLast {
-					*d = append(*d, kv[VAL])
-					return
-				}
-
-				next := parts[i+1]
-				// FIX: this type of heuristic don't allow map keys to be numeric! add value types
-				idx, err := strconv.Atoi(next)
-				if err != nil {
-					// FIX: this type of heuristic don't allow map keys to be numeric! add value types
-					keyIdx, _ := strconv.Atoi(key)
-					if len(*d) <= keyIdx {
-						doc = make(MapAny)
-						*d = append(*d, doc)
-					} else {
-						// Retrieve previously created map
-						// That is stored under given index
-						doc = (*d)[keyIdx]
-					}
-				} else {
-					if idx == 0 {
-						// Create list
-						doc = new(ListAny)
-						*d = append(*d, doc)
-					} else {
-						// Retrieve previously created list
-						// and append to it
-						doc = (*d)[len(*d)-1]
-					}
-				}
-			default:
-				panic(fmt.Errorf("%#v is unsupported", doc))
-			}
-
-		}
+		doc = unflatten(parts, 0, doc, kv[VAL])
 	})
 
-	return result
+	// Optimistic, but it can also be a ListAny
+	return doc.(MapAny)
+}
+
+func unflatten(parts []string, index int, prev interface{}, val string) (_ interface{}) {
+	switch parts[index] {
+	case "$M":
+		switch prevT := prev.(type) {
+		case MapAny:
+			key := parts[index+1]
+			next, _ := prevT[key]
+			prev.(MapAny)[key] = unflatten(parts, index+2, next, val)
+			return prev
+
+		case *ListAny:
+			key := parts[index+1]
+			i, _ := strconv.Atoi(key)
+			var next interface{}
+			if len(*prevT) > i {
+				next = (*prevT)[i]
+				(*prevT)[i] = unflatten(parts, index+2, next, val)
+			} else {
+				*prevT = append(*prevT, unflatten(parts, index+2, next, val))
+			}
+			return prev
+
+		default:
+			next := make(MapAny)
+			return unflatten(parts, index, next, val)
+		}
+
+	case "$L":
+		switch prevT := prev.(type) {
+		case MapAny:
+			key := parts[index+1]
+			next, _ := prevT[key]
+			prev.(MapAny)[key] = unflatten(parts, index+2, next, val)
+			return prev
+
+		case *ListAny:
+			key := parts[index+1]
+			i, _ := strconv.Atoi(key)
+			var next interface{}
+			if len(*prevT) > i {
+				next = (*prevT)[i]
+				(*prevT)[i] = unflatten(parts, index+2, next, val)
+			} else {
+				*prevT = append(*prevT, unflatten(parts, index+2, next, val))
+			}
+
+			return prev
+		default:
+			next := new(ListAny)
+			return unflatten(parts, index, next, val)
+		}
+
+	// Leaves
+	case "$S":
+		return val
+	case "$I":
+		v, _ := strconv.Atoi(val)
+		return v
+	case "$F":
+		v, _ := strconv.ParseFloat(val, 64)
+		return v
+	case "$B":
+		return val == "y"
+		//default:
+		//	search next token
+		//	return unflatten(parts, index+1, prev, val)
+	}
+
+	panic(fmt.Errorf("you should NEVER reach this place. \n"+
+		"parts = %v\n"+
+		"index = %v\n"+
+		"prev = %v\n"+
+		"val = %v\n", parts, index, prev, val))
 }

@@ -9,8 +9,9 @@ import (
 
 func TestDocDB(t *testing.T) {
 	doc := MapAny{
-		"$docId": "id123",
-		"some":   "key",
+		"$docId":    "id123",
+		"to-Leave?": true,
+		"some":      9.2,
 		"other": ListAny{
 			"a", "b", "c",
 			ListAny{"x", "y", "z"},
