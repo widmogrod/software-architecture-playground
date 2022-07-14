@@ -1,7 +1,10 @@
 package lets_build_db
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/google/btree"
+	"io"
 	"strings"
 )
 
@@ -303,4 +306,89 @@ func Range(appendLog AppendLog, begin, end *KeyPrefix) (_ KVSortedSet) {
 	}
 
 	return res
+}
+
+type (
+	Key     = string
+	Version = int
+
+	Operation struct {
+		Set    *SetOp    `json:"set"`
+		Delete *DeleteOp `json:"delete"`
+	}
+	SetOp struct {
+		//version Version
+		KvSet KVSortedSet `json:"kvSet"`
+	}
+	DeleteOp struct {
+		//version Version
+		Keys []Key `json:"keys"`
+	}
+)
+
+type (
+	NaiveDBState struct {
+		memory1            Segment
+		keysAndSegmentsMap *btree.BTree
+	}
+)
+
+func (state *NaiveDBState) Set(kvSet KVSortedSet) error {
+	state.memory1 = Set(state.memory1, kvSet)
+	return nil
+}
+
+func (state *NaiveDBState) Delete(keys []Key) error {
+	state.memory1 = Delete(state.memory1, keys)
+	return nil
+}
+
+// Restore recreate database from last snapshot
+// to restore it we have to get stream of bytes, that can be feed from any source and any size
+func (state *NaiveDBState) Restore(stream io.Reader) error {
+	// TODO remove json encoding
+	decoder := json.NewDecoder(stream)
+	decoder.UseNumber()
+
+	// Mark database as restoring
+
+	// Read commands & apply commands
+	var err error
+	for {
+		op := new(Operation)
+		err = decoder.Decode(op)
+		if err == io.EOF {
+			break
+		}
+
+		if err == nil {
+			if op.Delete != nil {
+				err = state.Delete(op.Delete.Keys)
+			} else if op.Set != nil {
+				err = state.Set(op.Set.KvSet)
+			} else {
+				err = fmt.Errorf("restor: unknow op %#v", op)
+			}
+		}
+
+		if err != nil {
+			return fmt.Errorf("restore: failed: %w", err)
+		}
+	}
+
+	// Because snapshot point can be old,
+	// to catch up to the newest updates Restore can ask for updates from other notes
+	// this function is much simpler, and focus on restoring state
+	// Mark database as ready to accept connections
+	return nil
+}
+
+func Append() {
+
+}
+
+func Stream() {
+	// reads from append log operations that are mutations
+	// Set(kvSet)
+	// Delete(kvSet)
 }

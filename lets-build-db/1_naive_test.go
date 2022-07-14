@@ -3,6 +3,7 @@ package lets_build_db
 import (
 	"github.com/google/btree"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -133,4 +134,24 @@ func TestRange(t *testing.T) {
 		},
 	)
 	assert.Equal(t, expected, actual)
+}
+
+func TestRestore(t *testing.T) {
+	// Let's test the database from one of the hardest parts - restoration from last snapshot
+	// Snapshots is sto
+
+	data := `
+{"set": {"kvSet": [["question:3:content", "content that I want to store 1"], ["question:3:creationDate", "2022-10-10"]]}}
+{"set": {"kvSet": [["question:3:content", "content that I want to store 2"], ["question:3:author", "Gabriel"]]}}
+`
+	stream := strings.NewReader(data)
+	db := &NaiveDBState{}
+	err := db.Restore(stream)
+	assert.NoError(t, err)
+
+	res := Get(db.memory1, []string{"question:3:content", "question:3:creationDate"})
+	assert.Equal(t, [][2]string{
+		{"question:3:content", "content that I want to store 2"},
+		{"question:3:creationDate", "2022-10-10"},
+	}, res)
 }
