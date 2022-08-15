@@ -1,10 +1,15 @@
 module github.com/widmogrod/software-architecture-playground/hypo/elasticsearch
 
-go 1.16
-
-require github.com/elastic/go-elasticsearch/v7 v7.5.1-0.20210322101442-a3e161131102
+go 1.18
 
 require (
 	github.com/brianvoe/gofakeit/v6 v6.3.0
+	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/stretchr/testify v1.7.0
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )

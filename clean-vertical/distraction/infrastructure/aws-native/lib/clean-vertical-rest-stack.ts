@@ -1,11 +1,12 @@
-import * as golang from 'aws-lambda-golang';
-import * as apigateway from '@aws-cdk/aws-apigateway';
-import * as codedeploy from '@aws-cdk/aws-codedeploy';
-import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
-import * as lambda from '@aws-cdk/aws-lambda';
-import {Tracing} from '@aws-cdk/aws-lambda';
-import {CfnOutput, Construct, Stack, StackProps} from "@aws-cdk/core";
-import * as iam from '@aws-cdk/aws-iam';
+import * as golang from '@aws-cdk/aws-lambda-go-alpha';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as codedeploy from 'aws-cdk-lib/aws-codedeploy';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import {Tracing} from 'aws-cdk-lib/aws-lambda';
+import {CfnOutput, Stack, StackProps} from "aws-cdk-lib";
+import {Construct} from "constructs";
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class CleanVerticalRestStack extends Stack {
     public readonly apiUrl: CfnOutput
@@ -16,7 +17,8 @@ export class CleanVerticalRestStack extends Stack {
         const insightsExtensionLayer = this.createLambdaInsightsExtensionLayer();
         const insightsAppConfigLayer = this.createLambdaAppConfigExtensionLayer();
 
-        const helloLambda = new golang.GolangFunction(this, '../functions/hello', {
+        const helloLambda = new golang.GoFunction(this, 'rest-http', {
+            entry: './functions/hello/main.go',
             tracing: Tracing.ACTIVE,
             layers: [
                 insightsExtensionLayer,
@@ -25,11 +27,11 @@ export class CleanVerticalRestStack extends Stack {
             deadLetterQueueEnabled: true,
         });
 
-        const helloLambdaLiveVersion = helloLambda.currentVersion.addAlias('live2')
+        const helloLambdaLiveVersion = helloLambda.addAlias('live2')
 
         new codedeploy.LambdaDeploymentGroup(this, 'rest-api-deployment-group', {
             alias: helloLambdaLiveVersion,
-            deploymentConfig: codedeploy.LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES,
+            deploymentConfig: codedeploy.LambdaDeploymentConfig.LINEAR_10PERCENT_EVERY_1MINUTE,
             alarms: [
                 // pass some alarms when constructing the deployment group
                 new cloudwatch.Alarm(this, 'CleanVerticalHelloErrors', {
@@ -73,7 +75,7 @@ export class CleanVerticalRestStack extends Stack {
             handler: 'index.handler',
             code: lambda.Code.fromAsset('functions/appconfig', {
                 bundling: {
-                    image: lambda.Runtime.NODEJS_12_X.bundlingDockerImage,
+                    image: lambda.Runtime.NODEJS_12_X.bundlingImage,
                     command: [
                         'bash', '-c', [
                             'npm install',
