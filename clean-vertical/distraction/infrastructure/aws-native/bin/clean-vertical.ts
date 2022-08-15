@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { App } from '@aws-cdk/core';
+import * as cdk from 'aws-cdk-lib';
 import { CleanVerticalPipelineStack } from '../lib/clean-vertical-pipeline-stack';
 import {CleanVerticalRestStack} from "../lib/clean-vertical-rest-stack";
 import {CleanVerticalHttpStack} from "../lib/clean-vertical-http-stack";
 
-const app = new App();
+const app = new cdk.App();
 
 new CleanVerticalPipelineStack(app, 'CleanVerticalPipelineStack', {});
 
