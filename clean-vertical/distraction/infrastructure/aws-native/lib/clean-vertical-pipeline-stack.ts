@@ -2,6 +2,7 @@ import {SecretValue, Stack, StackProps, Duration} from 'aws-cdk-lib';
 
 import {Construct} from 'constructs';
 import * as pipelines from 'aws-cdk-lib/pipelines';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import {CleanVerticalStage} from "./clean-vertical-stage";
 
 import * as targets from 'aws-cdk-lib/aws-events-targets';
@@ -16,6 +17,11 @@ export class CleanVerticalPipelineStack extends Stack {
 
         const pipeline = new pipelines.CodePipeline(this, 'Pipeline', {
                 pipelineName: 'CleanVerticalPipeline',
+                dockerEnabledForSynth: true,
+                // dockerEnabledForSelfMutation: true,
+                codeBuildDefaults: {
+                    cache: codebuild.Cache.local(codebuild.LocalCacheMode.DOCKER_LAYER)
+                },
                 synth: new pipelines.ShellStep('Synth', {
                     input: pipelines.CodePipelineSource.gitHub(
                         "widmogrod/software-architecture-playground",
@@ -25,13 +31,12 @@ export class CleanVerticalPipelineStack extends Stack {
                         }
                     ),
 
-                    // subdir: 'clean-vertical/distraction/infrastructure/aws-native',
                     commands: [
-                        'cd clean-vertical/distraction/infrastructure/aws-native',
-                        'npm install',
-                        'npm run build',
-                        'npm run cdk synth',
-                    ]
+                        'cd clean-vertical/distraction/infrastructure/aws-native; npm install',
+                        'cd clean-vertical/distraction/infrastructure/aws-native; npm run build',
+                        'cd clean-vertical/distraction/infrastructure/aws-native; npm run cdk synth',
+                    ],
+                    primaryOutputDirectory: 'clean-vertical/distraction/infrastructure/aws-native/cdk.out',
                 }),
             })
         ;
