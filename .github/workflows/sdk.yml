@@ -6,7 +6,7 @@ jobs:
 #    name: Generate Golang SDK
 #    runs-on: ubuntu-latest
 #    steps:
-#      - uses: actions/checkout@v2
+#      - uses: actions/checkout@v3
 #      - uses: actions/setup-node@v2.1.4
 #        with:
 #          node-version: '12'
@@ -31,7 +31,7 @@ jobs:
     name: Generate JS SDK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v2.1.4
         with:
           node-version: '12.x'
