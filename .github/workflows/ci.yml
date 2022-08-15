@@ -35,7 +35,7 @@ jobs:
           check-latest: true
 
       - run: cd clean-vertical/distraction/infrastructure/aws-native; npm install
-      - run: cd clean-vertical/distraction/infrastructure/aws-native; npx cdk synth
+      - run: cd clean-vertical/distraction/infrastructure/aws-native; npm run cdk synth
 
   finally:
     name: Post-workflow action
