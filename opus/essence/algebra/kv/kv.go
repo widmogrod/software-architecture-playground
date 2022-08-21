@@ -532,3 +532,24 @@ func (s *Store) Find() error {
 	fmt.Println(response.StatusCode)
 	return nil
 }
+
+func SyncStrategySequence(ctx context.Context, store *Store, sink func(key Key, attrs map[string]AttrType)) error {
+	err := store.EtlDynamoAndSync(ctx, sink)
+	if err != nil {
+		return err
+	}
+	err = store.Sync(ctx, sink)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func PtrInt64(nano int64) *int64 {
+	return &nano
+}
+
+func PtrTime(now time.Time) *time.Time {
+	return &now
+}
