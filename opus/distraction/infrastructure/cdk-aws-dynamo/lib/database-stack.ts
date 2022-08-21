@@ -29,20 +29,21 @@ export class DatabaseStack extends cdk.Stack {
         const domain = new opensearchservice.Domain(this, 'Domain', {
             domainName: 'opus-domain-dev',
             version: opensearchservice.EngineVersion.OPENSEARCH_1_3,
-            // fineGrainedAccessControl: {
-            //     masterUserName: 'master-user',
-            // },
+            fineGrainedAccessControl: {
+                masterUserName: 'admin',
+                // masterUserPassword: 'nile!DISLODGE5clause'
+            },
             capacity: {
                 masterNodes: 3,
                 dataNodes: 2,
                 dataNodeInstanceType: ec2.InstanceType.of(
                     ec2.InstanceClass.T3,
                     ec2.InstanceSize.SMALL
-                ).toString(),
+                ).toString() + ".search",
                 masterNodeInstanceType: ec2.InstanceType.of(
                     ec2.InstanceClass.T3,
                     ec2.InstanceSize.SMALL
-                ).toString(),
+                ).toString() + ".search",
             },
             ebs: {
                 volumeSize: 20,
@@ -55,6 +56,9 @@ export class DatabaseStack extends cdk.Stack {
                 appLogEnabled: true,
                 slowIndexLogEnabled: true,
             },
+            enforceHttps: true,
+            encryptionAtRest: {enabled: true},
+            nodeToNodeEncryption: true,
             // advancedOptions: {
             //     'rest.action.multi.allow_explicit_index': 'false',
             //     'indices.fielddata.cache.size': '25',
@@ -62,6 +66,14 @@ export class DatabaseStack extends cdk.Stack {
             // },
         });
 
+        domain.addAccessPolicies(
+            new iam.PolicyStatement({
+                actions: ['es:*'],
+                effect: iam.Effect.ALLOW,
+                principals: [new iam.AccountPrincipal('*')],
+                resources: [domain.domainArn, `${domain.domainArn}/*`],
+            })
+        );
         // domain.addAccessPolicies(
         //     new iam.PolicyStatement({
         //         actions: ['es:ESHttpPost', 'es:ESHttpPut'],

@@ -44,39 +44,6 @@ type AttrType struct {
 	DT *time.Time `json:"DT,omitempty"`
 }
 
-//func cleanES(t *testing.T, es *opensearch.Client) {
-//	ctx := context.Background()
-//	_, err := opensearchapi.IndicesDeleteRequest{
-//		Index:          []string{indexName},
-//		Pretty:         true,
-//		AllowNoIndices: opensearchapi.BoolPtr(true),
-//	}.Do(ctx, es)
-//
-//	if err != nil {
-//		//if err.Error() != "EOF" {
-//		t.Fatalf("cleanES: %#v", err)
-//		//}
-//	}
-//}
-
-//func mkIndex(t *testing.T, es *opensearch.Client) {
-//	req := opensearchapi.IndicesCreateRequest{
-//		Index:  indexName,
-//		Pretty: true,
-//		Body:   loadFile(t, "./create-index.json"),
-//	}
-//
-//	res, err := req.Do(context.Background(), es)
-//	assert.NoError(t, err)
-//	assert.False(t, res.IsError())
-//
-//	rbody, err := ioutil.ReadAll(res.Body)
-//	res.Body.Close()
-//	if !assert.NoError(t, err) {
-//		t.Logf("mkIndex: %s\n", rbody)
-//	}
-//}
-
 func Default() *Store {
 	os.Setenv("AWS_PROFILE", "gh-dev")
 	s := session.Must(session.NewSession(
@@ -93,19 +60,20 @@ func Default() *Store {
 		DomainName: aws.String("opus-domain-dev"),
 	})
 
-	// endpoints to addresses
-	var addresses []string
-	for _, endpoint := range domain.DomainStatus.Endpoints {
-		addresses = append(addresses, *endpoint)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	o, err := opensearch.NewClient(opensearch.Config{
-		//Addresses: addresses,
 		Addresses: []string{
-			"http://localhost:9200",
+			"https://" + *domain.DomainStatus.Endpoint,
 		},
+		//Addresses: []string{
+		//	"http://localhost:9200",
+		//},
 		Username: "admin",
-		Password: "admin",
+		//Password: "admin",
+		Password: "nile!DISLODGE5clause",
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
@@ -262,7 +230,7 @@ func (s *Store) Count() int64 {
 }
 
 func (s *Store) Sync(ctx context.Context, sink func(Key, map[string]AttrType)) error {
-	stream, err := s.kinesis.DescribeStream(&kinesis.DescribeStreamInput{
+	stream, err := s.kinesis.DescribeStreamWithContext(ctx, &kinesis.DescribeStreamInput{
 		StreamName: s.streamName,
 		Limit:      aws.Int64(10000),
 	})
@@ -289,7 +257,7 @@ func (s *Store) Sync(ctx context.Context, sink func(Key, map[string]AttrType)) e
 
 		go func(shard *kinesis.Shard) {
 			defer wg.Done()
-			iterator, err := s.kinesis.GetShardIterator(it)
+			iterator, err := s.kinesis.GetShardIteratorWithContext(ctx, it)
 			if err != nil {
 				log.Println("GetShardIterator:", err)
 				return
@@ -319,7 +287,7 @@ func (s *Store) consumeShard(ctx context.Context, sink func(Key, map[string]Attr
 			// continue
 		}
 
-		records, err := s.kinesis.GetRecords(&kinesis.GetRecordsInput{
+		records, err := s.kinesis.GetRecordsWithContext(ctx, &kinesis.GetRecordsInput{
 			Limit:         aws.Int64(100),
 			ShardIterator: nextIterator,
 		})
@@ -334,8 +302,6 @@ func (s *Store) consumeShard(ctx context.Context, sink func(Key, map[string]Attr
 		}
 		nextIterator = records.NextShardIterator
 	}
-
-	return nil
 }
 
 func (s *Store) processRecords(records *kinesis.GetRecordsOutput, sink func(Key, map[string]AttrType)) error {
@@ -346,8 +312,6 @@ func (s *Store) processRecords(records *kinesis.GetRecordsOutput, sink func(Key,
 			log.Println("processRecords: err=", err)
 			continue
 		}
-
-		//fmt.Println(string(d.Data))
 
 		dat := m["dynamodb"].(MapAny)["NewImage"].(MapAny)
 		res, err2 := s.deser(dat)
@@ -448,7 +412,6 @@ func (s *Store) IndexDocument(ctx context.Context, key Key, attrs map[string]Att
 		return err
 	}
 
-	fmt.Println(doc["docId"].(string))
 	req := opensearchapi.IndexRequest{
 		Index:        *s.indexName,
 		DocumentID:   doc["docId"].(string),
@@ -463,7 +426,7 @@ func (s *Store) IndexDocument(ctx context.Context, key Key, attrs map[string]Att
 
 	rbody, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
-	fmt.Println(string(rbody))
+	fmt.Println("body", string(rbody))
 	if err != nil {
 		return err
 	}

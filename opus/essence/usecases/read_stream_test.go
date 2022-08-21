@@ -30,7 +30,7 @@ func TestPopulateOpenSearch(t *testing.T) {
 }
 
 func TestETLData(t *testing.T) {
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*50)
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
 	store := kv.Default()
 
 	initialRecordsCount := store.Count()
@@ -42,7 +42,7 @@ func TestETLData(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for data := range GenerateData(50) {
+		for data := range GenerateData(5) {
 			err := store.SetAttributes(data.Key, data.Attr)
 			assert.NoError(t, err)
 			insertRecords++
@@ -146,3 +146,10 @@ func GenerateData(max int) chan *Generic {
 
 	return ch
 }
+
+//func TestAddRelations(t *testing.T) {
+//	ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
+//	store := kv.Default()
+//
+//	store.SetAttributes(kv.Key{PartitionKey: "1", EntityKey: "1"}, map[string]kv.AttrType{})
+//}
