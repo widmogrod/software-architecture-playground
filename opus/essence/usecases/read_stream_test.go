@@ -8,11 +8,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	ddb "github.com/aws/aws-sdk-go/service/dynamodb"
 	kcl "github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -214,16 +217,16 @@ func TestKVStore(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(time.Second * 20)
-
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 2; i++ {
+			entity := gofakeit.NounProper()
 			err := store.SetAttributes(kv.Key{
-				PartitionKey: "question#e" + strconv.Itoa(i) + "#" + time.Now().Format("20060102150405"),
-				EntityKey:    "question",
+				PartitionKey: entity + "#" + strconv.Itoa(i) + "#" + time.Now().Format("20060102150405"),
+				EntityKey:    entity,
 			}, map[string]kv.AttrType{
-				"content": {S: PtrString("ohoho")},
-				"created": {S: PtrString(time.Now().String())},
+				"content": {S: PtrString(gofakeit.HipsterSentence(30))},
+				"created": {DT: PtrTime(time.Now())},
+				"version": {I: PtrInt64(time.Now().UnixNano())},
 			})
 			assert.NoError(t, err)
 		}
@@ -238,6 +241,147 @@ func TestKVStore(t *testing.T) {
 	<-ctx.Done()
 }
 
+func PtrInt64(nano int64) *int64 {
+	return &nano
+}
+
+func PtrTime(now time.Time) *time.Time {
+	return &now
+}
+
 func PtrString(s string) *string {
 	return &s
+}
+
+func TestPopulateOpenSearch(t *testing.T) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
+	store := kv.Default()
+	go func() {
+		err := store.Sync(ctx, func(key kv.Key, m map[string]kv.AttrType) {
+			r, _ := json.Marshal(m)
+			fmt.Println(key, string(r))
+			err := store.IndexDocument(context.Background(), key, m)
+			assert.NoError(t, err)
+		})
+		assert.NoError(t, err)
+	}()
+
+	//time.Sleep(time.Second * 10)
+	//cancel()
+	<-ctx.Done()
+}
+
+func TestETLData(t *testing.T) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*50)
+	store := kv.Default()
+
+	initialRecordsCount := store.Count()
+	insertRecords := 0
+
+	lock := sync.Mutex{}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for data := range GenerateData(50) {
+			err := store.SetAttributes(data.Key, data.Attr)
+			assert.NoError(t, err)
+			insertRecords++
+		}
+	}()
+
+	uniqueIds := make(map[string]bool)
+
+	etlCount := 0
+	etlDupCout := 0
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		err := store.EtlDynamoAndSync(ctx, func(key kv.Key, m map[string]kv.AttrType) {
+			lock.Lock()
+			if _, ok := uniqueIds[key.String()]; !ok {
+				uniqueIds[key.String()] = true
+				etlCount++
+			} else {
+				etlDupCout++
+			}
+			lock.Unlock()
+
+		})
+		assert.NoError(t, err)
+	}()
+
+	fromStreamCount := 0
+	fromStreamDupCount := 0
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := store.Sync(ctx, func(key kv.Key, m map[string]kv.AttrType) {
+			lock.Lock()
+			if _, ok := uniqueIds[key.String()]; !ok {
+				uniqueIds[key.String()] = true
+				fromStreamCount++
+			} else {
+				fromStreamDupCount++
+			}
+			lock.Unlock()
+		})
+		assert.NoError(t, err)
+	}()
+
+	wg.Wait()
+
+	fmt.Println("initialRecordsCount", initialRecordsCount)
+	fmt.Println("insertRecords", insertRecords)
+	fmt.Println("fromStreamCount", fromStreamCount)
+	fmt.Println("fromStreamDupCount", fromStreamDupCount)
+	fmt.Println("etlCount", etlCount)
+	fmt.Println("etlDupCout", etlDupCout)
+
+	endCount := store.Count()
+
+	assert.Equal(t, endCount, int64(len(uniqueIds)))
+}
+
+type Generic struct {
+	Key  kv.Key                 `json:"key"`
+	Attr map[string]kv.AttrType `json:"attr"`
+}
+
+func GenerateData(max int) chan *Generic {
+	ch := make(chan *Generic)
+	go func() {
+		defer close(ch)
+		for i := 0; i < max; i++ {
+			entity := gofakeit.NounProper()
+			key := kv.Key{
+				PartitionKey: entity + "#" + strconv.Itoa(i) + "#" + time.Now().Format("20060102150405"),
+				EntityKey:    entity,
+			}
+			attr := map[string]kv.AttrType{
+				"content": {S: PtrString(gofakeit.HipsterSentence(30))},
+				"created": {DT: PtrTime(time.Now())},
+				"version": {I: PtrInt64(time.Now().UnixNano())},
+			}
+
+			for i := 0; i < rand.Int() && i < 3; i++ {
+				name := gofakeit.Name()
+				if rand.Float64() < 0.5 {
+					attr[name] = kv.AttrType{S: PtrString(gofakeit.HipsterSentence(30))}
+				} else {
+					attr[name] = kv.AttrType{I: PtrInt64(rand.Int63())}
+				}
+			}
+
+			ch <- &Generic{
+				Key:  key,
+				Attr: attr,
+			}
+		}
+	}()
+
+	return ch
 }

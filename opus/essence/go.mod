@@ -4,6 +4,8 @@ go 1.18
 
 require (
 	github.com/aws/aws-sdk-go v1.44.79
+	github.com/brianvoe/gofakeit/v6 v6.18.0
+	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/stretchr/testify v1.8.0
 )
 
