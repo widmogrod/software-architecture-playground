@@ -516,3 +516,7 @@ func PtrInt64(nano int64) *int64 {
 func PtrTime(now time.Time) *time.Time {
 	return &now
 }
+
+func PtrBool(b bool) *bool {
+	return &b
+}

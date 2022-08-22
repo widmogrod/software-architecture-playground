@@ -1,9 +1,13 @@
 package gm
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
+	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
@@ -165,8 +169,87 @@ func (r *SchemaRegistry) Validate(id string, data interface{}) error {
 	return errors.New("not implemented for this type" + v.Kind().String())
 }
 
+func Generate(r *SchemaRegistry, id string, in interface{}) error {
+	// get schema
+	sch, err := r.Get(id)
+	if err != nil {
+		return err
+	}
+
+	// reflect in
+	v := reflect.ValueOf(in)
+	// if ptr to struct
+	if v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct {
+		v = v.Elem()
+	}
+
+	if v.Kind() == reflect.Struct {
+		// iterate over fields
+		for i := 0; i < v.NumField(); i++ {
+			// check if field is required
+			field := v.Type().Field(i)
+			// get field from schema
+			fieldName := field.Name
+			attr, ok := sch.Attrs[fieldName]
+			if !ok {
+				// field name from tag name
+				fieldName = field.Tag.Get("name")
+				attr, ok = sch.Attrs[fieldName]
+				if !ok {
+					continue
+				}
+			}
+
+			// randomly skip non required field
+			if !attr.Required && rand.Intn(2) == 0 {
+				continue
+			}
+
+			// field pointer
+			fieldPtr := v.Field(i)
+
+			// set field value depening of its type
+			switch attr.T {
+			case StringType:
+				fieldPtr.Set(reflect.ValueOf(kv.PtrString(gofakeit.Word())))
+			case IntType:
+				fieldPtr.Set(reflect.ValueOf(kv.PtrInt64(gofakeit.Int64())))
+			case BoolType:
+				fieldPtr.Set(reflect.ValueOf(kv.PtrBool(gofakeit.Bool())))
+			default:
+				return errors.New(fmt.Sprintf("not implemented for this type=%v", attr.T))
+			}
+		}
+
+		return nil
+	}
+
+	return errors.New("not implemented for this type" + v.Kind().String())
+}
+
 func NewSchemaRegistry() *SchemaRegistry {
 	return &SchemaRegistry{
 		schemas: make(map[string]*Schema),
 	}
+}
+
+func TestSchemaGeneration(t *testing.T) {
+	// new schema registry
+	reg := NewSchemaRegistry()
+	// register schema
+	err := reg.Register("question", QuestionSchema())
+	assert.NoError(t, err)
+	// generate schema
+	obj := Question{}
+	err = Generate(reg, "question", &obj)
+
+	assert.NoError(t, err)
+	err = reg.Validate("question", obj)
+	assert.NoError(t, err)
+
+	fmt.Println(obj)
+	// json serialize obj
+	b, err := json.Marshal(obj)
+	assert.NoError(t, err)
+	fmt.Println(string(b))
 }
