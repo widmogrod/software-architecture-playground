@@ -31,7 +31,7 @@ export class DatabaseStack extends cdk.Stack {
             version: opensearchservice.EngineVersion.OPENSEARCH_1_3,
             fineGrainedAccessControl: {
                 masterUserName: 'admin',
-                // masterUserPassword: 'nile!DISLODGE5clause'
+                masterUserPassword: cdk.SecretValue.unsafePlainText('nile!DISLODGE5clause')
             },
             capacity: {
                 masterNodes: 3,
