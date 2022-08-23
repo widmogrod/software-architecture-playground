@@ -55,7 +55,7 @@ func run() error {
 
 	http.HandleFunc("/", func(r http.ResponseWriter, rq *http.Request) {
 		// create a post
-		createdPost, err := client.Post.FindMany().Exec(ctx)
+		createdPost, err := client.Post.FindMany().With(db.Post.Comments.Fetch()).Exec(ctx)
 		if err != nil {
 			reportErr(r, err)
 			return

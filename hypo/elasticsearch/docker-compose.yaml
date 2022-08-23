@@ -17,3 +17,53 @@ services:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:
       - 5601:5601
+
+#  auditbeat:
+#    image: docker.elastic.co/beats/auditbeat:7.13.2-arm64
+#    command: auditbeat -e -strict.perms=false
+#    user: root
+#    environment:
+#      - setup.kibana.host=kibana:5601
+#      - output.elasticsearch.hosts=["elasticsearch:9200"]
+#    cap_add: [ 'AUDIT_CONTROL', 'AUDIT_READ' ]
+#    pid: "host"
+#    volumes:
+#      #   - ${PWD}/configs/auditbeat.docker.yml:/usr/share/auditbeat/auditbeat.yml
+#      - /var/run/docker.sock:/var/run/docker.sock
+#
+#  metricbeat:
+#    image: docker.elastic.co/beats/metricbeat:7.13.2-arm64
+#    # command: --strict.perms=false
+#    environment:
+#      - setup.kibana.host=kibana:5601
+#      - output.elasticsearch.hosts=["elasticsearch:9200"]
+#    cap_add:
+#      - AUDIT_CONTROL
+#      - AUDIT_READ
+#    volumes:
+#      # - ${PWD}/configs/metricbeat.docker.yml:/usr/share/metricbeat/metricbeat.yml
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+#      - /proc:/hostfs/proc:ro
+#      - /:/hostfs:ro
+#
+#  heartbeat:
+#    image: docker.elastic.co/beats/heartbeat:7.13.2-arm64
+#    command: --strict.perms=false
+#    environment:
+#      - setup.kibana.host=kibana:5601
+#      - output.elasticsearch.hosts=["elasticsearch:9200"]
+#    # volumes:
+#    #   - ${PWD}/configs/heartbeat.docker.yml:/usr/share/heartbeat/heartbeat.yml
+#
+#  packetbeat:
+#    image: docker.elastic.co/beats/packetbeat:7.13.2-arm64
+#    command: --strict.perms=false
+#    environment:
+#      - setup.kibana.host=kibana:5601
+#      - output.elasticsearch.hosts=["elasticsearch:9200"]
+#    cap_add:
+#      - NET_RAW
+#      - NET_ADMIN
+#    # volumes:
+#    #   - ${PWD}/configs/packetbeat.docker.yml:/usr/share/packetbeat/packetbeat.yml

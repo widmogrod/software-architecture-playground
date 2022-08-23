@@ -70,7 +70,7 @@ export class DatabaseStack extends cdk.Stack {
             new iam.PolicyStatement({
                 actions: ['es:*'],
                 effect: iam.Effect.ALLOW,
-                principals: [new iam.AccountPrincipal('*')],
+                principals: [new iam.AnyPrincipal],
                 resources: [domain.domainArn, `${domain.domainArn}/*`],
             })
         );

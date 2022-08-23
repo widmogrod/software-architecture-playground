@@ -141,7 +141,7 @@ Answer(id, question_id, author_id, content)
 
 vs
 
-(entity, field) => (id, value:type)
+(entity, field) => (qid, value:type)
 
 QuestionContent(id, content)
 QuestionCreated(id, created)
@@ -187,6 +187,13 @@ Question(id, {
 How do we query this data?
 
 SQL++
+
+vs
+
+map(str,str)
+
+
+
 
 ---
 References
