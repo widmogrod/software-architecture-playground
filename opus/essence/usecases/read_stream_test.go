@@ -128,7 +128,7 @@ func GenerateData(max int) chan *Generic {
 				"version": {I: kv.PtrInt64(time.Now().UnixNano())},
 			}
 
-			for i := 0; i < rand.Int() || i < 10; i++ {
+			for i := 0; i < rand.Intn(10); i++ {
 				name := gofakeit.Noun()
 				if rand.Float64() < 0.5 {
 					attr[name] = kv.AttrType{S: kv.PtrString(gofakeit.HipsterSentence(30))}
