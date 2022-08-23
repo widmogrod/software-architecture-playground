@@ -22,8 +22,11 @@ type (
 )
 
 type Question struct {
-	Id      *string `name:"id"`
-	Content *string `name:"content"`
+	Id         *string `name:"id"`
+	Content    *string `name:"content"`
+	Version    *int64  `name:"version"`
+	SourceType *string `name:"sourceType"`
+	SourceId   *string `name:"sourceId"`
 }
 
 func TestSchema(t *testing.T) {
@@ -119,6 +122,11 @@ func (r *SchemaRegistry) Validate(id string, data interface{}) error {
 
 	// reflect data
 	v := reflect.ValueOf(data)
+	// if ptr to struct
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
 	if v.Kind() == reflect.Struct {
 		msg := strings.Builder{}
 		foundFields := make(map[string]bool)
@@ -126,17 +134,50 @@ func (r *SchemaRegistry) Validate(id string, data interface{}) error {
 		for i := 0; i < v.NumField(); i++ {
 			// check if field is required
 			field := v.Type().Field(i)
-			// get field from schema
-			fieldName := field.Name
-			attr, ok := sch.Attrs[fieldName]
-			if !ok {
-				// field name from tag name
-				fieldName = field.Tag.Get("name")
-				attr, ok = sch.Attrs[fieldName]
-				if !ok {
-					msg.WriteString("field " + fieldName + " is not defined in schema; ")
+			attr, fieldName, err := extractAttr(field, sch)
+			if err != nil {
+				msg.WriteString(err.Error())
+				continue
+			}
+
+			foundFields[*fieldName] = true
+
+			// check if field is required
+			if attr.Required {
+				// check if field is set
+				if v.Field(i).IsZero() {
+					msg.WriteString("field " + *fieldName + " is required; ")
 					continue
 				}
+			}
+		}
+
+		// check if all required fields are found
+		for fieldName, attr := range sch.Attrs {
+			if attr.Required && !foundFields[fieldName] {
+				msg.WriteString("field " + fieldName + " is required; ")
+			}
+		}
+
+		if msg.Len() > 0 {
+			return errors.New(msg.String())
+		}
+
+		return nil
+	}
+
+	if v.Kind() == reflect.Map {
+		msg := strings.Builder{}
+		foundFields := make(map[string]bool)
+		// iterate over fields
+		for _, key := range v.MapKeys() {
+			// check if field is required
+			fieldName := key.String()
+			// get attr from schema
+			attr, ok := sch.Attrs[fieldName]
+			if !ok {
+				msg.WriteString("field " + fieldName + " is not defined in schema; ")
+				continue
 			}
 
 			foundFields[fieldName] = true
@@ -144,7 +185,7 @@ func (r *SchemaRegistry) Validate(id string, data interface{}) error {
 			// check if field is required
 			if attr.Required {
 				// check if field is set
-				if v.Field(i).IsZero() {
+				if v.MapIndex(key).IsZero() {
 					msg.WriteString("field " + fieldName + " is required; ")
 					continue
 				}
@@ -179,7 +220,7 @@ func Generate(r *SchemaRegistry, id string, in interface{}) error {
 	// reflect in
 	v := reflect.ValueOf(in)
 	// if ptr to struct
-	if v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct {
+	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
@@ -188,16 +229,9 @@ func Generate(r *SchemaRegistry, id string, in interface{}) error {
 		for i := 0; i < v.NumField(); i++ {
 			// check if field is required
 			field := v.Type().Field(i)
-			// get field from schema
-			fieldName := field.Name
-			attr, ok := sch.Attrs[fieldName]
-			if !ok {
-				// field name from tag name
-				fieldName = field.Tag.Get("name")
-				attr, ok = sch.Attrs[fieldName]
-				if !ok {
-					continue
-				}
+			attr, _, err := extractAttr(field, sch)
+			if err != nil {
+				return err
 			}
 
 			// randomly skip non required field
@@ -209,22 +243,55 @@ func Generate(r *SchemaRegistry, id string, in interface{}) error {
 			fieldPtr := v.Field(i)
 
 			// set field value depening of its type
-			switch attr.T {
-			case StringType:
-				fieldPtr.Set(reflect.ValueOf(kv.PtrString(gofakeit.Word())))
-			case IntType:
-				fieldPtr.Set(reflect.ValueOf(kv.PtrInt64(gofakeit.Int64())))
-			case BoolType:
-				fieldPtr.Set(reflect.ValueOf(kv.PtrBool(gofakeit.Bool())))
-			default:
-				return errors.New(fmt.Sprintf("not implemented for this type=%v", attr.T))
-			}
+			fieldPtr.Set(generateValueOfForType(attr))
 		}
 
 		return nil
 	}
 
-	return errors.New("not implemented for this type" + v.Kind().String())
+	if v.Kind() == reflect.Map {
+		// iterate over attribute names
+		for fieldName, attr := range sch.Attrs {
+			// randomly skip non required field
+			if !attr.Required && rand.Intn(2) == 0 {
+				continue
+			}
+			v.SetMapIndex(reflect.ValueOf(fieldName), generateValueOfForType(&attr))
+		}
+
+		return nil
+	}
+
+	return errors.New("not implemented for this type: " + v.Kind().String())
+}
+
+func extractAttr(field reflect.StructField, sch *Schema) (*AttrType, *string, error) {
+	// get field from schema
+	fieldName := field.Name
+	attr, ok := sch.Attrs[fieldName]
+	if !ok {
+		// field name from tag name
+		fieldName = field.Tag.Get("name")
+		attr, ok = sch.Attrs[fieldName]
+		if !ok {
+			return nil, nil, errors.New("field " + fieldName + " is not defined in schema")
+		}
+	}
+
+	return &attr, &fieldName, nil
+}
+
+func generateValueOfForType(v *AttrType) reflect.Value {
+	switch v.T {
+	case StringType:
+		return reflect.ValueOf(kv.PtrString(gofakeit.Word()))
+	case IntType:
+		return reflect.ValueOf(kv.PtrInt64(gofakeit.Int64()))
+	case BoolType:
+		return reflect.ValueOf(kv.PtrBool(gofakeit.Bool()))
+	default:
+		panic(fmt.Sprintf("not implemented for this type=%v", v))
+	}
 }
 
 func NewSchemaRegistry() *SchemaRegistry {
@@ -239,17 +306,29 @@ func TestSchemaGeneration(t *testing.T) {
 	// register schema
 	err := reg.Register("question", QuestionSchema())
 	assert.NoError(t, err)
-	// generate schema
+
 	obj := Question{}
 	err = Generate(reg, "question", &obj)
-
 	assert.NoError(t, err)
+
 	err = reg.Validate("question", obj)
 	assert.NoError(t, err)
 
-	fmt.Println(obj)
 	// json serialize obj
 	b, err := json.Marshal(obj)
 	assert.NoError(t, err)
 	fmt.Println(string(b))
+
+	obj2 := map[string]interface{}{}
+	err = Generate(reg, "question", &obj2)
+	assert.NoError(t, err)
+
+	err = reg.Validate("question", obj2)
+	assert.NoError(t, err)
+
+	// json serialize obj
+	b, err = json.Marshal(obj2)
+	assert.NoError(t, err)
+	fmt.Println(string(b))
+
 }

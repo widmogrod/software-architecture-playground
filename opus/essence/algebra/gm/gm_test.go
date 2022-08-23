@@ -11,8 +11,8 @@ func Sourcable(in map[string]AttrType) map[string]AttrType {
 	//in["id"] = AttrType{T: StringType, Required: true, Identifier: true}
 
 	// add sourceType and sourceId to the input map
-	//in["sourceType"] = AttrType{T: StringType, Required: true}
-	//in["sourceId"] = AttrType{T: StringType, Required: true}
+	in["sourceType"] = AttrType{T: StringType, Required: true}
+	in["sourceId"] = AttrType{T: StringType, Required: true}
 
 	// add tenantId to the input map
 	//in["tenantId"] = AttrType{T: StringType, Required: true}
@@ -21,7 +21,7 @@ func Sourcable(in map[string]AttrType) map[string]AttrType {
 	//in["schema"] = AttrType{T: IntType, Required: true}
 
 	// add version to the input map
-	//in["version"] = AttrType{T: IntType, Required: true}
+	in["version"] = AttrType{T: IntType, Required: true}
 	return in
 }
 
