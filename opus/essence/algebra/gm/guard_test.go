@@ -144,7 +144,7 @@ func TestPredicates(t *testing.T) {
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
-			err := uc.predicate.Eval(uc.data)
+			err := uc.predicate.Eval(&GolangTypeReader{uc.data})
 			if err != nil {
 				t.Log(err.Error())
 				if uc.err != nil {

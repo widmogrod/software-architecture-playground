@@ -20,6 +20,16 @@ func PtrType(x Typ) *Typ {
 	return &x
 }
 
+var typToString = map[Typ]string{
+	TypeInt:    "int",
+	TypeString: "string",
+	TypeBool:   "bool",
+}
+
+func (t Typ) String() string {
+	return typToString[t]
+}
+
 type (
 	RuleID = string
 
@@ -118,7 +128,7 @@ func (a *Guard) EvalRule(id RuleID, data interface{}) error {
 		return err
 	}
 
-	return rule.Eval(data)
+	return rule.Eval(&GolangTypeReader{data: data})
 }
 
 var (
@@ -131,74 +141,129 @@ var (
 	ErrAllOrPredicatesFailed    = errors.New("all of the OR predicates failed")
 )
 
-func (p *Predicate) Eval(data interface{}) error {
+var _ DataReader = &GolangTypeReader{}
+
+type GolangTypeReader struct {
+	data interface{}
+}
+
+func (g *GolangTypeReader) GetType() Typ {
+	switch g.data.(type) {
+	case int, int8, int16, int32, int64:
+		return TypeInt
+	case bool:
+		return TypeBool
+
+	case string:
+		return TypeString
+	}
+
+	// check if the field is in the map
+	v := reflect.ValueOf(g.data)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Map {
+		return TypeMap
+	}
+
+	panic("not implemented")
+}
+
+func (g *GolangTypeReader) Equals(eq interface{}) bool {
+	return reflect.DeepEqual(g.data, eq)
+}
+
+func (g *GolangTypeReader) ToKeyable() (DataReader, error) {
+	if _, ok := g.data.(map[string]interface{}); ok {
+		return g, nil
+	}
+
+	v := reflect.ValueOf(g.data)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() == reflect.Map {
+		// convert map to map[string]interface{}
+		m := make(map[string]interface{})
+		for _, k := range v.MapKeys() {
+			m[k.String()] = v.MapIndex(k).Interface()
+		}
+		return &GolangTypeReader{data: m}, nil
+	}
+
+	if v.Kind() == reflect.Struct {
+		// convert struct to map[string]interface{}
+		m := make(map[string]interface{})
+		for i := 0; i < v.NumField(); i++ {
+			m[v.Type().Field(i).Name] = v.Field(i).Interface()
+		}
+		return &GolangTypeReader{data: m}, nil
+	}
+
+	return nil, ErrValueNotMap
+}
+
+func (g *GolangTypeReader) GetKey(key string) (data DataReader, exists bool) {
+	if m, ok := g.data.(map[string]interface{}); ok {
+		if v, ok := m[key]; ok {
+			return &GolangTypeReader{data: v}, true
+		}
+	}
+
+	return nil, false
+}
+
+type (
+	DataReader interface {
+		GetType() Typ
+		Equals(eq interface{}) bool
+		ToKeyable() (DataReader, error)
+		GetKey(key string) (data DataReader, exists bool)
+	}
+)
+
+func (p *Predicate) Eval(data DataReader) error {
 	if p.Type != nil {
-		switch data.(type) {
-		case int, int8, int16, int32, int64:
-			if *p.Type != TypeInt {
-				// wrap error to provide more info
-				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
-			}
-
-		case bool:
-			if *p.Type != TypeBool {
-				// wrap error to provide more info
-				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
-			}
-
-		case string:
-			if *p.Type != TypeString {
-				// wrap error to provide more info
-				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
-			}
+		if data.GetType() != *p.Type {
+			return fmt.Errorf("%w: given %v expeteed %s", ErrWrongType, data.GetType().String(), p.Type.String())
 		}
-
-		// if si map, check if the field is in the map
-		if *p.Type == TypeMap {
-			// check if the field is in the map
-			v := reflect.ValueOf(data)
-			if v.Kind() == reflect.Ptr {
-				v = v.Elem()
-			}
-
-			if v.Kind() != reflect.Map {
-				// wrap error to provide more info
-				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
-			}
-		}
-
 		return nil
+
 	}
 
 	if p.Eq != nil {
-		if reflect.DeepEqual(p.Eq, data) {
+		if data.Equals(p.Eq) {
 			return nil
 		}
 		// wrap error to provide more info
-		return fmt.Errorf("%w: %v != %v", ErrValueNotEqual, p.Eq, data)
+		return fmt.Errorf("%w: %v != %s", ErrValueNotEqual, p.Eq, data.GetType())
 	}
 
 	if p.In != nil {
 		for _, v := range p.In {
-			if reflect.DeepEqual(v, data) {
+			if data.Equals(v) {
 				return nil
 			}
 		}
 		// wrap error to provide more info
-		return fmt.Errorf("%w: %v", ErrValueNotContainedIn, data)
+		return fmt.Errorf("%w: %s", ErrValueNotContainedIn, data.GetType())
 	}
 
 	if p.Fields != nil {
-		mapAny, ok := data.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("%w: %v", ErrValueNotMap, reflect.TypeOf(data).String())
+		m, err := data.ToKeyable()
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrValueNotMap, data.GetType())
 		}
 
 		for k, v := range p.Fields {
-			if _, ok := mapAny[k]; !ok {
+			item, exists := m.GetKey(k)
+			if !exists {
 				return fmt.Errorf("%w: %v", ErrFieldInMap, k)
 			}
-			err := v.Eval(mapAny[k])
+			err := v.Eval(item)
 			if err != nil {
 				return err
 			}
@@ -229,15 +294,9 @@ func (p *Predicate) Eval(data interface{}) error {
 	return errors.New(fmt.Sprintf("eval: type %s not implemented", reflect.TypeOf(data).String()))
 }
 
-var typToString = map[Typ]string{
-	TypeInt:    "int",
-	TypeString: "string",
-	TypeBool:   "bool",
-}
-
 func (p *Predicate) String() string {
 	if p.Type != nil {
-		return fmt.Sprintf("Typ(%s)", typToString[*p.Type])
+		return fmt.Sprintf("Typ(%s)", p.Type.String())
 	}
 
 	if p.Eq != nil {
