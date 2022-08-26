@@ -8,8 +8,22 @@ import (
 	"sync"
 )
 
+// iota of type
+const (
+	TypeInt Typ = iota
+	TypeString
+	TypeBool
+	TypeMap
+)
+
+func PtrType(x Typ) *Typ {
+	return &x
+}
+
 type (
 	RuleID = string
+
+	Typ uint
 
 	Guard struct {
 		rules map[string]*Predicate
@@ -17,6 +31,7 @@ type (
 	}
 
 	Predicate struct {
+		Type   *Typ
 		Eq     interface{}
 		In     []interface{}
 		Fields map[string]Predicate
@@ -107,6 +122,7 @@ func (a *Guard) EvalRule(id RuleID, data interface{}) error {
 }
 
 var (
+	ErrWrongType                = errors.New("wrong type")
 	ErrValueNotContainedIn      = errors.New("value not contained in")
 	ErrValueNotEqual            = errors.New("value not equal")
 	ErrValueNotMap              = errors.New("value not map, but looking for field")
@@ -116,6 +132,44 @@ var (
 )
 
 func (p *Predicate) Eval(data interface{}) error {
+	if p.Type != nil {
+		switch data.(type) {
+		case int, int8, int16, int32, int64:
+			if *p.Type != TypeInt {
+				// wrap error to provide more info
+				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
+			}
+
+		case bool:
+			if *p.Type != TypeBool {
+				// wrap error to provide more info
+				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
+			}
+
+		case string:
+			if *p.Type != TypeString {
+				// wrap error to provide more info
+				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
+			}
+		}
+
+		// if si map, check if the field is in the map
+		if *p.Type == TypeMap {
+			// check if the field is in the map
+			v := reflect.ValueOf(data)
+			if v.Kind() == reflect.Ptr {
+				v = v.Elem()
+			}
+
+			if v.Kind() != reflect.Map {
+				// wrap error to provide more info
+				return fmt.Errorf("%w: %v", ErrWrongType, *p.Type)
+			}
+		}
+
+		return nil
+	}
+
 	if p.Eq != nil {
 		if reflect.DeepEqual(p.Eq, data) {
 			return nil
@@ -175,7 +229,17 @@ func (p *Predicate) Eval(data interface{}) error {
 	return errors.New(fmt.Sprintf("eval: type %s not implemented", reflect.TypeOf(data).String()))
 }
 
+var typToString = map[Typ]string{
+	TypeInt:    "int",
+	TypeString: "string",
+	TypeBool:   "bool",
+}
+
 func (p *Predicate) String() string {
+	if p.Type != nil {
+		return fmt.Sprintf("Typ(%s)", typToString[*p.Type])
+	}
+
 	if p.Eq != nil {
 		// get type of p.Eq
 		return fmt.Sprintf("Eq(%v)", reflect.TypeOf(p.Eq).String())
@@ -202,7 +266,7 @@ func (p *Predicate) String() string {
 		}
 		return fmt.Sprintf("And(%v)", strings.Join(predicates, ","))
 	}
-	
+
 	if p.Or != nil {
 		// get list of or predicates
 		predicates := make([]string, 0, len(p.Or))

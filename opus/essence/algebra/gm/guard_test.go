@@ -11,6 +11,15 @@ func TestPredicates(t *testing.T) {
 		data      interface{}
 		err       error
 	}{
+		"check if Typ accept correct type": {
+			predicate: Predicate{Type: PtrType(TypeString)},
+			data:      "asd",
+		},
+		"check if Typ reject incorrect type": {
+			predicate: Predicate{Type: PtrType(TypeString)},
+			data:      123123,
+			err:       ErrWrongType,
+		},
 		"check if In predicate work as expected on correct data": {
 			predicate: Predicate{
 				In: []interface{}{
