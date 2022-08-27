@@ -9,7 +9,7 @@ import (
 	"reflect"
 )
 
-func Generate(r *SchemaRegistry, id string, in interface{}) error {
+func GenerateRandomData(r *SchemaRegistry, id string, in interface{}) error {
 	// get schema
 	sch, err := r.Get(id)
 	if err != nil {

@@ -15,7 +15,7 @@ func TestSchemaGeneration(t *testing.T) {
 	assert.NoError(t, err)
 
 	obj := Question{}
-	err = Generate(reg, "question", &obj)
+	err = GenerateRandomData(reg, "question", &obj)
 	assert.NoError(t, err)
 
 	err = reg.Validate("question", obj)
@@ -27,7 +27,7 @@ func TestSchemaGeneration(t *testing.T) {
 	fmt.Println(string(b))
 
 	obj2 := map[string]interface{}{}
-	err = Generate(reg, "question", &obj2)
+	err = GenerateRandomData(reg, "question", &obj2)
 	assert.NoError(t, err)
 
 	err = reg.Validate("question", obj2)
