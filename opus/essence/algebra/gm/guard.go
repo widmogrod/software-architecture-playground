@@ -198,7 +198,11 @@ func (g *GolangTypeReader) ToKeyable() (DataReader, error) {
 		// convert struct to map[string]interface{}
 		m := make(map[string]interface{})
 		for i := 0; i < v.NumField(); i++ {
-			m[v.Type().Field(i).Name] = v.Field(i).Interface()
+			name, ok := v.Type().Field(i).Tag.Lookup("name")
+			if !ok {
+				name = v.Type().Field(i).Name
+			}
+			m[name] = v.Field(i).Interface()
 		}
 		return &GolangTypeReader{data: m}, nil
 	}
