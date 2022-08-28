@@ -43,12 +43,10 @@ func (d *DSL) Invoke(in *CreateQuestionRequest) error {
 		return fmt.Errorf("invoke1: %s: %w", err, ErrAccessDenied)
 	}
 
-	data := Question{
-		Content:    in.Content,
-		SourceId:   in.Id,
-		SourceType: d.conf.tenantId,
-		Version:    1,
-	}
+	data := DefaultQuestion()
+	data.Content = kv.PtrString(in.Content)
+	data.SourceId = kv.PtrString(in.Id)
+	data.SourceType = kv.PtrString(d.conf.tenantId)
 
 	err = d.reg.Validate(data.SchemaID(), data)
 	if err != nil {

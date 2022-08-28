@@ -433,10 +433,6 @@ func (s *Store) IndexDocument(ctx context.Context, key Key, attrs map[string]Att
 	return nil
 }
 
-func PtrString(s string) *string {
-	return &s
-}
-
 /*
 {
 	"docId": "textbook_solution#13123/question#666"
@@ -507,6 +503,10 @@ func SyncStrategySequence(ctx context.Context, store *Store, sink func(key Key, 
 	}
 	return nil
 
+}
+
+func PtrString(s string) *string {
+	return &s
 }
 
 func PtrInt64(nano int64) *int64 {

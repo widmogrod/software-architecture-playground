@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
 	"io"
 	"math/rand"
 	"reflect"
@@ -85,14 +86,14 @@ func extractAttr(field reflect.StructField, sch *Schema) (*AttrType, *string, er
 func generateValueOfForType(v *AttrType) reflect.Value {
 	switch v.T {
 	case StringType:
-		return reflect.ValueOf(gofakeit.Word())
-		//return reflect.ValueOf(kv.PtrString(gofakeit.Word()))
+		//return reflect.ValueOf(gofakeit.Word())
+		return reflect.ValueOf(kv.PtrString(gofakeit.Word()))
 	case IntType:
-		//return reflect.ValueOf(kv.PtrInt64(gofakeit.Int64()))
-		return reflect.ValueOf(gofakeit.Int64())
+		return reflect.ValueOf(kv.PtrInt64(gofakeit.Int64()))
+		//return reflect.ValueOf(gofakeit.Int64())
 	case BoolType:
-		return reflect.ValueOf(gofakeit.Bool())
-		//return reflect.ValueOf(kv.PtrBool(gofakeit.Bool()))
+		//return reflect.ValueOf(gofakeit.Bool())
+		return reflect.ValueOf(kv.PtrBool(gofakeit.Bool()))
 	default:
 		panic(fmt.Sprintf("not implemented for this type=%v", v))
 	}
@@ -102,11 +103,32 @@ func generateValueOfForType(v *AttrType) reflect.Value {
 var goStruct = `
 type {{fieldName .Name}} struct {
 {{- range $k, $type := .Attrs }}
-	{{fieldName $k}}
-	{{- if not $type.Required }} *
- 	{{- else }} {{ end -}} 
-	{{- typeName $type.T}} {{tag}}name:"{{$k}}" {{tag}}
+	{{fieldName $k}} *{{typeName $type.T}} {{tag}}name:"{{$k}}"{{tag}}
 {{- end }}
+}
+`
+
+// create new golang template
+var defaultStruct = `
+func Default{{fieldName .Name}}() *{{fieldName .Name}} {
+	return &{{fieldName .Name}} {
+	{{- range $k, $type := .Attrs }}
+		{{- if not (eq $type.Default nil) -}}
+		{{- if isString $type }}
+		{{fieldName $k}}: kv.PtrString("{{ $type.Default }}"),
+		{{- end -}}
+		{{- if isInt $type }}
+		{{fieldName $k}}: kv.PtrInt64({{ $type.Default }}),
+		{{- end -}}
+		{{- if isBool $type }}
+		{{fieldName $k}}: kv.PtrBool({{ $type.Default }}),
+		{{- end -}}
+		{{- if isTime $type }}	
+		{{fieldName $k}}: kv.PtrTime(time.Now()),
+		{{- end -}}
+		{{- end -}}
+	{{- end }}
+	}
 }
 `
 
@@ -117,16 +139,16 @@ func (self *{{fieldName .Name}}) ToAttr() map[string]kv.AttrType {
 {{- range $k, $type := .Attrs }}
 		"{{$k}}": {
 			{{- if isString $type -}}
-			S: kv.PtrString(self.{{fieldName $k}}),
+			S: self.{{fieldName $k}}
 			{{- end -}}
 			{{- if isInt $type -}}
-			I: kv.PtrInt64(self.{{fieldName $k}}),
+			I: self.{{fieldName $k}}
 			{{- end -}}
 			{{- if isBool $type -}}
-			B: kv.PtrBool(self.{{fieldName $k}}),
+			B: self.{{fieldName $k}}
 			{{- end -}}
 			{{- if isTime $type -}}	
-			DT: self.{{fieldName $k}},
+			DT: self.{{fieldName $k}}
 			{{- end -}}
 		},
 {{- end }}
@@ -137,7 +159,7 @@ func (self *{{fieldName .Name}}) ToAttr() map[string]kv.AttrType {
 var toKey = `
 func (self *{{fieldName .Name}}) ToKey() kv.Key {
 	return kv.Key{
-		PartitionKey: self.{{ fieldName (findIdKey .Attrs) }},
+		PartitionKey: *self.{{ fieldName (findIdKey .Attrs) }},
 		EntityKey: "{{ .Name }}",
 	}
 }
@@ -193,7 +215,13 @@ func GenerateGolangCode(r *SchemaRegistry, id string, res io.Writer, conf *GenCo
 	fmt.Fprintf(res, "package %s\n\n", conf.PackageName)
 	fmt.Fprintf(res, "import \"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv\" \n")
 
-	t := template.Must(template.New("go-struct").Funcs(funMap).Parse(goStruct))
+	t := template.Must(template.New("go-default").Funcs(funMap).Parse(defaultStruct))
+	err = t.Execute(res, sch)
+	if err != nil {
+		// wrap error with function name
+		return fmt.Errorf("error generating golang code for %s: %w", id, err)
+	}
+	t = template.Must(template.New("go-struct").Funcs(funMap).Parse(goStruct))
 	err = t.Execute(res, sch)
 	if err != nil {
 		// wrap error with function name
