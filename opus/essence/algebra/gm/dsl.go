@@ -50,7 +50,7 @@ func (d *DSL) Invoke(in *CreateQuestionRequest) error {
 		Version:    1,
 	}
 
-	err = d.reg.Validate("question", data)
+	err = d.reg.Validate(data.SchemaID(), data)
 	if err != nil {
 		return fmt.Errorf("invoke2: %s: %w", err, ErrAccessDenied)
 	}

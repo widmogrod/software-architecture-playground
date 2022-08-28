@@ -143,6 +143,12 @@ func (self *{{fieldName .Name}}) ToKey() kv.Key {
 }
 `
 
+var toSchemaId = `
+func (self *{{fieldName .Name}}) SchemaID() string {
+	return "{{ .Name }}"
+}
+`
+
 type GenConf struct {
 	PackageName string
 }
@@ -202,6 +208,12 @@ func GenerateGolangCode(r *SchemaRegistry, id string, res io.Writer, conf *GenCo
 	}
 
 	t = template.Must(template.New("to-key").Funcs(funMap).Parse(toKey))
+	err = t.Execute(res, sch)
+	if err != nil {
+		// wrap error with function name
+		return fmt.Errorf("error generating golang code for %s: %w", id, err)
+	}
+	t = template.Must(template.New("to-schema-id").Funcs(funMap).Parse(toSchemaId))
 	err = t.Execute(res, sch)
 	if err != nil {
 		// wrap error with function name
