@@ -3,6 +3,7 @@ package gm
 import (
 	"errors"
 	"fmt"
+	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
 )
 
 type Config struct {
@@ -10,14 +11,15 @@ type Config struct {
 }
 
 type DSL struct {
-	reg  *SchemaRegistry
-	conf *Config
-	acl  *Guard
+	reg   *SchemaRegistry
+	conf  *Config
+	acl   *Guard
+	store *kv.Store
 }
 
-type CreateRequest struct {
-	Entity string
-	Data   map[string]interface{}
+type CreateQuestionRequest struct {
+	Id      string `json:"sourceId"`
+	Content string `json:"content"`
 }
 
 type Attributes = map[string]interface{}
@@ -29,19 +31,36 @@ type InvokeRequest struct {
 	Payload interface{} `name:"payload"`
 }
 
-func (d *DSL) Invoke(in *CreateRequest) error {
+func (d *DSL) Invoke(in *CreateQuestionRequest) error {
 	request := InvokeRequest{
-		Action:  "CreateRequest",
+		Action:  "CreateQuestionRequest",
 		Payload: in,
 	}
 
 	err := d.acl.EvalRule(d.conf.tenantId, request)
 	if err != nil {
 		// wrap error with details
-		return fmt.Errorf("invoke: %s: %w", err, ErrAccessDenied)
+		return fmt.Errorf("invoke1: %s: %w", err, ErrAccessDenied)
 	}
 
-	return errors.New("not implemented")
+	data := Question{
+		Content:    in.Content,
+		SourceId:   in.Id,
+		SourceType: d.conf.tenantId,
+		Version:    1,
+	}
+
+	err = d.reg.Validate("question", data)
+	if err != nil {
+		return fmt.Errorf("invoke2: %s: %w", err, ErrAccessDenied)
+	}
+
+	err = d.store.SetAttributes(data.ToKey(), data.ToAttr())
+	if err != nil {
+		return fmt.Errorf("invoke3: %s: %w", err, ErrAccessDenied)
+	}
+
+	return nil
 }
 
 func (d *DSL) Update(entity string, data Attributes) error {
@@ -52,10 +71,11 @@ func (d *DSL) Archive(entity string, data Attributes) error {
 	return errors.New("not implemented")
 }
 
-func NewStorageDSL(reg *SchemaRegistry, acl *Guard, c *Config) *DSL {
+func NewStorageDSL(reg *SchemaRegistry, acl *Guard, store *kv.Store, c *Config) *DSL {
 	return &DSL{
-		reg:  reg,
-		conf: c,
-		acl:  acl,
+		reg:   reg,
+		conf:  c,
+		acl:   acl,
+		store: store,
 	}
 }

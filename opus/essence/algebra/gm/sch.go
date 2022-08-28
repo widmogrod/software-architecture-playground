@@ -14,13 +14,11 @@ type (
 	}
 )
 
-type Question struct {
-	Id         *string `name:"id"`
-	Content    *string `name:"content"`
-	Version    *int64  `name:"version"`
-	SourceType *string `name:"sourceType"`
-	SourceId   *string `name:"sourceId"`
-}
+//type SchemaRegistrer interface {
+//	Register(id string, schema Schema) error
+//	Get(id string) (*Schema, error)
+//	Validate(id string, data interface{}) error
+//}
 
 func NewSchemaRegistry() *SchemaRegistry {
 	return &SchemaRegistry{
@@ -34,9 +32,10 @@ type SchemaRegistry struct {
 	lock    sync.Mutex
 }
 
-func (r *SchemaRegistry) Register(id string, schema Schema) error {
+func (r *SchemaRegistry) Register(schema Schema) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	id := schema.Name
 	// check if id is unique and return error if not
 	if _, ok := r.schemas[id]; ok {
 		return errors.New("id " + id + " is not unique")

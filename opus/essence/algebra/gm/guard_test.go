@@ -23,17 +23,17 @@ func TestPredicates(t *testing.T) {
 		"check if In predicate work as expected on correct data": {
 			predicate: Predicate{
 				In: []interface{}{
-					"CreateRequest",
+					"CreateQuestionRequest",
 					"UpdateRequest",
 					"ArchiveRequest",
 				},
 			},
-			data: "CreateRequest",
+			data: "CreateQuestionRequest",
 		},
 		"check if In predicate work as expected on incorrect data": {
 			predicate: Predicate{
 				In: []interface{}{
-					"CreateRequest",
+					"CreateQuestionRequest",
 					"UpdateRequest",
 					"ArchiveRequest",
 				},
@@ -43,14 +43,14 @@ func TestPredicates(t *testing.T) {
 		},
 		"check if Eq predicate work as expected on correct data": {
 			predicate: Predicate{
-				Eq: "CreateRequest",
+				Eq: "CreateQuestionRequest",
 			},
-			data: "CreateRequest",
+			data: "CreateQuestionRequest",
 		},
 
 		"check if Eq predicate work as expected on incorrect data": {
 			predicate: Predicate{
-				Eq: "CreateRequest",
+				Eq: "CreateQuestionRequest",
 			},
 			data: "DeleteRequest",
 			err:  ErrValueNotEqual,
@@ -60,7 +60,7 @@ func TestPredicates(t *testing.T) {
 				Fields: map[string]Predicate{
 					"action": {
 						In: []interface{}{
-							"CreateRequest",
+							"CreateQuestionRequest",
 							"UpdateRequest",
 							"ArchiveRequest",
 						},
@@ -68,7 +68,7 @@ func TestPredicates(t *testing.T) {
 				},
 			},
 			data: map[string]interface{}{
-				"action": "CreateRequest",
+				"action": "CreateQuestionRequest",
 			},
 		},
 		"check if Fields predicate work as expected on incorrect data": {
@@ -76,7 +76,7 @@ func TestPredicates(t *testing.T) {
 				Fields: map[string]Predicate{
 					"action": {
 						In: []interface{}{
-							"CreateRequest",
+							"CreateQuestionRequest",
 							"UpdateRequest",
 							"ArchiveRequest",
 						},
@@ -91,7 +91,7 @@ func TestPredicates(t *testing.T) {
 				Fields: map[string]Predicate{
 					"action": {
 						In: []interface{}{
-							"CreateRequest",
+							"CreateQuestionRequest",
 							"UpdateRequest",
 							"ArchiveRequest",
 						},
@@ -104,26 +104,26 @@ func TestPredicates(t *testing.T) {
 		"check if And predicate work as expected on correct data": {
 			predicate: Predicate{
 				And: []Predicate{
-					{Eq: "CreateRequest"},
-					{In: []interface{}{"CreateRequest"}},
+					{Eq: "CreateQuestionRequest"},
+					{In: []interface{}{"CreateQuestionRequest"}},
 				},
 			},
-			data: "CreateRequest",
+			data: "CreateQuestionRequest",
 		},
 		"check if And predicate work as expected on incorrect data": {
 			predicate: Predicate{
 				And: []Predicate{
-					{Eq: "CreateRequest"},
+					{Eq: "CreateQuestionRequest"},
 					{In: []interface{}{"DeleteRequest"}},
 				},
 			},
-			data: "CreateRequest",
+			data: "CreateQuestionRequest",
 			err:  ErrOneOfAndPredicatesFailed,
 		},
 		"check if Or predicate work as expected on correct data": {
 			predicate: Predicate{
 				Or: []Predicate{
-					{Eq: "CreateRequest"},
+					{Eq: "CreateQuestionRequest"},
 					{Eq: "Some other request"},
 					{In: []interface{}{"DeleteRequest"}},
 				},
@@ -133,7 +133,7 @@ func TestPredicates(t *testing.T) {
 		"check if Or predicate work as expected on incorrect data": {
 			predicate: Predicate{
 				Or: []Predicate{
-					{Eq: "CreateRequest"},
+					{Eq: "CreateQuestionRequest"},
 					{Eq: "Some other request"},
 					{In: []interface{}{"DeleteRequest"}},
 				},
@@ -165,7 +165,7 @@ func TestNewGuard(t *testing.T) {
 	acl := NewGuard()
 	err := acl.CreateRule("full-question-management", Predicate{Fields: map[string]Predicate{
 		"action": {In: []interface{}{
-			"CreateRequest",
+			"CreateQuestionRequest",
 			"UpdateRequest",
 			"ArchiveRequest",
 		}},
@@ -198,7 +198,7 @@ func TestNewGuard(t *testing.T) {
 		"check if action is allowed": {
 			rule: "limited-question-management",
 			data: map[string]interface{}{
-				"action": "CreateRequest",
+				"action": "CreateQuestionRequest",
 				"payload": map[string]interface{}{
 					"data": map[string]interface{}{
 						"sourceType": "quora.com",

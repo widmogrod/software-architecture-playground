@@ -1,6 +1,7 @@
 package gm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,7 @@ func TestSchemaGeneration(t *testing.T) {
 	// new schema registry
 	reg := NewSchemaRegistry()
 	// register schema
-	err := reg.Register("question", QuestionSchema())
+	err := reg.Register(QuestionSchema())
 	assert.NoError(t, err)
 
 	obj := Question{}
@@ -37,4 +38,18 @@ func TestSchemaGeneration(t *testing.T) {
 	b, err = json.Marshal(obj2)
 	assert.NoError(t, err)
 	fmt.Println(string(b))
+}
+
+func TestGenerateGolangCode(t *testing.T) {
+	// new schema registry
+	reg := NewSchemaRegistry()
+	// register schema
+	err := reg.Register(QuestionSchema())
+	assert.NoError(t, err)
+
+	res := bytes.NewBuffer([]byte{})
+	err = GenerateGolangCode(reg, "question", res, &GenConf{PackageName: "gm"})
+	assert.NoError(t, err)
+
+	fmt.Println(res.String())
 }

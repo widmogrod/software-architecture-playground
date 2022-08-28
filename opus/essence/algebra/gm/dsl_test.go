@@ -1,7 +1,10 @@
 package gm
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
+	"io/ioutil"
 	"testing"
 )
 
@@ -9,51 +12,40 @@ func TestDSL(t *testing.T) {
 	// new schema registry
 	reg := NewSchemaRegistry()
 	// register schema
-	err := reg.Register("question", QuestionSchema())
+	err := reg.Register(QuestionSchema())
 	assert.NoError(t, err)
-	err = reg.Register("answer", AnswerSchema())
+	err = reg.Register(AnswerSchema())
 	assert.NoError(t, err)
-	err = reg.Register("comment", CommentSchema())
+	err = reg.Register(CommentSchema())
+	assert.NoError(t, err)
+
+	// create file and write to it
+	res := bytes.NewBuffer([]byte{})
+	err = GenerateGolangCode(reg, "question", res, &GenConf{PackageName: "gm"})
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile("dls_gen_question.go", res.Bytes(), 0644)
 	assert.NoError(t, err)
 
 	acl := NewGuard()
-	err = acl.CreateRule("brainly.com", Predicate{Fields: map[string]Predicate{
-		"action": {
-			In: []interface{}{
-				"CreateRequest",
-				"UpdateRequest",
-				"ArchiveRequest",
+	err = acl.CreateRule("brainly.com", Predicate{
+		Fields: map[string]Predicate{
+			"action": {
+				In: []interface{}{
+					"CreateQuestionRequest",
+				},
 			},
-		},
-	}})
+		}})
 	assert.NoError(t, err)
 
-	dsl := NewStorageDSL(reg, acl, &Config{
+	store := kv.Default()
+
+	dsl := NewStorageDSL(reg, acl, store, &Config{
 		tenantId: "brainly.com",
 	})
-	err = dsl.Invoke(&CreateRequest{
-		Entity: "question",
-		Data: map[string]interface{}{
-			"sourceType": "brainly",
-			"sourceId":   "1",
-			"content":    "who was king of spain?",
-			//"version":  1, this is automatically set by the DSL
-		},
+	err = dsl.Invoke(&CreateQuestionRequest{
+		Id:      "1",
+		Content: "How to write tests in golang?",
 	})
 	assert.NoError(t, err)
-
-	//err = dsl.Update("question", map[string]interface{}{
-	//	"sourceType": "brainly",
-	//	"sourceId":   "1",
-	//	"content":    "who was king of spain?",
-	//	"version":    1, // this is required, and needs monotonically increasing version numbers
-	//})
-	//err = dsl.Archive("question", map[string]interface{}{
-	//	"sourceType": "brainly",
-	//	"sourceId":   "1",
-	//	"content":    "who was king of spain?",
-	//	//"version":  1, // version is not necessary
-	//})
-	//assert.NoError(t, err)
-
 }
