@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option go_package = ".;question";
+
+service QuestionUseCases {
+  rpc CreateQuestion(CreateQuestionRequest) returns (CreateQuestionResponse) {}
+}
+
+message CreateQuestionRequest {
+  Source source = 1;
+  string content = 2;
+}
+
+message CreateQuestionResponse {
+  QuestionState state = 1;
+}
+
+message SelectQuestionRequest {
+  string gameID = 1;
+  string playerID = 2;
+}
+
+message SelectQuestionResponse {
+  QuestionState state = 1;
+}
+
+message Source {
+  string type = 1;
+  string id = 2;
+}
+
+message QuestionState {
+  Source source = 1;
+  Question question = 2;
+  CommunityTaxonomy cqa_taxonomy = 3;
+
+  message Question {
+    string contentType = 1;
+    string text = 2;
+  }
+
+  message CommunityTaxonomy {
+    string subjectId = 1;
+    string gradeId = 2;
+  }
+
+  message TextbookTaxonomy {
+    string textbookId = 1;
+    string gradeId = 2;
+  }
+}
