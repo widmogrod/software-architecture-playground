@@ -11,6 +11,8 @@ import (
 var _ QuestionUseCasesServer = &DefaultQuestionUseCasesServer{}
 
 type DefaultQuestionUseCasesServer struct {
+	UnimplementedQuestionUseCasesServer
+
 	Reg   *gm.SchemaRegistry
 	Acl   *gm.Guard
 	Store *kv.Store
@@ -51,5 +53,3 @@ func (d *DefaultQuestionUseCasesServer) CreateQuestion(ctx context.Context, requ
 		},
 	}, nil
 }
-
-func (d DefaultQuestionUseCasesServer) mustEmbedUnimplementedQuestionUseCasesServer() {}
