@@ -37,6 +37,14 @@ func (k Key) String() string {
 	return fmt.Sprintf("pk=%s#e=%s", k.PartitionKey, k.EntityKey)
 }
 
+////go:generate mkunion -name=AttrType2 -types=S,I,B,DT
+//type (
+//	S  string
+//	I  int
+//	B  bool
+//	DT time.Time
+//)
+
 type AttrType struct {
 	S  *string    `json:"S,omitempty"`
 	I  *int64     `json:"I,omitempty"`
@@ -434,16 +442,16 @@ func (s *Store) IndexDocument(ctx context.Context, key Key, attrs map[string]Att
 }
 
 /*
-{
-	"docId": "textbook_solution#13123/question#666"
-    "entityId": "question#us123",
-	"entityType": "question#666"
-	"attributes": [
-		{"name": "edgeName", "value": { "string": "is_canonical_to}}
-		{"name": "created",  "value": { "date": 2020-08-15 10:10:10}}
-		{"name": "update",   "value": { "date": 2020-08-15 10:10:10}
-	]
-}
+	{
+		"docId": "textbook_solution#13123/question#666"
+	    "entityId": "question#us123",
+		"entityType": "question#666"
+		"attributes": [
+			{"name": "edgeName", "value": { "string": "is_canonical_to}}
+			{"name": "created",  "value": { "date": 2020-08-15 10:10:10}}
+			{"name": "update",   "value": { "date": 2020-08-15 10:10:10}
+		]
+	}
 */
 func ToOpenSearchIndex(key Key, attrs map[string]AttrType) map[string]interface{} {
 	fmt.Println(key, attrs)
