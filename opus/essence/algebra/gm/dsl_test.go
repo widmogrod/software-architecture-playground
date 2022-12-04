@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/software-architecture-playground/opus/essence/algebra/kv"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -24,7 +24,7 @@ func TestDSL(t *testing.T) {
 	err = GenerateGolangCode(reg, "question", res, &GenConf{PackageName: "gm"})
 	assert.NoError(t, err)
 
-	err = ioutil.WriteFile("dls_gen_question.go", res.Bytes(), 0644)
+	err = os.WriteFile("dls_gen_question.go", res.Bytes(), 0644)
 	assert.NoError(t, err)
 
 	acl := NewGuard()
@@ -41,7 +41,7 @@ func TestDSL(t *testing.T) {
 	store := kv.Default()
 
 	dsl := NewStorageDSL(reg, acl, store, &Config{
-		tenantId: "brainly.com",
+		TenantId: "brainly.com",
 	})
 	err = dsl.Invoke(&CreateQuestionRequest{
 		Id:      "1",

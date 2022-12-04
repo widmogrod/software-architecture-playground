@@ -149,3 +149,54 @@ func (r *SchemaRegistry) Validate(id string, data interface{}) error {
 	// validate object against schema
 	return errors.New("not implemented for this type" + v.Kind().String())
 }
+
+func Sourcable(in map[string]AttrType) map[string]AttrType {
+	// add sourceType and sourceId to the input map
+	in["sourceType"] = AttrType{T: StringType, Required: true}
+	in["sourceId"] = AttrType{T: StringType, Required: true, Identifier: true}
+	return in
+}
+
+func Versionable(in map[string]AttrType) map[string]AttrType {
+	// add version to the input map
+	in["version"] = AttrType{T: IntType, Required: true, Default: 1}
+	return in
+}
+
+func SchemaAware(schemaId string, in map[string]AttrType) map[string]AttrType {
+	// add schema to the input map
+	in["schema"] = AttrType{
+		T:        StringType,
+		Required: true,
+		Default:  schemaId,
+	}
+	return in
+}
+
+func CommentSchema() Schema {
+	return Schema{
+		Name: "comment",
+		Attrs: Sourcable(map[string]AttrType{
+			"content": {T: StringType, Required: true},
+		}),
+	}
+}
+
+func AnswerSchema() Schema {
+	return Schema{
+		Name: "answer",
+		Attrs: Sourcable(map[string]AttrType{
+			"content": {T: StringType, Required: true},
+		}),
+	}
+}
+
+func QuestionSchema() Schema {
+	schemaId := "question"
+	return Schema{
+		Name: schemaId,
+		Attrs: SchemaAware(schemaId, Versionable(Sourcable(map[string]AttrType{
+			"content": {T: StringType, Required: true},
+		}))),
+	}
+}

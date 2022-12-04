@@ -30,6 +30,21 @@ func (t Typ) String() string {
 	return typToString[t]
 }
 
+// //go:generate mkunion --name=Predicate --types=Typ,Eq,In,Fields,And,Or
+// type (
+//
+//	Typ    uint
+//	Eq     struct{ Val interface{} }
+//	In     []interface{}
+//	Fields map[string]Predicate
+//	//Path   struct {
+//	//	Path []interface{}
+//	//	Is   Predicate
+//	//}
+//	And []Predicate
+//	Or  []Predicate
+//
+// )
 type (
 	RuleID = string
 

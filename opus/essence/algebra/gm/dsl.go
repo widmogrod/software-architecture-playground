@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	tenantId string
+	TenantId string
 }
 
 type DSL struct {
@@ -37,7 +37,7 @@ func (d *DSL) Invoke(in *CreateQuestionRequest) error {
 		Payload: in,
 	}
 
-	err := d.acl.EvalRule(d.conf.tenantId, request)
+	err := d.acl.EvalRule(d.conf.TenantId, request)
 	if err != nil {
 		// wrap error with details
 		return fmt.Errorf("invoke1: %s: %w", err, ErrAccessDenied)
@@ -46,7 +46,7 @@ func (d *DSL) Invoke(in *CreateQuestionRequest) error {
 	data := DefaultQuestion()
 	data.Content = kv.PtrString(in.Content)
 	data.SourceId = kv.PtrString(in.Id)
-	data.SourceType = kv.PtrString(d.conf.tenantId)
+	data.SourceType = kv.PtrString(d.conf.TenantId)
 
 	err = d.reg.Validate(data.SchemaID(), data)
 	if err != nil {
