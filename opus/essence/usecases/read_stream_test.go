@@ -153,3 +153,41 @@ func GenerateData(max int) chan *Generic {
 //
 //	store.SetAttributes(kv.Key{PartitionKey: "1", EntityKey: "1"}, map[string]kv.AttrType{})
 //}
+
+func TestRecords(t *testing.T) {
+	store := kv.Default()
+
+	r1 := kv.Record{
+		Key: kv.Key{
+			PartitionKey: "question" + "#" + strconv.Itoa(1) + "#" + time.Now().Format("20060102150405"),
+			EntityKey:    "question",
+		},
+		Attributes: map[string]kv.AttrType{
+			"content": kv.MkString("content of question 1"),
+			"created": kv.MkTime(time.Now()),
+			"version": kv.MkInt64(time.Now().UnixNano()),
+		},
+	}
+
+	r2 := kv.Record{
+		Key: kv.Key{
+			PartitionKey: "question" + "#" + strconv.Itoa(2) + "#" + time.Now().Format("20060102150405"),
+			EntityKey:    "question",
+		},
+		Attributes: map[string]kv.AttrType{
+			"content": kv.MkString("content of question 2"),
+			"created": kv.MkTime(time.Now()),
+			"version": kv.MkInt64(time.Now().UnixNano()),
+		},
+	}
+
+	err := store.SaveRecords(&kv.SaveRecords{
+		Saving: []kv.Record{r1, r2},
+	})
+	assert.NoError(t, err)
+
+	err = store.SaveRecords(&kv.SaveRecords{
+		Deleting: []kv.Record{r1, r2},
+	})
+	assert.NoError(t, err)
+}

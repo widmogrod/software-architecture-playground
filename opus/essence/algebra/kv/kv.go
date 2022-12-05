@@ -124,6 +124,26 @@ type Store struct {
 }
 
 func (s *Store) SetAttributes(key Key, attributes map[string]AttrType) error {
+	item, err2 := s.toDynamoAttributeValue(key, attributes)
+	if err2 != nil {
+		return err2
+	}
+
+	_, err := s.dynamo.PutItem(&ddb.PutItemInput{
+		Item:                   item,
+		TableName:              s.tableName,
+		ReturnConsumedCapacity: aws.String("TOTAL"),
+		ReturnValues:           aws.String("ALL_OLD"),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) toDynamoAttributeValue(key Key, attributes map[string]AttrType) (map[string]*ddb.AttributeValue, error) {
 	item := map[string]*ddb.AttributeValue{}
 
 	for k, v := range attributes {
@@ -142,11 +162,11 @@ func (s *Store) SetAttributes(key Key, attributes map[string]AttrType) error {
 		} else if v.DT != nil {
 			dv, err := dynamodbattribute.Marshal(v)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			item[k] = dv
 		} else {
-			return errors.New("unsupported type")
+			return nil, errors.New("unsupported type")
 		}
 	}
 
@@ -156,19 +176,7 @@ func (s *Store) SetAttributes(key Key, attributes map[string]AttrType) error {
 	item[s.dynamoPartitionKey] = &ddb.AttributeValue{
 		S: aws.String(key.PartitionKey),
 	}
-
-	_, err := s.dynamo.PutItem(&ddb.PutItemInput{
-		Item:                   item,
-		TableName:              s.tableName,
-		ReturnConsumedCapacity: aws.String("TOTAL"),
-		ReturnValues:           aws.String("ALL_OLD"),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return item, nil
 }
 
 func (s *Store) GetAttributes(key Key) (map[string]AttrType, error) {
@@ -527,4 +535,28 @@ func PtrTime(now time.Time) *time.Time {
 
 func PtrBool(b bool) *bool {
 	return &b
+}
+
+func MkString(s string) AttrType {
+	return AttrType{
+		S: &s,
+	}
+}
+
+func MkInt64(i int64) AttrType {
+	return AttrType{
+		I: &i,
+	}
+}
+
+func MkTime(t time.Time) AttrType {
+	return AttrType{
+		DT: &t,
+	}
+}
+
+func MkBool(b bool) AttrType {
+	return AttrType{
+		B: &b,
+	}
 }
