@@ -56,3 +56,10 @@ Hello wasm
 wasmer run main-tiny.wasm 
 Hello wasm
 ```
+
+## call wasm module from golang using wasmtime-go
+```
+go get -u github.com/bytecodealliance/wasmtime-go@v1.0.0
+
+go run call.go
+```
