@@ -58,8 +58,18 @@ Hello wasm
 ```
 
 ## call wasm module from golang using wasmtime-go
+and also call golang function from wasm!
 ```
 go get -u github.com/bytecodealliance/wasmtime-go@v1.0.0
 
-go run call.go
+go run call-wasmtime.go
+```
+
+## call wasm module from golang using wasmer-go
+and also call golang function from wasm!
+```
+go get -u github.com/wasmerio/wasmer-go@v1.0.4
+
+ go run call-wasmer.go
+
 ```
