@@ -91,3 +91,12 @@ wasmer run rustpython/rustpython python/main.py --dir=.
 go run call-python.go
 ```
 
+
+## build WAI and publish it using wapm
+https://wasmer.io/posts/wasmer-takes-webassembly-libraries-manistream-with-wai
+code in `[tutorial-01](tutorial-01)`
+
+```
+wapm install widmogrod/tutorial-01 --pip
+python tutorial-01/python.py
+```
