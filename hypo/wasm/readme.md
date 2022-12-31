@@ -2,6 +2,9 @@
 
 ## setup wasm runtime
 ```
+brew install rustup
+rustup-init
+
 brew install wasmtime
 brew install wasmer
 ```
@@ -69,7 +72,22 @@ go run call-wasmtime.go
 and also call golang function from wasm!
 ```
 go get -u github.com/wasmerio/wasmer-go@v1.0.4
-
- go run call-wasmer.go
-
+go run call-wasmer.go
 ```
+
+## call wasm modules from golang
+### Install python interpreter in wasm
+```
+wapm install rustpython/rustpython
+```
+
+### run python in wasm
+```
+wasmer run rustpython/rustpython python/main.py --dir=.
+```
+
+### run python from golang as wasm module
+```
+go run call-python.go
+```
+
