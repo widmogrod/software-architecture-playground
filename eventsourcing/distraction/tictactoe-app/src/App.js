@@ -4,6 +4,7 @@ import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
+import {CreateGameCMD, JoinGameCMD, MoveCMD, StartGameCMD} from "./commands";
 
 
 export function App() {
@@ -116,40 +117,6 @@ function Board({state, transition, playerID}) {
     );
 }
 
-function CreateGameCMD(p1) {
-    return {
-        "CreateGameCMD": {
-            "FirstPlayerID": p1,
-        }
-    }
-}
-
-function JoinGameCMD(p2) {
-    return {
-        "StartGameCMD": {
-            "SecondPlayerID": p2,
-        }
-    }
-}
-
-function StartGameCMD(p1, p2) {
-    return {
-        "StartGameCMD": {
-            "FirstPlayerID": p1,
-            "SecondPlayerID": p2,
-        }
-    }
-}
-
-
-function MoveCMD(pid, position) {
-    return {
-        "MoveCMD": {
-            "PlayerID": pid,
-            "Position": position,
-        }
-    }
-}
 
 function serverURL(gameID) {
     return 'ws://' + document.location.hostname + ':8080/play/' + gameID
@@ -161,14 +128,6 @@ function gameURL(gameID) {
 
 export function Game() {
     let {gameID} = useParams();
-
-    // if (!gameID) {
-    //     return (
-    //         <div>
-    //             Wrong gameID
-    //         </div>
-    //     )
-    // }
 
     const [currentGameState, setGameState] = useState({});
     const [cookies, setCookie] = useCookies(['playerID']);
@@ -215,13 +174,6 @@ export function Game() {
         }
     }, [readyState, currentGameState, cookies, sendJsonMessage]);
 
-    // useEffect(() => {
-    //     if (readyState === ReadyState.OPEN) {
-    //         sendJsonMessage(StartGameCMD("x", "o"))
-    //     }
-    // }, [readyState, sendJsonMessage]);
-
-
     return (
         <div className="game">
             <div className="game-board">
@@ -232,7 +184,8 @@ export function Game() {
                 <p>GameID: {gameID}</p>
                 <Actions state={currentGameState} transition={sendJsonMessage} playerID={cookies.playerID}/>
                 <p>Game server is currently {connectionStatus}</p>
-                QR: <QRCode value={gameURL(gameID)}/>
+                <QRCode value={gameURL(gameID)}
+                        style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
             </div>
         </div>
     );
