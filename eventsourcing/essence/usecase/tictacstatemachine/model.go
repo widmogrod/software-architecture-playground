@@ -40,11 +40,17 @@ type (
 		MovesOrder       []Move
 	}
 
-	GameResult struct {
+	GameEndWithWin struct {
 		TicTacToeBaseState
 
 		Winner         PlayerID
 		WiningSequence []Move
+		MovesTaken     map[Move]PlayerID
+	}
+	GameEndWithDraw struct {
+		TicTacToeBaseState
+
+		MovesTaken map[Move]PlayerID
 	}
 )
 
