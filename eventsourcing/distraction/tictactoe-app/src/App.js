@@ -3,6 +3,7 @@ import React, {useEffect, useState} from 'react';
 import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
+import QRCode from "react-qr-code";
 
 
 export function App() {
@@ -153,6 +154,11 @@ function MoveCMD(pid, position) {
 function serverURL(gameID) {
     return 'ws://' + document.location.hostname + ':8080/play/' + gameID
 }
+
+function gameURL(gameID) {
+    return 'http://' + document.location.hostname + ':3000/#/game/' + gameID
+}
+
 export function Game() {
     let {gameID} = useParams();
 
@@ -226,6 +232,7 @@ export function Game() {
                 <p>GameID: {gameID}</p>
                 <Actions state={currentGameState} transition={sendJsonMessage} playerID={cookies.playerID}/>
                 <p>Game server is currently {connectionStatus}</p>
+                QR: <QRCode value={gameURL(gameID)}/>
             </div>
         </div>
     );
