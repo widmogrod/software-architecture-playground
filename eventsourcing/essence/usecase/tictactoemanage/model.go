@@ -1,6 +1,8 @@
 package tictactoemanage
 
-import "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
+import (
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
+)
 
 type (
 	SessionID = string
@@ -18,6 +20,10 @@ type (
 		SessionID SessionID
 		PlayerID  PlayerID
 	}
+	LeaveGameSessionCMD struct {
+		SessionID SessionID
+		PlayerID  PlayerID
+	}
 	NewGameCMD struct {
 		SessionID SessionID
 		GameID    GameID
@@ -25,7 +31,7 @@ type (
 	GameActionCMD struct {
 		SessionID SessionID
 		GameID    GameID
-		Action    tictacstatemachine.Command
+		Action    tictacstatemachine.Command `json:"-"`
 	}
 )
 

@@ -84,7 +84,49 @@ func (o *Machine) Handle(cmd Command) {
 				ID:      state.ID,
 				Players: newState.Players,
 			}
-		}, func(x *NewGameCMD) State {
+		},
+		func(x *LeaveGameSessionCMD) State {
+			switch state := o.state.(type) {
+			case *SessionWaitingForPlayers:
+				if state.ID != x.SessionID {
+					panic(ErrNotTheSameSessions)
+				}
+
+				var players []PlayerID
+				for _, player := range state.Players {
+					if player != x.PlayerID {
+						players = append(players, player)
+					}
+				}
+
+				return &SessionWaitingForPlayers{
+					ID:           state.ID,
+					NeedsPlayers: state.NeedsPlayers + (len(state.Players) - len(players)),
+					Players:      players,
+				}
+
+			case *SessionReady:
+				if state.ID != x.SessionID {
+					panic(ErrNotTheSameSessions)
+				}
+
+				var players []PlayerID
+				for _, player := range state.Players {
+					if player != x.PlayerID {
+						players = append(players, player)
+					}
+				}
+
+				return &SessionWaitingForPlayers{
+					ID:           state.ID,
+					NeedsPlayers: len(players),
+					Players:      players,
+				}
+			}
+
+			panic("not implemented, TODO: error!")
+		},
+		func(x *NewGameCMD) State {
 			state, ok := o.state.(*SessionReady)
 			if !ok {
 				panic(ErrSessionNotReadyToStartGame)

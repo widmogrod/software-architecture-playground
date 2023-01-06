@@ -7,6 +7,7 @@ import (
 	"github.com/gobwas/ws/wsutil"
 	"github.com/rs/cors"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"io"
 	"log"
 	"net"
@@ -15,31 +16,21 @@ import (
 	"sync"
 )
 
+type ma = map[string]interface{}
+
 func main() {
 	registry := sync.Map{}
 	peers := sync.Map{}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.FileServer(http.Dir("../tictactoe-app/build")).ServeHTTP)
-	//mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	//	// generate uuid for game
-	//	uuid, err := uuid.NewUUID()
-	//	if err != nil {
-	//		w.WriteHeader(http.StatusInternalServerError)
-	//		w.Write([]byte(err.Error()))
-	//	} else {
-	//		w.WriteHeader(http.StatusSeeOther)
-	//		w.Header().Add("Location", "/play/"+uuid.String())
-	//	}
-	//})
 	mux.HandleFunc("/play/", func(w http.ResponseWriter, r *http.Request) {
 		uuid := strings.TrimPrefix(r.URL.Path, "/play/")
-		fmt.Println("uuid", uuid)
-		//uuid := "game-1"
+		fmt.Println("session uuid", uuid)
 		conn, _, _, err := ws.UpgradeHTTP(r, w)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 
@@ -51,8 +42,8 @@ func main() {
 			connections.Store(conn, conn)
 			defer connections.Delete(conn)
 
-			gameAny, _ := registry.LoadOrStore(uuid, tictacstatemachine.NewMachine())
-			game := gameAny.(*tictacstatemachine.Machine)
+			manageAny, _ := registry.LoadOrStore(uuid, tictactoemanage.NewMachine())
+			manage := manageAny.(*tictactoemanage.Machine)
 
 			for {
 				msg, op, err := wsutil.ReadClientData(conn)
@@ -66,23 +57,50 @@ func main() {
 
 				log.Printf("received: \n\t%s\n", string(msg))
 
-				var cmd tictacstatemachine.CommandOneOf
+				var o map[string]interface{}
+				err = json.Unmarshal(msg, &o)
+				if err != nil {
+					log.Printf("unmarshal error: %v", err)
+					continue
+				}
+
+				var action []byte
+				if o1, ok := o["GameActionCMD"]; ok {
+					if o2, ok := o1.(ma)["Action"]; ok {
+						action, _ = json.Marshal(o2.(ma))
+						delete(o2.(ma), "Action")
+						msg, _ = json.Marshal(o)
+					}
+				}
+
+				var cmd tictactoemanage.CommandOneOf
 				err = json.Unmarshal(msg, &cmd)
 				if err != nil {
 					log.Printf("unmarshal error: %v", err)
 					continue
 				}
 
+				if action != nil {
+					var a tictacstatemachine.CommandOneOf
+
+					_ = json.Unmarshal(action, &a)
+					cmd.GameActionCMD.Action = tictacstatemachine.UnwrapCommandOneOf(&a)
+				}
+
 				log.Printf("cmd: \n\t%#v\n", cmd)
+				log.Printf("GameActionCMD:: \n\t%#v\n", cmd.GameActionCMD)
+				if cmd.GameActionCMD != nil {
+					log.Printf("Action:: \n\t%#v\n", cmd.GameActionCMD.Action)
+				}
 
-				game.Handle(cmd.Unwrap())
-
-				if err := game.LastErr(); err != nil {
+				manage.Handle(cmd.Unwrap())
+				if err := manage.LastErr(); err != nil {
 					log.Printf("game handle command error: %v", err)
 				}
 
-				state := game.State()
-				stateOneOf := tictacstatemachine.MapStateToOneOf(state)
+				state := manage.State()
+				log.Printf("State:: \n\t%#v\n", state)
+				stateOneOf := tictactoemanage.WrapStateOneOf(state)
 				result, err := json.Marshal(stateOneOf)
 				if err != nil {
 					log.Printf("marshal error: %v", err)
@@ -98,16 +116,14 @@ func main() {
 						log.Printf("write error: %v", err)
 					}
 					return true
-
 				})
-				//err = wsutil.WriteServerMessage(conn, op, result)
-				//if err != nil {
-				//	handle error
-				//}
 			}
 		}()
 	})
 
 	handler := cors.AllowAll().Handler(mux)
-	http.ListenAndServe(":8080", handler)
+	err := http.ListenAndServe(":8080", handler)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

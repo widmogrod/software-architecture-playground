@@ -22,6 +22,10 @@ func TestNewMachine(t *testing.T) {
 					SessionID:    "a",
 					NeedsPlayers: 2,
 				},
+				&LeaveGameSessionCMD{
+					SessionID: "a",
+					PlayerID:  "1",
+				},
 				&JoinGameSessionCMD{
 					SessionID: "a",
 					PlayerID:  "1",
@@ -41,6 +45,14 @@ func TestNewMachine(t *testing.T) {
 				&JoinGameSessionCMD{ // cannot join session that is not waiting for players
 					SessionID: "a",
 					PlayerID:  "3",
+				},
+				&LeaveGameSessionCMD{
+					SessionID: "a",
+					PlayerID:  "1",
+				},
+				&JoinGameSessionCMD{
+					SessionID: "a",
+					PlayerID:  "1",
 				},
 				&NewGameCMD{ // cannot start game in different session
 					SessionID: "b",
@@ -79,10 +91,13 @@ func TestNewMachine(t *testing.T) {
 				nil,
 				ErrSessionAlreadyCreated,
 				nil,
+				nil,
 				ErrPlayerAlreadyJoined,
 				ErrNotTheSameSessions,
 				nil,
 				ErrSessionNotWaitingForPlayers,
+				nil,
+				nil,
 				ErrNotTheSameSessions,
 				nil,
 				ErrNotTheSameSessions,
@@ -102,8 +117,8 @@ func TestNewMachine(t *testing.T) {
 				},
 				&SessionWaitingForPlayers{
 					ID:           "a",
-					NeedsPlayers: 1,
-					Players:      []PlayerID{"1"},
+					NeedsPlayers: 2,
+					Players:      []PlayerID(nil),
 				},
 				&SessionWaitingForPlayers{
 					ID:           "a",
@@ -115,9 +130,10 @@ func TestNewMachine(t *testing.T) {
 					NeedsPlayers: 1,
 					Players:      []PlayerID{"1"},
 				},
-				&SessionReady{
-					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+				&SessionWaitingForPlayers{
+					ID:           "a",
+					NeedsPlayers: 1,
+					Players:      []PlayerID{"1"},
 				},
 				&SessionReady{
 					ID:      "a",
@@ -127,24 +143,37 @@ func TestNewMachine(t *testing.T) {
 					ID:      "a",
 					Players: []PlayerID{"1", "2"},
 				},
+				&SessionWaitingForPlayers{
+					ID:           "a",
+					NeedsPlayers: 1,
+					Players:      []PlayerID{"2"},
+				},
+				&SessionReady{
+					ID:      "a",
+					Players: []PlayerID{"2", "1"},
+				},
+				&SessionReady{
+					ID:      "a",
+					Players: []PlayerID{"2", "1"},
+				},
 				&SessionInGame{
 					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					Players: []PlayerID{"2", "1"},
 					GameID:  "g1",
 				},
 				&SessionInGame{
 					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					Players: []PlayerID{"2", "1"},
 					GameID:  "g1",
 				},
 				&SessionInGame{
 					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					Players: []PlayerID{"2", "1"},
 					GameID:  "g1",
 				},
 				&SessionInGame{
 					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					Players: []PlayerID{"2", "1"},
 					GameID:  "g1",
 					GameState: &tictacstatemachine.GameProgress{
 						TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
