@@ -101,7 +101,7 @@ func (o *Machine) Handle(cmd Command) {
 
 				return &SessionWaitingForPlayers{
 					ID:           state.ID,
-					NeedsPlayers: state.NeedsPlayers + (len(state.Players) - len(players)),
+					NeedsPlayers: state.NeedsPlayers + float64(len(state.Players)-len(players)),
 					Players:      players,
 				}
 
@@ -119,7 +119,7 @@ func (o *Machine) Handle(cmd Command) {
 
 				return &SessionWaitingForPlayers{
 					ID:           state.ID,
-					NeedsPlayers: len(players),
+					NeedsPlayers: float64(len(players)),
 					Players:      players,
 				}
 			}
@@ -162,7 +162,11 @@ func (o *Machine) Handle(cmd Command) {
 			//		SecondPlayerID: state.Players[1],
 			//	})
 			//}
-			game.Handle(x.Action)
+			if action, ok := x.Action.(*tictacstatemachine.CommandOneOf); ok {
+				game.Handle(action.Unwrap())
+			} else {
+				game.Handle(x.Action)
+			}
 
 			if tictacstatemachine.IsGameFinished(game.State()) {
 				return &SessionReady{

@@ -6,6 +6,7 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/rs/cors"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"io"
@@ -57,40 +58,65 @@ func main() {
 
 				log.Printf("received: \n\t%s\n", string(msg))
 
-				var o map[string]interface{}
-				err = json.Unmarshal(msg, &o)
+				sch, err := schema.JsonToSchema(msg)
 				if err != nil {
-					log.Printf("unmarshal error: %v", err)
+					log.Printf("JsonToSchema: %v", err)
 					continue
 				}
 
-				var action []byte
-				if o1, ok := o["GameActionCMD"]; ok {
-					if o2, ok := o1.(ma)["Action"]; ok {
-						action, _ = json.Marshal(o2.(ma))
-						delete(o2.(ma), "Action")
-						msg, _ = json.Marshal(o)
-					}
-				}
+				goo := schema.SchemaToGo(
+					sch,
+					schema.WhenPath(
+						[]string{},
+						schema.UseStruct(&tictactoemanage.CommandOneOf{}),
+					),
+					schema.WhenPath(
+						[]string{"CreateSessionCMD"},
+						schema.UseStruct(&tictactoemanage.CreateSessionCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"JoinGameSessionCMD"},
+						schema.UseStruct(&tictactoemanage.JoinGameSessionCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"NewGameCMD"},
+						schema.UseStruct(&tictactoemanage.NewGameCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"LeaveGameSessionCMD"},
+						schema.UseStruct(&tictactoemanage.LeaveGameSessionCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"GameActionCMD"},
+						schema.UseStruct(&tictactoemanage.GameActionCMD{}),
+					),
 
-				var cmd tictactoemanage.CommandOneOf
-				err = json.Unmarshal(msg, &cmd)
-				if err != nil {
-					log.Printf("unmarshal error: %v", err)
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action"},
+						schema.UseStruct(&tictacstatemachine.CommandOneOf{}),
+					),
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action", "CreateGameCMD"},
+						schema.UseStruct(&tictacstatemachine.CreateGameCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action", "JoinGameCMD"},
+						schema.UseStruct(&tictacstatemachine.JoinGameCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action", "StartGameCMD"},
+						schema.UseStruct(&tictacstatemachine.StartGameCMD{}),
+					),
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action", "MoveCMD"},
+						schema.UseStruct(&tictacstatemachine.MoveCMD{}),
+					),
+				)
+
+				cmd, ok := goo.(*tictactoemanage.CommandOneOf)
+				if !ok {
+					log.Printf("invalid command: %#v", goo)
 					continue
-				}
-
-				if action != nil {
-					var a tictacstatemachine.CommandOneOf
-
-					_ = json.Unmarshal(action, &a)
-					cmd.GameActionCMD.Action = tictacstatemachine.UnwrapCommandOneOf(&a)
-				}
-
-				log.Printf("cmd: \n\t%#v\n", cmd)
-				log.Printf("GameActionCMD:: \n\t%#v\n", cmd.GameActionCMD)
-				if cmd.GameActionCMD != nil {
-					log.Printf("Action:: \n\t%#v\n", cmd.GameActionCMD.Action)
 				}
 
 				manage.Handle(cmd.Unwrap())

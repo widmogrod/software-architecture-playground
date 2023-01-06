@@ -14,7 +14,7 @@ type (
 type (
 	CreateSessionCMD struct {
 		SessionID    SessionID
-		NeedsPlayers int
+		NeedsPlayers float64
 	}
 	JoinGameSessionCMD struct {
 		SessionID SessionID
@@ -31,7 +31,7 @@ type (
 	GameActionCMD struct {
 		SessionID SessionID
 		GameID    GameID
-		Action    tictacstatemachine.Command `json:"-"`
+		Action    tictacstatemachine.Command
 	}
 )
 
@@ -39,7 +39,7 @@ type (
 type (
 	SessionWaitingForPlayers struct {
 		ID           SessionID
-		NeedsPlayers int
+		NeedsPlayers float64
 		Players      []PlayerID
 	}
 	SessionReady struct {
