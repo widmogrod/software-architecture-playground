@@ -9,11 +9,13 @@ import * as manage from "./cmd.manage";
 
 /*
 * TODO
-*  - [ ] When game is over, Manager transition to SessionReady, but this remove from UI the winning sequence!
-*  - [ ] Add play again that use NewGameCMD()
+*  - [√] When game is over, Manager transition to SessionReady, but this remove from UI the winning sequence!
+*  - [√] Add play again that use NewGameCMD()
 *  - [ ] Inform when players gets disconnected, to not show that "waiting for other player" forever
 *  - [ ] Consider auto-start of the game in Manager, not by sending StartGameCMD from UI
 *  - [ ] Consider timout for waiting for player moves
+*  - [ ] List all sessions that are waiting for players, alow to join them, show when session expires was active
+*  - [ ] Add bigger board
 */
 
 export function App() {
@@ -194,6 +196,15 @@ export function Game() {
         sendJsonMessage(manage.GameActionCMD(sessionID, gid, cmd))
     }
 
+    function newGame() {
+        let gameId = uuid()
+        sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
+        sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
+            currentGameState?.SessionInGame?.Players[0],
+            currentGameState?.SessionInGame?.Players[1],
+        )))
+    }
+
     return (
         <>
             <div className="nav">
@@ -205,7 +216,9 @@ export function Game() {
             <div className="game">
                 <div className="game-info">
                     <p>You are {squareStyle[playerNo]} <b>vs</b> other {squareStyle.filter((_, i) => i != playerNo)}</p>
-                    <Actions state={currentGameState?.SessionInGame?.GameState} transition={transition}
+                    <Actions state={currentGameState?.SessionInGame?.GameState}
+                             transition={transition}
+                             newGame={newGame}
                              playerID={cookies.playerID}/>
                 </div>
                 <div className="game-board">
@@ -230,7 +243,7 @@ export function Game() {
     );
 }
 
-function Actions({state, transition, playerID}) {
+function Actions({state, transition, playerID, newGame}) {
     if (state?.GameWaitingForPlayers) {
         return (
             <div>
@@ -263,7 +276,7 @@ function Actions({state, transition, playerID}) {
                 <div>
                     You won! 🎉
                     <button className="button-29"
-                            onClick={() => window.location.reload()}>Play again
+                            onClick={() => newGame()}>Play again
                     </button>
                 </div>
             )
@@ -272,7 +285,7 @@ function Actions({state, transition, playerID}) {
                 <div>
                     You lost! 😢
                     <button className="button-29"
-                            onClick={() => window.location.reload()}>Play again
+                            onClick={() => newGame()}>Play again
                     </button>
                 </div>
             )
@@ -283,7 +296,7 @@ function Actions({state, transition, playerID}) {
                 Game result is a <b>DRAW!</b> 🤝
                 <br/>
                 <button className="button-29"
-                        onClick={() => window.location.reload()}>Play again
+                        onClick={() => newGame()}>Play again
                 </button>
             </div>
         )
