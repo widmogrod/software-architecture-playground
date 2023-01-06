@@ -4,8 +4,17 @@ import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
-import {CreateGameCMD, JoinGameCMD, MoveCMD, StartGameCMD} from "./commands";
+import {JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
+import * as manage from "./cmd.manage";
 
+/*
+* TODO
+*  - [ ] When game is over, Manager transition to SessionReady, but this remove from UI the winning sequence!
+*  - [ ] Add play again that use NewGameCMD()
+*  - [ ] Inform when players gets disconnected, to not show that "waiting for other player" forever
+*  - [ ] Consider auto-start of the game in Manager, not by sending StartGameCMD from UI
+*  - [ ] Consider timout for waiting for player moves
+*/
 
 export function App() {
     const routes = [
@@ -16,36 +25,20 @@ export function App() {
                     index: true,
                     element: <Info/>,
                 }, {
-                    path: "game/:gameID",
+                    path: "/game/:sessionID",
                     element: <Game/>,
                 }
             ]
         }
     ]
 
-    let element = useRoutes(routes);
-
-    return (
-        <div>
-            <h1>Route Objects Example</h1>
-            {element}
-        </div>
-    )
+    return useRoutes(routes);
 }
 
 export function Layout() {
     return (
-        <div className="main">
-            <h1>Gra</h1>
-            <main>
-                <Outlet/>
-            </main>
-            <aside>
-                <Link className="button-29"
-                      to={"game/" + uuid()}>
-                    StartGame
-                </Link>
-            </aside>
+        <div>
+            <Outlet/>
         </div>
     );
 }
@@ -53,11 +46,10 @@ export function Layout() {
 
 export function Info() {
     return (
-        <div>
-            <h2>Info</h2>
+        <div className="nav">
             <Link className="button-29"
                   to={"game/" + uuid()}>
-                StartGame
+                Create game session
             </Link>
         </div>
     );
@@ -71,6 +63,7 @@ function Square({value, isWin, onSquareClick}) {
         </button>
     );
 }
+
 
 function Board({state, transition, playerID}) {
     let {MovesTaken, WiningSequence, FirstPlayerID, SecondPlayerID} = (() => {
@@ -97,9 +90,9 @@ function Board({state, transition, playerID}) {
             let player = MovesTaken?.[move]
             if (player) {
                 if (player === FirstPlayerID) {
-                    style = "X"
+                    style = "🧜‍"
                 } else if (player === SecondPlayerID) {
-                    style = "O"
+                    style = "🖤"
                 }
             }
 
@@ -118,16 +111,19 @@ function Board({state, transition, playerID}) {
 }
 
 
-function serverURL(gameID) {
-    return 'ws://' + document.location.hostname + ':8080/play/' + gameID
+function serverURL(sessionID) {
+    return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
 }
 
-function gameURL(gameID) {
-    return 'http://' + document.location.hostname + ':3000/#/game/' + gameID
+function gameURL(sessionID) {
+    return 'http://' + document.location.hostname + ':3000/#/game/' + sessionID
 }
 
 export function Game() {
-    let {gameID} = useParams();
+    let {sessionID} = useParams();
+
+    const [squareStyle, setSquareStyle] = useState(["🧜‍", "🖤"]);
+    const [playerNo, setPlayerNo] = useState(0)
 
     const [currentGameState, setGameState] = useState({});
     const [cookies, setCookie] = useCookies(['playerID']);
@@ -149,8 +145,8 @@ export function Game() {
     }
 
     useEffect(() => {
-        setSocketUrl(serverURL(gameID));
-    }, [gameID]);
+        setSocketUrl(serverURL(sessionID));
+    }, [sessionID]);
 
     useEffect(() => {
         setGameState(lastJsonMessage)
@@ -164,35 +160,78 @@ export function Game() {
             return
         }
         if (!currentGameState) {
+            sendJsonMessage(manage.CreateSessionCMD(sessionID, 2))
+            sendJsonMessage(manage.JoinGameSessionCMD(sessionID, cookies.playerID))
             // Automatically create a game if the playerID is already set
-            sendJsonMessage(CreateGameCMD(cookies.playerID))
-        } else if (currentGameState?.GameWaitingForPlayer) {
-            if (currentGameState?.GameWaitingForPlayer?.FirstPlayerID !== cookies.playerID) {
+            // sendJsonMessage(CreateGameCMD(cookies.playerID))
+        } else if (currentGameState?.SessionWaitingForPlayers) {
+            if (!currentGameState?.SessionWaitingForPlayers?.Players.find((x) => x == cookies.playerID)) {
                 // Automatically join the game if the playerID is already set
-                sendJsonMessage(JoinGameCMD(cookies.playerID))
+                // sendJsonMessage(JoinGameCMD(cookies.playerID))
+                sendJsonMessage(manage.JoinGameSessionCMD(sessionID, cookies.playerID))
+            }
+        } else if (currentGameState?.SessionReady) {
+            currentGameState?.SessionReady?.Players.find((x, i) => {
+                if (x == cookies.playerID) {
+                    setPlayerNo(i)
+                }
+            })
+            if (currentGameState?.SessionReady?.Players[0] == cookies.playerID) {
+                let gameId = uuid()
+                sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
+                sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
+                    currentGameState?.SessionReady?.Players[0],
+                    currentGameState?.SessionReady?.Players[1]
+                )))
             }
         }
+
     }, [readyState, currentGameState, cookies, sendJsonMessage]);
 
+
+    function transition(cmd) {
+        let gid = currentGameState?.SessionInGame?.GameID
+        sendJsonMessage(manage.GameActionCMD(sessionID, gid, cmd))
+    }
+
     return (
-        <div className="game">
-            <div className="game-board">
-                <Board state={currentGameState} transition={sendJsonMessage} playerID={cookies.playerID}/>
+        <>
+            <div className="nav">
+                <Link className="button-29"
+                      to={"/"}>
+                    👈
+                </Link>
             </div>
-            <div className="game-info">
-                <p>Player: {cookies.playerID}</p>
-                <p>GameID: {gameID}</p>
-                <Actions state={currentGameState} transition={sendJsonMessage} playerID={cookies.playerID}/>
-                <p>Game server is currently {connectionStatus}</p>
-                <QRCode value={gameURL(gameID)}
-                        style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
+            <div className="game">
+                <div className="game-info">
+                    <p>You are {squareStyle[playerNo]} <b>vs</b> other {squareStyle.filter((_, i) => i != playerNo)}</p>
+                    <Actions state={currentGameState?.SessionInGame?.GameState} transition={transition}
+                             playerID={cookies.playerID}/>
+                </div>
+                <div className="game-board">
+                    <Board state={currentGameState?.SessionInGame?.GameState} transition={transition}
+                           playerID={cookies.playerID}/>
+                </div>
+                <div className="game-share">
+                    <p>Ask friend to scan code to join</p>
+                    <QRCode value={gameURL(sessionID)}
+                            style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
+
+                </div>
+                <div className="game-debug">
+                    <p>Player: {cookies.playerID}</p>
+                    <p>SessionID: {sessionID}</p>
+                    <p>GameID: {currentGameState?.SessionInGame?.GameID}</p>
+                    <p>Game server is currently {connectionStatus}</p>
+                    <p><code>{currentGameState?.SessionInGame?.GameProblem}</code></p>
+                </div>
             </div>
-        </div>
+        </>
     );
 }
 
 function Actions({state, transition, playerID}) {
-    if (state?.GameWaitingForPlayer) {
+    if (state?.GameWaitingForPlayers) {
         return (
             <div>
                 <button className="button-29"
@@ -206,13 +245,13 @@ function Actions({state, transition, playerID}) {
         if (NextMovePlayerID === playerID) {
             return (
                 <div>
-                    Make a move! ⚽️
+                    <b>Your a move! ⚽️</b>
                 </div>
             )
         } else {
             return (
                 <div>
-                    Waiting for the other player to make a move... ⏳
+                    <b>⏳ Other player is moving </b>
                 </div>
             )
         }
@@ -245,19 +284,6 @@ function Actions({state, transition, playerID}) {
                 <br/>
                 <button className="button-29"
                         onClick={() => window.location.reload()}>Play again
-                </button>
-            </div>
-        )
-    } else {
-        return (
-            <div>
-                <button className="button-29"
-                        onClick={() => transition(StartGameCMD("x", "o"))}>
-                    Start Game
-                </button>
-                <button className="button-29"
-                        onClick={() => transition(CreateGameCMD("x"))}>
-                    Create Game
                 </button>
             </div>
         )

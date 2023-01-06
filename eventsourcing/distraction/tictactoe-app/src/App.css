@@ -67,8 +67,8 @@ body {
     margin-top: -1px;
     padding: 0;
     text-align: center;
-    height: 50px;
-    width: 50px;
+    height: 70px;
+    width: 70px;
 }
 
 .square:hover {
@@ -90,10 +90,16 @@ body {
     margin-bottom: 10px;
 }
 
+.nav {
+    margin-bottom: 20px;
+}
+
 .game {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .game-board {
@@ -102,6 +108,18 @@ body {
 
 .game-info {
     margin-left: 20px;
+}
+
+.game-board,
+.game-info,
+.game-share {
+    padding: 20px;
+}
+
+.game-debug {
+    color: #999999;
+    margin-top: auto;
+    height: 100%;
 }
 
 .button-29 {
