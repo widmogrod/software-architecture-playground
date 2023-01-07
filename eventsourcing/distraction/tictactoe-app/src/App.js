@@ -57,7 +57,7 @@ export function Info() {
                 <p>Classic 3 in a row wins. Played on board with dimensions 3x3</p>
                 <Board2 cols={3} rows={3}
                         winingSequence={["1.1", "2.2", "3.3"]}/>
-                <Link className={"button-29"} to={"game/" + uuid()}>
+                <Link className={"button-action"} to={"game/" + uuid()}>
                     Play
                 </Link>
             </div>
@@ -66,7 +66,7 @@ export function Info() {
                 <p>Board has 5x5 dimensions, but still 3 in a row wins</p>
                 <Board2 cols={5} rows={5}
                         winingSequence={["2.2", "3.3", "4.4"]}/>
-                <Link className={"button-29"} to={"game/" + uuid() + "/5"}>
+                <Link className={"button-action"} to={"game/" + uuid() + "/5"}>
                     Play
                 </Link>
             </div>
@@ -75,7 +75,7 @@ export function Info() {
                 <p>Much more demanding variant of tic tac toe. Board has 8x8 dimensions, and four in row wins </p>
                 <Board2 cols={8} rows={8}
                         winingSequence={["3.3", "4.4", "5.5", "6.6"]}/>
-                <Link className={"button-29"} to={"game/" + uuid() + "/8/4"}>
+                <Link className={"button-action"} to={"game/" + uuid() + "/8/4"}>
                     Play
                 </Link>
             </div>
@@ -158,7 +158,7 @@ function Board2({movesTaken, playersStyle, rows, cols, winingSequence, onSquareC
     return (
         <table className={`tictactoe size${rows}x${cols}`}>
             <tbody>
-                {result}
+            {result}
             </tbody>
         </table>
     )
@@ -261,13 +261,13 @@ export function Game() {
 
     return (
         <>
-            <div className="nav">
-                <Link className="button-close" to={"/"}></Link>
-            </div>
+            <ul className="nav">
+                <li><Link className="button-close" to={"/"}></Link></li>
+                <li>You are {squareStyle[playerNo]} <b>vs</b> other {squareStyle.filter((_, i) => i != playerNo)}</li>
+            </ul>
             <div className="game">
                 <div className="game-info">
-                    <p>You are {squareStyle[playerNo]} <b>vs</b> other {squareStyle.filter((_, i) => i != playerNo)}</p>
-                    <Actions state={currentGameState?.SessionInGame?.GameState}
+                       <Actions state={currentGameState?.SessionInGame?.GameState}
                              transition={transition}
                              newGame={newGame}
                              playerID={cookies.playerID}/>
@@ -296,11 +296,38 @@ export function Game() {
     );
 }
 
+function PostGameActions({newGame}) {
+    return (
+        <p>
+            <button className="button-action"
+                    onClick={() => newGame()}>Play again
+            </button>
+            <br />
+            <span> or change game </span>
+            <br />
+            <button className="button-text"
+                    onClick={() => newGame(3,3)}>
+                3x3
+            </button>
+            <span> or </span>
+            <button className="button-text"
+                    onClick={() => newGame(3,5)}>
+                5x5
+            </button>
+            <span> or </span>
+            <button className="button-text"
+                    onClick={() => newGame(10,4)}>
+                4x10
+            </button>
+        </p>
+    )
+}
+
 function Actions({state, transition, playerID, newGame}) {
     if (state?.GameWaitingForPlayers) {
         return (
             <div>
-                <button className="button-29"
+                <button className="button-action"
                         onClick={() => transition(JoinGameCMD())}>
                     Invite Player
                 </button>
@@ -328,30 +355,22 @@ function Actions({state, transition, playerID, newGame}) {
             return (
                 <div>
                     <p>Bravo! <b>you won!</b> 🎉🎉🎉</p>
-                    <button className="button-29"
-                            onClick={() => newGame()}>Play again
-                    </button>
+                    <PostGameActions newGame={newGame}/>
                 </div>
             )
         } else {
             return (
                 <div>
-                    You lost! 😢
-                    <br/>
-                    <button className="button-29"
-                            onClick={() => newGame()}>Play again
-                    </button>
+                    <p>You lost! 😢. Try <b>again</b></p>
+                    <PostGameActions newGame={newGame}/>
                 </div>
             )
         }
     } else if (state?.GameEndWithDraw) {
         return (
             <div>
-                Game result is a <b>DRAW!</b> 🤝
-                <br/>
-                <button className="button-29"
-                        onClick={() => newGame()}>Play again
-                </button>
+                <p><b>DRAW!</b> 🤝. Good game!</p>
+                <PostGameActions newGame={newGame}/>
             </div>
         )
     }
