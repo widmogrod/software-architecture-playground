@@ -4,7 +4,7 @@ import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
-import {CreateGameCMD, JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
+import {JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
 
 /*
@@ -30,7 +30,7 @@ export function App() {
                     index: true,
                     element: <Info/>,
                 }, {
-                    path: "/game/:sessionID",
+                    path: "/game/:sessionID/:widthAndHeight?/:lengthToWin?",
                     element: <Game/>,
                 }
             ]
@@ -51,11 +51,34 @@ export function Layout() {
 
 export function Info() {
     return (
-        <div className="nav">
-            <Link className="button-29"
-                  to={"game/" + uuid()}>
-                Create game session
-            </Link>
+        <div className="game-options">
+            <div className="game-option">
+                <h2><b>Classic</b> tic-tac-toe</h2>
+                <p>Classic 3 in a row wins. Played on board with dimensions 3x3</p>
+                <Board2 cols={3} rows={3}
+                        winingSequence={["1.1", "2.2", "3.3"]}/>
+                <Link className={"button-29"} to={"game/" + uuid()}>
+                    Play
+                </Link>
+            </div>
+            <div className="game-option">
+                <h2>Tic-tac-toe but <b>bigger</b></h2>
+                <p>Board has 5x5 dimensions, but still 3 in a row wins</p>
+                <Board2 cols={5} rows={5}
+                        winingSequence={["2.2", "3.3", "4.4"]}/>
+                <Link className={"button-29"} to={"game/" + uuid() + "/5"}>
+                    Play
+                </Link>
+            </div>
+            <div className="game-option">
+                <h2>4 in a row</h2>
+                <p>Much more demanding variant of tic tac toe. Board has 8x8 dimensions, and four in row wins </p>
+                <Board2 cols={8} rows={8}
+                        winingSequence={["3.3", "4.4", "5.5", "6.6"]}/>
+                <Link className={"button-29"} to={"game/" + uuid() + "/8/4"}>
+                    Play
+                </Link>
+            </div>
         </div>
     );
 }
@@ -63,14 +86,15 @@ export function Info() {
 function Square({value, isWin, onSquareClick}) {
     let className = isWin ? "square win" : "square"
     return (
-        <button className={className} onClick={onSquareClick}>
+        <button className={className}
+                onClick={onSquareClick}>
             {value}
         </button>
     );
 }
 
 
-function Board({state, transition, playerID}) {
+function Board({state, transition, playerID, squareStyle}) {
     let {
         MovesTaken, WiningSequence,
         FirstPlayerID, SecondPlayerID,
@@ -87,36 +111,57 @@ function Board({state, transition, playerID}) {
         return {}
     })()
 
+    return (
+        <Board2 rows={BoardRows}
+                cols={BoardCols}
+                winingSequence={WiningSequence}
+                movesTaken={MovesTaken}
+                playersStyle={({playerID}) => {
+                    switch (playerID) {
+                        case FirstPlayerID:
+                            return squareStyle[0]
+                        case SecondPlayerID:
+                            return squareStyle[1]
+                        default:
+                            return ""
+                    }
+                }}
+                onSquareClick={({move}) => transition(MoveCMD(playerID, move))}/>
+    );
+}
+
+function Board2({movesTaken, playersStyle, rows, cols, winingSequence, onSquareClick}) {
     let result = []
-    for (let i = 1; i <= BoardRows; i++) {
+    for (let i = 1; i <= rows; i++) {
         let row = []
-        for (let j = 1; j <= BoardCols; j++) {
+        for (let j = 1; j <= cols; j++) {
             let move = "" + i + "." + j
+            let isWin = winingSequence?.find((m) => m === move)
 
-            let isWin = WiningSequence?.find((m) => m === move)
+            let playerID = movesTaken?.[move]
+            let style = playersStyle?.({playerID})
 
-            let style = ""
-            let player = MovesTaken?.[move]
-            if (player) {
-                if (player === FirstPlayerID) {
-                    style = "🧜‍"
-                } else if (player === SecondPlayerID) {
-                    style = "🖤"
-                }
-            }
-
-            row.push(<Square key={move} value={style} isWin={isWin}
-                             onSquareClick={() => transition(MoveCMD(playerID, move))}/>)
+            row.push(
+                <td key={move}>
+                    <div className={"cell"}>
+                        <Square value={style} isWin={isWin}
+                                onSquareClick={() => onSquareClick?.({move})}
+                        />
+                    </div>
+                </td>
+            )
         }
 
-        result.push(<div key={i} className="board-row">{row}</div>)
+        result.push(<tr key={i}>{row}</tr>)
     }
 
     return (
-        <>
-            {result}
-        </>
-    );
+        <table className={`tictactoe size${rows}x${cols}`}>
+            <tbody>
+                {result}
+            </tbody>
+        </table>
+    )
 }
 
 
@@ -129,7 +174,7 @@ function gameURL(sessionID) {
 }
 
 export function Game() {
-    let {sessionID} = useParams();
+    let {sessionID, widthAndHeight, lengthToWin} = useParams();
 
     const [squareStyle, setSquareStyle] = useState(["🧜‍", "🖤"]);
     const [playerNo, setPlayerNo] = useState(0)
@@ -191,7 +236,7 @@ export function Game() {
                 sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
                     currentGameState?.SessionReady?.Players[0],
                     currentGameState?.SessionReady?.Players[1],
-                    5,3
+                    widthAndHeight | 0, lengthToWin | 0,
                 )))
             }
         }
@@ -210,7 +255,7 @@ export function Game() {
         sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
             currentGameState?.SessionInGame?.Players[0],
             currentGameState?.SessionInGame?.Players[1],
-            5,3
+            widthAndHeight | 0, lengthToWin | 0,
         )))
     }
 
@@ -231,7 +276,9 @@ export function Game() {
                              playerID={cookies.playerID}/>
                 </div>
                 <div className="game-board">
-                    <Board state={currentGameState?.SessionInGame?.GameState} transition={transition}
+                    <Board state={currentGameState?.SessionInGame?.GameState}
+                           transition={transition}
+                           squareStyle={squareStyle}
                            playerID={cookies.playerID}/>
                 </div>
                 <div className="game-share">
@@ -266,15 +313,15 @@ function Actions({state, transition, playerID, newGame}) {
         let {NextMovePlayerID} = state?.GameProgress
         if (NextMovePlayerID === playerID) {
             return (
-                <div>
+                <p>
                     <b>Your a move! ⚽️</b>
-                </div>
+                </p>
             )
         } else {
             return (
-                <div>
+                <p>
                     <b>⏳ Other player is moving </b>
-                </div>
+                </p>
             )
         }
 
@@ -283,8 +330,7 @@ function Actions({state, transition, playerID, newGame}) {
         if (Winner === playerID) {
             return (
                 <div>
-                    Bravo! <b>you won!</b> 🎉🎉🎉
-                    <br/>
+                    <p>Bravo! <b>you won!</b> 🎉🎉🎉</p>
                     <button className="button-29"
                             onClick={() => newGame()}>Play again
                     </button>

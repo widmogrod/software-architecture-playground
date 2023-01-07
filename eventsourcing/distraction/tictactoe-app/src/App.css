@@ -1,125 +1,81 @@
 * {
-    box-sizing: border-box;
+    box-sizing: content-box;
+    padding: 0;
+    margin: 0;
 }
 
 body {
-    font-family: sans-serif;
-    margin: 20px;
+    font-family: 'Helvetica Neue', sans-serif;
     padding: 0;
-}
-
-h1 {
-    margin-top: 0;
-    font-size: 22px;
+    color: #1f1f1f;
 }
 
 h2 {
-    margin-top: 0;
-    font-size: 20px;
+    color: #102a0d;
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 32px;
 }
 
-h3 {
-    margin-top: 0;
+p {
     font-size: 18px;
-}
-
-h4 {
-    margin-top: 0;
-    font-size: 16px;
-}
-
-h5 {
-    margin-top: 0;
-    font-size: 14px;
-}
-
-h6 {
-    margin-top: 0;
-    font-size: 12px;
-}
-
-code {
-    font-size: 1.2em;
-}
-
-ul {
-    padding-left: 20px;
-}
-
-* {
-    box-sizing: border-box;
-}
-
-body {
-    font-family: sans-serif;
-    margin: 20px;
-    padding: 0;
-}
-
-.square {
-    background: #fff;
-    border: 1px solid #999;
-    float: left;
-    font-size: 24px;
-    font-weight: bold;
-    line-height: 34px;
-    margin-right: -1px;
-    margin-top: -1px;
-    padding: 0;
-    text-align: center;
-    height: 60px;
-    width: 60px;
-}
-
-.square:hover {
-    background: #eee;
-    cursor: pointer;
-}
-
-.square.win {
-    background: #0f0;
-}
-
-.board-row:after {
-    clear: both;
-    content: '';
-    display: table;
-}
-
-.status {
-    margin-bottom: 10px;
+    line-height: 24px;
+    margin: 0 0 24px;
 }
 
 .nav {
     margin-bottom: 20px;
 }
 
+.game-options {
+    display: flex;
+    flex-direction: row;
+}
+
+.game-option {
+    margin: 0px auto;
+    align-self: center;
+    padding: 20px;
+    max-width: 400px;
+}
+
+@media (max-width: 800px) {
+    .game-options {
+        flex-direction: column;
+    }
+}
+
+.game-options .tictactoe {
+    max-width: 100px;
+    float: right;
+}
+
 .game {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: row;
 }
 
-.game-board {
-    min-width: 200px;
+@media (max-width: 800px) {
+    .game {
+        flex-direction: column;
+    }
 }
 
-.game-info {
-    margin-left: 20px;
+.game .game-board {
+    width: 400px;
 }
 
-.game-board,
-.game-info,
-.game-share {
+.game .game-info,
+.game .game-debug,
+.game .game-share,
+.game .game-board {
+    margin: 0px auto;
+    align-self: center;
     padding: 20px;
 }
 
-.game-debug {
+.game-debug p {
     color: #999999;
-    margin-top: auto;
-    height: 100%;
 }
 
 .button-29 {
@@ -165,4 +121,69 @@ body {
 .button-29:active {
     box-shadow: #3c4fe0 0 3px 7px inset;
     transform: translateY(2px);
+}
+
+
+table.tictactoe {
+    border-spacing: 0;
+    border-collapse: collapse;
+    empty-cells: show;
+    width: 100%;
+    height: 100%;
+}
+
+table.tictactoe td {
+    width: 100%;
+    position: relative;
+}
+
+table.tictactoe td:after {
+    content: '';
+    display: block;
+    margin-top: 100%;
+}
+
+table.tictactoe td .cell {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+table.tictactoe.size3x3 td {
+    width: 33%;
+}
+
+table.tictactoe.size5x5 td {
+    width: 20%;
+}
+
+table.tictactoe.size8x8 td {
+    width: 12.5%;
+}
+
+table.tictactoe.size10x10 td {
+    width: 10%;
+}
+
+.square {
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    border: 1px solid #999;
+    line-height: 34px;
+    font-size: 24px;
+    text-align: center;
+    font-weight: bold;
+    padding: 0;
+}
+
+.square:hover {
+    background: #eee;
+    cursor: pointer;
+}
+
+.square.win {
+    background: rgba(0, 255, 0, 0.56);
 }
