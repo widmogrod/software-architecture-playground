@@ -263,7 +263,7 @@ export function Game() {
         <>
             <ul className="nav">
                 <li><Link className="button-close" to={"/"}></Link></li>
-                <li>You are {squareStyle[playerNo]} <b>vs</b> other {squareStyle.filter((_, i) => i != playerNo)}</li>
+                <li>You are {squareStyle[playerNo]} <b>vs</b> {squareStyle.filter((_, i) => i != playerNo)}</li>
             </ul>
             <div className="game">
                 <div className="game-info">
