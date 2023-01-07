@@ -40,3 +40,16 @@ func TestWining(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratedPositions(t *testing.T) {
+	assert.Equal(t, Wining(), GenerateWiningPositions(3, 3, 3))
+
+	rows, cols := 5, 5
+	for _, seq := range GenerateWiningPositions(3, rows, cols) {
+		mm := map[Move]PlayerID{}
+		for _, m := range seq {
+			mm[m] = "1"
+		}
+		PrintGameRC(mm, rows, cols)
+	}
+}
