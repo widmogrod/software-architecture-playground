@@ -262,10 +262,7 @@ export function Game() {
     return (
         <>
             <div className="nav">
-                <Link className="button-29"
-                      to={"/"}>
-                    👈
-                </Link>
+                <Link className="button-close" to={"/"}></Link>
             </div>
             <div className="game">
                 <div className="game-info">

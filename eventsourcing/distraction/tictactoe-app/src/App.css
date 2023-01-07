@@ -55,6 +55,12 @@ p {
     flex-direction: row;
 }
 
+.nav {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+}
+
 @media (max-width: 800px) {
     .game {
         flex-direction: column;
@@ -123,6 +129,31 @@ p {
     transform: translateY(2px);
 }
 
+.button-close {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    opacity: 0.3;
+    position:relative;
+    overflow: hidden;
+}
+.button-close:hover {
+    opacity: 1;
+}
+.button-close:before, .button-close:after {
+    position: absolute;
+    left: 16px;
+    content: ' ';
+    height: 32px;
+    width: 2px;
+    background-color: #1e1d1d;
+}
+.button-close:before {
+    transform: rotate(45deg);
+}
+.button-close:after {
+    transform: rotate(-45deg);
+}
 
 table.tictactoe {
     border-spacing: 0;
