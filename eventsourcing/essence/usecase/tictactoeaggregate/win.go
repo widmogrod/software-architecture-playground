@@ -6,9 +6,11 @@ import (
 	"sort"
 )
 
-var board = [3][3]string{}
-
 func Wining() [][]Move {
+	return GenerateWiningPositions(3, 3, 3)
+}
+
+func Wining3x3() [][]Move {
 	horizontalWins := [][]Move{
 		{"1.1", "1.2", "1.3"},
 		{"2.1", "2.2", "2.3"},
@@ -77,9 +79,7 @@ func GenerateWiningPositions(inline int, rows, columns int) [][]Move {
 	return winseq
 }
 
-func CheckIfMoveWin(moves []Move, nextMove Move, playerID PlayerID) ([]Move, bool) {
-	winseq := Wining()
-
+func CheckIfMoveWin(moves []Move, nextMove Move, winseq [][]Move) ([]Move, bool) {
 	moves1 := append([]Move{}, moves...)
 	if nextMove != "" {
 		moves1 = append(moves1, nextMove)

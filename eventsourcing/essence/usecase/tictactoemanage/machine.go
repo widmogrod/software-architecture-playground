@@ -127,20 +127,34 @@ func (o *Machine) Handle(cmd Command) {
 			panic("not implemented, TODO: error!")
 		},
 		func(x *NewGameCMD) State {
-			state, ok := o.state.(*SessionReady)
-			if !ok {
+			switch state := o.state.(type) {
+			case *SessionReady:
+				if state.ID != x.SessionID {
+					panic(ErrNotTheSameSessions)
+				}
+
+				return &SessionInGame{
+					ID:      state.ID,
+					Players: state.Players,
+					GameID:  x.GameID,
+				}
+
+			case *SessionInGame:
+				if state.ID != x.SessionID {
+					panic(ErrNotTheSameSessions)
+				}
+				//if state.GameID != x.GameID {
+				//	panic(ErrNotTheSameGame)
+				//}
+
+				return &SessionInGame{
+					ID:      state.ID,
+					Players: state.Players,
+					GameID:  x.GameID,
+				}
+			default:
 				panic(ErrSessionNotReadyToStartGame)
 			}
-			if state.ID != x.SessionID {
-				panic(ErrNotTheSameSessions)
-			}
-
-			return &SessionInGame{
-				ID:      state.ID,
-				Players: state.Players,
-				GameID:  x.GameID,
-			}
-
 		}, func(x *GameActionCMD) State {
 			state, ok := o.state.(*SessionInGame)
 			if !ok {
@@ -168,12 +182,12 @@ func (o *Machine) Handle(cmd Command) {
 				game.Handle(x.Action)
 			}
 
-			if tictacstatemachine.IsGameFinished(game.State()) {
-				return &SessionReady{
-					ID:      state.ID,
-					Players: state.Players,
-				}
-			}
+			//if tictacstatemachine.IsGameFinished(game.State()) {
+			//	return &SessionReady{
+			//		ID:      state.ID,
+			//		Players: state.Players,
+			//	}
+			//}
 
 			newState := &SessionInGame{
 				ID:        state.ID,

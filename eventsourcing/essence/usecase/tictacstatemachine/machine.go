@@ -2,6 +2,7 @@ package tictacstatemachine
 
 import (
 	"errors"
+	"fmt"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
 )
 
@@ -59,9 +60,14 @@ func (o *Machine) Handle(cmd Command) {
 				panic(ErrGameAlreadyStarted)
 			}
 
+			rows, cols, length := GameRules(x.BoardRows, x.BoardCols, x.WinningLength)
+
 			return &GameWaitingForPlayer{
 				TicTacToeBaseState: TicTacToeBaseState{
 					FirstPlayerID: x.FirstPlayerID,
+					BoardRows:     rows,
+					BoardCols:     cols,
+					WinningLength: length,
 				},
 			}
 		},
@@ -83,11 +89,15 @@ func (o *Machine) Handle(cmd Command) {
 				MovesTaken:         map[Move]PlayerID{},
 				MovesOrder:         []Move{},
 				NextMovePlayerID:   state.FirstPlayerID,
-				AvailableMoves:     NewAvailableMoves(),
 			}
 		},
 		func(x *StartGameCMD) State {
-			o.Handle(&CreateGameCMD{FirstPlayerID: x.FirstPlayerID})
+			o.Handle(&CreateGameCMD{
+				FirstPlayerID: x.FirstPlayerID,
+				BoardRows:     x.BoardRows,
+				BoardCols:     x.BoardCols,
+				WinningLength: x.WinningLength,
+			})
 			o.Handle(&JoinGameCMD{SecondPlayerID: x.SecondPlayerID})
 			return o.state
 		},
@@ -101,11 +111,10 @@ func (o *Machine) Handle(cmd Command) {
 				panic(ErrNotYourTurn)
 			}
 
-			if _, ok := state.AvailableMoves[x.Position]; !ok {
+			if _, ok := state.MovesTaken[x.Position]; ok {
 				panic(ErrPositionTaken)
 			}
 
-			delete(state.AvailableMoves, x.Position)
 			state.MovesTaken[x.Position] = x.PlayerID
 			state.MovesOrder = append(state.MovesOrder, x.Position)
 
@@ -116,14 +125,15 @@ func (o *Machine) Handle(cmd Command) {
 			}
 
 			// Check if there is a winner
-			if seq, win := tictactoeaggregate.CheckIfMoveWin(state.MovesOrder, "", x.PlayerID); win {
+			winseq := tictactoeaggregate.GenerateWiningPositions(state.WinningLength, state.BoardRows, state.BoardCols)
+			if seq, win := tictactoeaggregate.CheckIfMoveWin(state.MovesOrder, "", winseq); win {
 				return &GameEndWithWin{
 					TicTacToeBaseState: state.TicTacToeBaseState,
 					Winner:             x.PlayerID,
 					WiningSequence:     seq,
 					MovesTaken:         state.MovesTaken,
 				}
-			} else if len(state.AvailableMoves) == 0 {
+			} else if len(state.MovesTaken) == (state.BoardRows * state.BoardCols) {
 				return &GameEndWithDraw{
 					TicTacToeBaseState: state.TicTacToeBaseState,
 					MovesTaken:         state.MovesTaken,
@@ -135,18 +145,36 @@ func (o *Machine) Handle(cmd Command) {
 	)
 }
 
-func NewAvailableMoves() map[Move]struct{} {
-	return map[Move]struct{}{
-		"1.1": {},
-		"1.2": {},
-		"1.3": {},
-		"2.1": {},
-		"2.2": {},
-		"2.3": {},
-		"3.1": {},
-		"3.2": {},
-		"3.3": {},
+func GameRules(rows int, cols int, length int) (int, int, int) {
+	r, c, l := rows, cols, length
+
+	max := 10
+
+	if l < 3 {
+		l = 3
+	} else if l > max {
+		l = max
 	}
+
+	if r <= l {
+		r = l
+	}
+
+	if c <= l {
+		c = l
+	}
+
+	return r, c, l
+}
+
+func NewAvailableMoves(rows, cols int) map[Move]struct{} {
+	m := map[Move]struct{}{}
+	for i := 1; i <= rows; i++ {
+		for j := 1; j <= cols; j++ {
+			m[fmt.Sprintf("%d.%d", i, j)] = struct{}{}
+		}
+	}
+	return m
 }
 
 func IsGameFinished(x State) bool {

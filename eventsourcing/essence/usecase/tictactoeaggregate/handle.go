@@ -77,7 +77,7 @@ func (o *TicTacToeAggregate) Handle(cmd interface{}) error {
 			return errors.New(fmt.Sprintf("Move is not available %#v", c))
 		}
 
-		if positions, ok := CheckIfMoveWin(o.state.MovesOrder, c.Position, c.PlayerID); ok {
+		if positions, ok := CheckIfMoveWin(o.state.MovesOrder, c.Position, Wining()); ok {
 			return o.changes.
 				Append(&Moved{
 					PlayerID: c.PlayerID,

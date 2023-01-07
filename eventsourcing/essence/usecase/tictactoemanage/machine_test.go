@@ -179,9 +179,11 @@ func TestNewMachine(t *testing.T) {
 						TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
 							FirstPlayerID:  "1",
 							SecondPlayerID: "2",
+							BoardRows:      3,
+							BoardCols:      3,
+							WinningLength:  3,
 						},
 						NextMovePlayerID: "1",
-						AvailableMoves:   tictacstatemachine.NewAvailableMoves(),
 						MovesTaken:       map[tictacstatemachine.Move]tictacstatemachine.PlayerID{},
 						MovesOrder:       []tictacstatemachine.Move{},
 					},

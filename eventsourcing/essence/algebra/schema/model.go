@@ -137,12 +137,29 @@ func (s *StructSetter) Set(key string, value any) error {
 		y := s.deref.Elem()
 		f := y.FieldByName(key)
 		if f.IsValid() && f.CanSet() {
-			f.Set(reflect.ValueOf(value))
+			v := reflect.ValueOf(value)
+			if f.Type() != v.Type() {
+				if f.Type().Kind() == reflect.Int &&
+					v.Type().Kind() == reflect.Float64 {
+					f.Set(reflect.ValueOf(int(v.Float())))
+					return nil
+				}
+			}
+
+			f.Set(v)
 			return nil
 		}
 	} else if e.Kind() == reflect.Struct {
 		f := e.FieldByName(key)
 		if f.IsValid() && f.CanSet() {
+			v := reflect.ValueOf(value)
+			if f.Type() != v.Type() {
+				if f.Type().Kind() == reflect.Int &&
+					v.Type().Kind() == reflect.Float64 {
+					f.Set(reflect.ValueOf(int(v.Float())))
+					return nil
+				}
+			}
 			f.Set(reflect.ValueOf(value))
 			return nil
 		}

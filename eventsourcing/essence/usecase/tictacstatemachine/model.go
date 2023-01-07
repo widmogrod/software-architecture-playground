@@ -10,11 +10,19 @@ type (
 //
 //go:generate mkunion -name=Command
 type (
-	CreateGameCMD struct{ FirstPlayerID PlayerID }
-	JoinGameCMD   struct{ SecondPlayerID PlayerID }
-	StartGameCMD  struct {
+	CreateGameCMD struct {
+		FirstPlayerID PlayerID
+		BoardRows     int
+		BoardCols     int
+		WinningLength int
+	}
+	JoinGameCMD  struct{ SecondPlayerID PlayerID }
+	StartGameCMD struct {
 		FirstPlayerID  PlayerID
 		SecondPlayerID PlayerID
+		BoardRows      int
+		BoardCols      int
+		WinningLength  int
 	}
 	MoveCMD struct {
 		PlayerID PlayerID
@@ -35,7 +43,6 @@ type (
 		TicTacToeBaseState
 
 		NextMovePlayerID Move
-		AvailableMoves   map[Move]struct{}
 		MovesTaken       map[Move]PlayerID
 		MovesOrder       []Move
 	}
@@ -57,4 +64,7 @@ type (
 type TicTacToeBaseState struct {
 	FirstPlayerID  PlayerID
 	SecondPlayerID PlayerID
+	BoardRows      int
+	BoardCols      int
+	WinningLength  int
 }

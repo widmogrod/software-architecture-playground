@@ -34,7 +34,7 @@ func TestWining(t *testing.T) {
 			_, win := CheckIfMoveWin(
 				uc.sequence,
 				uc.move,
-				uc.playerID,
+				Wining(),
 			)
 			assert.Equal(t, uc.want, win)
 		})
@@ -42,7 +42,7 @@ func TestWining(t *testing.T) {
 }
 
 func TestGeneratedPositions(t *testing.T) {
-	assert.Equal(t, Wining(), GenerateWiningPositions(3, 3, 3))
+	assert.Equal(t, Wining3x3(), GenerateWiningPositions(3, 3, 3))
 
 	rows, cols := 5, 5
 	for _, seq := range GenerateWiningPositions(3, rows, cols) {

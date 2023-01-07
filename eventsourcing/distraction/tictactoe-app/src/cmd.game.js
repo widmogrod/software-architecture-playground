@@ -1,7 +1,10 @@
-export function CreateGameCMD(p1) {
+export function CreateGameCMD(p1, wh, len) {
     return {
         "CreateGameCMD": {
             "FirstPlayerID": p1,
+            "BoardRows": wh,
+            "BoardCols": wh,
+            "WinningLength": len,
         }
     }
 }
@@ -14,11 +17,14 @@ export function JoinGameCMD(p2) {
     }
 }
 
-export function StartGameCMD(p1, p2) {
+export function StartGameCMD(p1, p2, wh, len) {
     return {
         "StartGameCMD": {
             "FirstPlayerID": p1,
             "SecondPlayerID": p2,
+            "BoardRows": wh,
+            "BoardCols": wh,
+            "WinningLength": len,
         }
     }
 }

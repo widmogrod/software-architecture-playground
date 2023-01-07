@@ -2,7 +2,6 @@ package tictacstatemachine
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
 	"testing"
 )
 
@@ -29,11 +28,17 @@ func TestNewMachine(t *testing.T) {
 				&GameWaitingForPlayer{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID: "1",
+						BoardRows:     3,
+						BoardCols:     3,
+						WinningLength: 3,
 					},
 				},
 				&GameWaitingForPlayer{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID: "1",
+						BoardRows:     3,
+						BoardCols:     3,
+						WinningLength: 3,
 					},
 				},
 			},
@@ -74,69 +79,52 @@ func TestNewMachine(t *testing.T) {
 				&GameWaitingForPlayer{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID: "1",
+						BoardRows:     3,
+						BoardCols:     3,
+						WinningLength: 3,
 					},
 				},
 				&GameWaitingForPlayer{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID: "1",
+						BoardRows:     3,
+						BoardCols:     3,
+						WinningLength: 3,
 					},
 				},
 				&GameProgress{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.1": {},
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
-					MovesTaken: map[Move]PlayerID{},
-					MovesOrder: []Move{},
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
 				},
 				&GameProgress{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.1": {},
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
-					MovesTaken: map[Move]PlayerID{},
-					MovesOrder: []Move{},
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
 				},
 				&GameProgress{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 					},
@@ -146,18 +134,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 					},
@@ -167,18 +148,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 					},
@@ -188,17 +162,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -209,16 +177,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.3": {},
-						"2.1": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -230,15 +193,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.3": {},
-						"2.1": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -251,6 +210,9 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					Winner:         "1",
 					WiningSequence: []Move{"1.1", "1.2", "1.3"},
@@ -266,6 +228,9 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					Winner:         "1",
 					WiningSequence: []Move{"1.1", "1.2", "1.3"},
@@ -312,38 +277,23 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.1": {},
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
-					MovesTaken: map[Move]PlayerID{},
-					MovesOrder: []Move{},
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
 				},
 				&GameProgress{
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.2": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 					},
@@ -355,17 +305,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"1.2": {},
-						"1.3": {},
-						"2.1": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -378,16 +322,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"1.3": {},
-						"2.1": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -401,15 +340,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"2.1": {},
-						"2.3": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -425,14 +360,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"2.1": {},
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -449,13 +381,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"3.1": {},
-						"3.2": {},
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -473,12 +403,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "2",
-					AvailableMoves: map[Move]struct{}{
-						"3.3": {},
-						"3.2": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -498,11 +427,11 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					NextMovePlayerID: "1",
-					AvailableMoves: map[Move]struct{}{
-						"3.3": {},
-					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
 						"2.2": "2",
@@ -523,6 +452,9 @@ func TestNewMachine(t *testing.T) {
 					TicTacToeBaseState: TicTacToeBaseState{
 						FirstPlayerID:  "1",
 						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
 					},
 					MovesTaken: map[Move]PlayerID{
 						"1.1": "1",
@@ -538,15 +470,106 @@ func TestNewMachine(t *testing.T) {
 				},
 			},
 		},
+		"creating game without settings sets default rules": {
+			commands: []Command{
+				&CreateGameCMD{
+					FirstPlayerID: "1",
+				},
+			},
+			err: []error{
+				nil,
+			},
+			states: []State{
+				&GameWaitingForPlayer{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID: "1",
+						BoardRows:     3,
+						BoardCols:     3,
+						WinningLength: 3,
+					},
+				},
+			},
+		},
+		"creating game with bad settings corrects them": {
+			commands: []Command{
+				&CreateGameCMD{
+					FirstPlayerID: "1",
+					BoardRows:     2,
+					BoardCols:     2,
+					WinningLength: 5,
+				},
+			},
+			err: []error{
+				nil,
+			},
+			states: []State{
+				&GameWaitingForPlayer{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID: "1",
+						BoardRows:     5,
+						BoardCols:     5,
+						WinningLength: 5,
+					},
+				},
+			},
+		},
+		"creating game with good settings sets them": {
+			commands: []Command{
+				&CreateGameCMD{
+					FirstPlayerID: "1",
+					BoardRows:     5,
+					BoardCols:     5,
+					WinningLength: 3,
+				},
+			},
+			err: []error{
+				nil,
+			},
+			states: []State{
+				&GameWaitingForPlayer{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID: "1",
+						BoardRows:     5,
+						BoardCols:     5,
+						WinningLength: 3,
+					},
+				},
+			},
+		},
+		"starting game with game settings is possible": {
+			commands: []Command{
+				&StartGameCMD{
+					FirstPlayerID:  "1",
+					SecondPlayerID: "2",
+					BoardRows:      5,
+					BoardCols:      5,
+					WinningLength:  3,
+				},
+			},
+			err: []error{
+				nil,
+			},
+			states: []State{
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      5,
+						BoardCols:      5,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "1",
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
+				},
+			},
+		},
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			m := NewMachine()
 			for i, cmd := range uc.commands {
 				m.Handle(cmd)
-				if s, ok := m.State().(*GameProgress); ok {
-					tictactoeaggregate.PrintGame(s.MovesTaken)
-				}
 				assert.Equal(t, uc.states[i], m.State(), "state at index: %d", i)
 				assert.Equal(t, uc.err[i], m.LastErr(), "error at index: %d", i)
 			}

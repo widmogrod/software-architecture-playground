@@ -4,7 +4,7 @@ import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
-import {JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
+import {CreateGameCMD, JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
 
 /*
@@ -16,6 +16,9 @@ import * as manage from "./cmd.manage";
 *  - [ ] Consider timout for waiting for player moves
 *  - [ ] List all sessions that are waiting for players, alow to join them, show when session expires was active
 *  - [ ] Add bigger board
+*  - [ ] Add remote play, local play, and play with AI
+*  - [ ] Player who clicks "Play again" should be the first to move
+*  - [√] Remove AvailableMoves! they are not needed, and make code harder to read
 */
 
 export function App() {
@@ -68,7 +71,11 @@ function Square({value, isWin, onSquareClick}) {
 
 
 function Board({state, transition, playerID}) {
-    let {MovesTaken, WiningSequence, FirstPlayerID, SecondPlayerID} = (() => {
+    let {
+        MovesTaken, WiningSequence,
+        FirstPlayerID, SecondPlayerID,
+        BoardRows, BoardCols
+    } = (() => {
         if (state?.GameProgress) {
             return state?.GameProgress
         } else if (state?.GameEndWithWin) {
@@ -81,9 +88,9 @@ function Board({state, transition, playerID}) {
     })()
 
     let result = []
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= BoardRows; i++) {
         let row = []
-        for (let j = 1; j <= 3; j++) {
+        for (let j = 1; j <= BoardCols; j++) {
             let move = "" + i + "." + j
 
             let isWin = WiningSequence?.find((m) => m === move)
@@ -183,7 +190,8 @@ export function Game() {
                 sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
                 sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
                     currentGameState?.SessionReady?.Players[0],
-                    currentGameState?.SessionReady?.Players[1]
+                    currentGameState?.SessionReady?.Players[1],
+                    5,3
                 )))
             }
         }
@@ -202,6 +210,7 @@ export function Game() {
         sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
             currentGameState?.SessionInGame?.Players[0],
             currentGameState?.SessionInGame?.Players[1],
+            5,3
         )))
     }
 
@@ -274,7 +283,8 @@ function Actions({state, transition, playerID, newGame}) {
         if (Winner === playerID) {
             return (
                 <div>
-                    You won! 🎉
+                    Bravo! <b>you won!</b> 🎉🎉🎉
+                    <br/>
                     <button className="button-29"
                             onClick={() => newGame()}>Play again
                     </button>
@@ -284,6 +294,7 @@ function Actions({state, transition, playerID, newGame}) {
             return (
                 <div>
                     You lost! 😢
+                    <br/>
                     <button className="button-29"
                             onClick={() => newGame()}>Play again
                     </button>
