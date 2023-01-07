@@ -307,12 +307,12 @@ function ChangeGameActions({newGame}) {
            <span> or </span>
            <button className="button-text"
                    onClick={() => newGame(5, 3)}>
-               5x5
+               3x5
            </button>
            <span> or </span>
            <button className="button-text"
-                   onClick={() => newGame(10, 4)}>
-               4x10
+                   onClick={() => newGame(8, 4)}>
+               4x8
            </button>
        </>
    )
