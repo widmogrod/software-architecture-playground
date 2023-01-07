@@ -126,7 +126,7 @@ func (o *Machine) Handle(cmd Command) {
 
 			// Check if there is a winner
 			winseq := tictactoeaggregate.GenerateWiningPositions(state.WinningLength, state.BoardRows, state.BoardCols)
-			if seq, win := tictactoeaggregate.CheckIfMoveWin(state.MovesOrder, "", winseq); win {
+			if seq, win := tictactoeaggregate.CheckIfMoveWin(state.MovesOrder, winseq); win {
 				return &GameEndWithWin{
 					TicTacToeBaseState: state.TicTacToeBaseState,
 					Winner:             x.PlayerID,

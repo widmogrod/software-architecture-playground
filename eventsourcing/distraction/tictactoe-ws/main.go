@@ -90,7 +90,6 @@ func main() {
 						[]string{"GameActionCMD"},
 						schema.UseStruct(&tictactoemanage.GameActionCMD{}),
 					),
-
 					schema.WhenPath(
 						[]string{"GameActionCMD", "Action"},
 						schema.UseStruct(&tictacstatemachine.CommandOneOf{}),

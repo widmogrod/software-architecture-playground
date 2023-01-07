@@ -1,10 +1,14 @@
 package tictactoeaggregate
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"sort"
 )
+
+func MkMove(x, y int) Move {
+	return fmt.Sprintf("%d.%d", x, y)
+}
 
 func Wining() [][]Move {
 	return GenerateWiningPositions(3, 3, 3)
@@ -79,15 +83,11 @@ func GenerateWiningPositions(inline int, rows, columns int) [][]Move {
 	return winseq
 }
 
-func CheckIfMoveWin(moves []Move, nextMove Move, winseq [][]Move) ([]Move, bool) {
+func CheckIfMoveWin(moves []Move, winseq [][]Move) ([]Move, bool) {
 	moves1 := append([]Move{}, moves...)
-	if nextMove != "" {
-		moves1 = append(moves1, nextMove)
-	}
 
 	a_moves, b_moves := make([]Move, 0), make([]Move, 0)
 	for idx, m := range moves1 {
-		m := m
 		if idx%2 == 0 {
 			a_moves = append(a_moves, m)
 		} else {
@@ -115,45 +115,35 @@ func is_win_seq(moves, seq []Move) ([]Move, bool) {
 		return nil, false
 	}
 
-	if len(moves) == len(seq) {
-		for i := 0; i < len(seq); i++ {
-			if moves[i] != seq[i] {
-				return nil, false
+	for i := 0; i < len(seq); i++ {
+		var foundInMoves bool
+		for j := 0; j < len(moves); j++ {
+			if seq[i] == moves[j] {
+				foundInMoves = true
+				break
 			}
 		}
-
-		return seq, true
-	}
-
-	offset := len(moves) - 3
-	for i := 0; i <= offset; i++ {
-		if _, win := is_win_seq(moves[i:i+3], seq); win {
-			return seq, true
+		if !foundInMoves {
+			return nil, false
 		}
 	}
 
-	return nil, false
+	return seq, true
 }
 
-func PrintGame(movesTaken map[Move]PlayerID) {
-	PrintGameRC(movesTaken, 3, 3)
-}
-
-func PrintGameRC(movesTaken map[Move]PlayerID, rows, cols int) {
-	buffer := bytes.NewBuffer(nil)
+func PrintGameRC(w io.Writer, movesTaken map[Move]PlayerID, rows, cols int) {
+	fmt.Fprintln(w)
 	for i := 1; i <= rows; i++ {
 		for j := 1; j <= cols; j++ {
-			move := Move(fmt.Sprintf("%d.%d", i, j))
+			move := MkMove(i, j)
 			if playerID, ok := movesTaken[move]; ok {
-				fmt.Fprint(buffer, playerID)
+				fmt.Fprint(w, playerID)
 			} else {
-				fmt.Fprint(buffer, "_")
+				fmt.Fprint(w, "_")
 			}
-			fmt.Fprint(buffer, " | ")
+			fmt.Fprint(w, " | ")
 		}
-		fmt.Fprintln(buffer)
+		fmt.Fprintln(w)
 	}
-
-	fmt.Println(buffer.String())
-
+	fmt.Fprintln(w)
 }
