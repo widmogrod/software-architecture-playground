@@ -22,9 +22,9 @@ export function StartGameCMD(p1, p2, wh, len) {
         "StartGameCMD": {
             "FirstPlayerID": p1,
             "SecondPlayerID": p2,
-            "BoardRows": wh,
-            "BoardCols": wh,
-            "WinningLength": len,
+            "BoardRows": wh | 0,
+            "BoardCols": wh | 0,
+            "WinningLength": len | 0,
         }
     }
 }

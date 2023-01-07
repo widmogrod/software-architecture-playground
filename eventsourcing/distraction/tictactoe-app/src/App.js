@@ -4,7 +4,7 @@ import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
 import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
-import {JoinGameCMD, MoveCMD, StartGameCMD} from "./cmd.game";
+import {MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
 
 /*
@@ -231,13 +231,7 @@ export function Game() {
                 }
             })
             if (currentGameState?.SessionReady?.Players[0] == cookies.playerID) {
-                let gameId = uuid()
-                sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
-                sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
-                    currentGameState?.SessionReady?.Players[0],
-                    currentGameState?.SessionReady?.Players[1],
-                    widthAndHeight | 0, lengthToWin | 0,
-                )))
+                newGame(widthAndHeight, lengthToWin)
             }
         }
 
@@ -249,13 +243,19 @@ export function Game() {
         sendJsonMessage(manage.GameActionCMD(sessionID, gid, cmd))
     }
 
-    function newGame() {
+    function playAgain() {
+        newGame(widthAndHeight, lengthToWin)
+    }
+
+    function newGame(wh, l) {
         let gameId = uuid()
+
         sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
         sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
-            currentGameState?.SessionInGame?.Players[0],
-            currentGameState?.SessionInGame?.Players[1],
-            widthAndHeight | 0, lengthToWin | 0,
+            "",
+            "",
+            wh,
+            l,
         )))
     }
 
@@ -267,9 +267,10 @@ export function Game() {
             </ul>
             <div className="game">
                 <div className="game-info">
-                       <Actions state={currentGameState?.SessionInGame?.GameState}
+                    <Actions state={currentGameState?.SessionInGame?.GameState}
                              transition={transition}
                              newGame={newGame}
+                             playAgain={playAgain}
                              playerID={cookies.playerID}/>
                 </div>
                 <div className="game-board">
@@ -296,44 +297,43 @@ export function Game() {
     );
 }
 
-function PostGameActions({newGame}) {
+function ChangeGameActions({newGame}) {
+   return (
+       <>
+           <button className="button-text"
+                   onClick={() => newGame(3, 3)}>
+               3x3
+           </button>
+           <span> or </span>
+           <button className="button-text"
+                   onClick={() => newGame(5, 3)}>
+               5x5
+           </button>
+           <span> or </span>
+           <button className="button-text"
+                   onClick={() => newGame(10, 4)}>
+               4x10
+           </button>
+       </>
+   )
+}
+
+function PostGameActions({newGame, playAgain}) {
     return (
         <p>
             <button className="button-action"
-                    onClick={() => newGame()}>Play again
+                    onClick={() => playAgain()}>Play again
             </button>
-            <br />
+            <br/>
             <span> or change game </span>
-            <br />
-            <button className="button-text"
-                    onClick={() => newGame(3,3)}>
-                3x3
-            </button>
-            <span> or </span>
-            <button className="button-text"
-                    onClick={() => newGame(3,5)}>
-                5x5
-            </button>
-            <span> or </span>
-            <button className="button-text"
-                    onClick={() => newGame(10,4)}>
-                4x10
-            </button>
+            <br/>
+            <ChangeGameActions newGame={newGame}/>
         </p>
     )
 }
 
-function Actions({state, transition, playerID, newGame}) {
-    if (state?.GameWaitingForPlayers) {
-        return (
-            <div>
-                <button className="button-action"
-                        onClick={() => transition(JoinGameCMD())}>
-                    Invite Player
-                </button>
-            </div>
-        )
-    } else if (state?.GameProgress) {
+function Actions({state, playerID, newGame, playAgain}) {
+    if (state?.GameProgress) {
         let {NextMovePlayerID} = state?.GameProgress
         if (NextMovePlayerID === playerID) {
             return (
@@ -355,14 +355,14 @@ function Actions({state, transition, playerID, newGame}) {
             return (
                 <div>
                     <p>Bravo! <b>you won!</b> 🎉🎉🎉</p>
-                    <PostGameActions newGame={newGame}/>
+                    <PostGameActions newGame={newGame} playAgain={playAgain}/>
                 </div>
             )
         } else {
             return (
                 <div>
                     <p>You lost! 😢. Try <b>again</b></p>
-                    <PostGameActions newGame={newGame}/>
+                    <PostGameActions newGame={newGame} playAgain={playAgain}/>
                 </div>
             )
         }
@@ -370,7 +370,7 @@ function Actions({state, transition, playerID, newGame}) {
         return (
             <div>
                 <p><b>DRAW!</b> 🤝. Good game!</p>
-                <PostGameActions newGame={newGame}/>
+                <PostGameActions newGame={newGame} playAgain={playAgain}/>
             </div>
         )
     }
