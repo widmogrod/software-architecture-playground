@@ -28,6 +28,9 @@ type (
 		PlayerID PlayerID
 		Position Move
 	}
+	GiveUpCMD struct {
+		PlayerID PlayerID
+	}
 )
 
 // State of the game.

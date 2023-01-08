@@ -470,6 +470,65 @@ func TestNewMachine(t *testing.T) {
 				},
 			},
 		},
+		"game that a player given up on": {
+			commands: []Command{
+				&StartGameCMD{
+					FirstPlayerID:  "1",
+					SecondPlayerID: "2",
+				},
+				&MoveCMD{PlayerID: "1", Position: "1.1"},
+				&GiveUpCMD{PlayerID: "2"},
+			},
+			err: []error{
+				nil,
+				nil,
+				nil,
+			},
+			states: []State{
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "1",
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
+				},
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "2",
+					MovesTaken: map[Move]PlayerID{
+						"1.1": "1",
+					},
+					MovesOrder: []Move{
+						"1.1",
+					},
+				},
+				&GameEndWithWin{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      3,
+						BoardCols:      3,
+						WinningLength:  3,
+					},
+					Winner:         "1",
+					WiningSequence: nil,
+					MovesTaken: map[Move]PlayerID{
+						"1.1": "1",
+					},
+				},
+			},
+		},
 		"creating game without settings sets default rules": {
 			commands: []Command{
 				&CreateGameCMD{
@@ -564,7 +623,7 @@ func TestNewMachine(t *testing.T) {
 				},
 			},
 		},
-		"makgin move that is not properly formatted": {
+		"making move that is not properly formatted": {
 			commands: []Command{
 				&StartGameCMD{
 					FirstPlayerID:  "1",

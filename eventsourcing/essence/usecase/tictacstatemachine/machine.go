@@ -148,6 +148,23 @@ func (o *Machine) Handle(cmd Command) {
 
 			return state
 		},
+		func(x *GiveUpCMD) State {
+			state, ok := o.state.(*GameProgress)
+			if !ok {
+				panic(ErrGameNotInProgress)
+			}
+
+			winnerID := state.FirstPlayerID
+			if x.PlayerID == state.FirstPlayerID {
+				winnerID = state.SecondPlayerID
+			}
+
+			return &GameEndWithWin{
+				TicTacToeBaseState: state.TicTacToeBaseState,
+				Winner:             winnerID,
+				MovesTaken:         state.MovesTaken,
+			}
+		},
 	)
 }
 
