@@ -2,9 +2,9 @@ import {v4 as uuid} from 'uuid';
 import React, {useEffect, useState} from 'react';
 import useWebSocket, {ReadyState} from 'react-use-websocket';
 import {useCookies} from 'react-cookie';
-import {Link, Outlet, useParams, useRoutes} from "react-router-dom";
+import {Link, Outlet, useNavigate, useParams, useRoutes} from "react-router-dom";
 import QRCode from "react-qr-code";
-import {MoveCMD, StartGameCMD} from "./cmd.game";
+import {GiveUpCMD, MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
 
 /*
@@ -66,7 +66,7 @@ export function Info() {
                 <p>Board has 5x5 dimensions, but still 3 in a row wins</p>
                 <Board2 cols={5} rows={5}
                         winingSequence={["2.2", "3.3", "4.4"]}/>
-                <Link className={"button-action"} to={"game/" + uuid() + "/5"}>
+                <Link className={"button-action"} to={"game/" + uuid() + "/5/3"}>
                     Play
                 </Link>
             </div>
@@ -174,9 +174,14 @@ function gameURL(sessionID) {
 }
 
 export function Game() {
+    const navigate = useNavigate();
     let {sessionID, widthAndHeight, lengthToWin} = useParams();
 
     const [squareStyle, setSquareStyle] = useState(["🧜‍", "🖤"]);
+    const [settings, setSettings] = useState({
+        WidthAndHeight: widthAndHeight,
+        LengthToWin: lengthToWin
+    });
     const [playerNo, setPlayerNo] = useState(0)
 
     const [currentGameState, setGameState] = useState({});
@@ -244,11 +249,16 @@ export function Game() {
     }
 
     function playAgain() {
-        newGame(widthAndHeight, lengthToWin)
+        newGame(settings.WidthAndHeight, settings.LengthToWin)
     }
 
     function newGame(wh, l) {
         let gameId = uuid()
+
+        setSettings({
+            WidthAndHeight: wh,
+            LengthToWin: l,
+        })
 
         sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
         sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
@@ -259,10 +269,20 @@ export function Game() {
         )))
     }
 
+    function giveUpOrBack() {
+        if (currentGameState?.SessionInGame?.GameState?.GameProgress) {
+            transition(GiveUpCMD(cookies.playerID))
+        } else {
+            navigate("/")
+        }
+    }
+
     return (
         <>
             <ul className="nav">
-                <li><Link className="button-close" to={"/"}></Link></li>
+                <li>
+                    <button className="button-close" onClick={giveUpOrBack}></button>
+                </li>
                 <li>You are {squareStyle[playerNo]} <b>vs</b> {squareStyle.filter((_, i) => i != playerNo)}</li>
             </ul>
             <div className="game">
@@ -298,24 +318,24 @@ export function Game() {
 }
 
 function ChangeGameActions({newGame}) {
-   return (
-       <>
-           <button className="button-text"
-                   onClick={() => newGame(3, 3)}>
-               3x3
-           </button>
-           <span> or </span>
-           <button className="button-text"
-                   onClick={() => newGame(5, 3)}>
-               3x5
-           </button>
-           <span> or </span>
-           <button className="button-text"
-                   onClick={() => newGame(8, 4)}>
-               4x8
-           </button>
-       </>
-   )
+    return (
+        <>
+            <button className="button-text"
+                    onClick={() => newGame(3, 3)}>
+                3x3
+            </button>
+            <span> or </span>
+            <button className="button-text"
+                    onClick={() => newGame(5, 3)}>
+                3x5
+            </button>
+            <span> or </span>
+            <button className="button-text"
+                    onClick={() => newGame(8, 4)}>
+                4x8
+            </button>
+        </>
+    )
 }
 
 function PostGameActions({newGame, playAgain}) {
@@ -334,20 +354,19 @@ function PostGameActions({newGame, playAgain}) {
 
 function Actions({state, playerID, newGame, playAgain}) {
     if (state?.GameProgress) {
+        let callToAction
         let {NextMovePlayerID} = state?.GameProgress
         if (NextMovePlayerID === playerID) {
-            return (
-                <p>
-                    <b>Your a move! ⚽️</b>
-                </p>
-            )
+            callToAction = <span>⚽️ Your <b> move</b>...</span>
         } else {
-            return (
-                <p>
-                    <b>⏳ Other player is moving </b>
-                </p>
-            )
+            callToAction = <span>⏳ <b>Wait</b> on the other player move... </span>
         }
+
+        return (
+            <p>
+                {callToAction}
+            </p>
+        )
 
     } else if (state?.GameEndWithWin) {
         let {Winner} = state?.GameEndWithWin

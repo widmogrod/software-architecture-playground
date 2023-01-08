@@ -37,3 +37,11 @@ export function MoveCMD(pid, position) {
         }
     }
 }
+
+export function GiveUpCMD(pid) {
+    return {
+        "GiveUpCMD": {
+            "PlayerID": pid,
+        }
+    }
+}

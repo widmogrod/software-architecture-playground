@@ -144,6 +144,9 @@ table.tictactoe.size3x3 td {
 table.tictactoe.size5x5 td {
     width: 20%;
 }
+table.tictactoe.size4x4 td {
+    width: 15%;
+}
 
 table.tictactoe.size8x8 td {
     width: 12.5%;

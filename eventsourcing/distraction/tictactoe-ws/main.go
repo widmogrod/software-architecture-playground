@@ -110,6 +110,10 @@ func main() {
 						[]string{"GameActionCMD", "Action", "MoveCMD"},
 						schema.UseStruct(&tictacstatemachine.MoveCMD{}),
 					),
+					schema.WhenPath(
+						[]string{"GameActionCMD", "Action", "GiveUpCMD"},
+						schema.UseStruct(&tictacstatemachine.GiveUpCMD{}),
+					),
 				)
 
 				cmd, ok := goo.(*tictactoemanage.CommandOneOf)
