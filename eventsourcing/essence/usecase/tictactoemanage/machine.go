@@ -3,7 +3,11 @@ package tictactoemanage
 import (
 	"errors"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
+	"math/rand"
 )
+
+const BotPlayerID = "i-am-bot"
 
 var (
 	ErrSessionAlreadyCreated            = errors.New("session already created")
@@ -54,7 +58,8 @@ func (o *Machine) Handle(cmd Command) {
 				NeedsPlayers: x.NeedsPlayers,
 				Players:      []PlayerID{},
 			}
-		}, func(x *JoinGameSessionCMD) State {
+		},
+		func(x *JoinGameSessionCMD) State {
 			state, ok := o.state.(*SessionWaitingForPlayers)
 			if !ok {
 				panic(ErrSessionNotWaitingForPlayers)
@@ -84,6 +89,14 @@ func (o *Machine) Handle(cmd Command) {
 				ID:      state.ID,
 				Players: newState.Players,
 			}
+		},
+		func(x *GameSessionWithBotCMD) State {
+			o.Handle(&JoinGameSessionCMD{
+				SessionID: x.SessionID,
+				PlayerID:  BotPlayerID,
+			})
+
+			return o.state
 		},
 		func(x *LeaveGameSessionCMD) State {
 			switch state := o.state.(type) {
@@ -176,10 +189,43 @@ func (o *Machine) Handle(cmd Command) {
 			//		SecondPlayerID: state.Players[1],
 			//	})
 			//}
-			if action, ok := x.Action.(*tictacstatemachine.CommandOneOf); ok {
-				game.Handle(action.Unwrap())
-			} else {
-				game.Handle(x.Action)
+			action := x.Action
+			if cmd, ok := action.(*tictacstatemachine.CommandOneOf); ok {
+				action = cmd.Unwrap()
+			}
+
+			if sg, ok := action.(*tictacstatemachine.StartGameCMD); ok {
+				if HasBotPlayer(state.Players) ||
+					rand.Float64() < 0.5 {
+					sg.FirstPlayerID = state.Players[0]
+					sg.SecondPlayerID = state.Players[1]
+				} else {
+					sg.FirstPlayerID = state.Players[1]
+					sg.SecondPlayerID = state.Players[0]
+				}
+			}
+
+			game.Handle(action)
+
+			if game.LastErr() == nil {
+				if _, ok := action.(*tictacstatemachine.MoveCMD); ok {
+					if progress, ok := game.State().(*tictacstatemachine.GameProgress); ok {
+						if IsBot(progress.NextMovePlayerID) {
+							nextMove := tictactoeaggregate.NextMoveMinMax(
+								progress.MovesOrder,
+								progress.BoardRows,
+								progress.BoardCols,
+							)
+
+							if nextMove != "" {
+								game.Handle(&tictacstatemachine.MoveCMD{
+									PlayerID: progress.NextMovePlayerID,
+									Position: nextMove,
+								})
+							}
+						}
+					}
+				}
 			}
 
 			//if tictacstatemachine.IsGameFinished(game.State()) {
@@ -203,4 +249,18 @@ func (o *Machine) Handle(cmd Command) {
 
 			return newState
 		})
+}
+
+func IsBot(id PlayerID) bool {
+	return id == BotPlayerID
+}
+
+func HasBotPlayer(players []PlayerID) bool {
+	for _, player := range players {
+		if IsBot(player) {
+			return true
+		}
+	}
+
+	return false
 }

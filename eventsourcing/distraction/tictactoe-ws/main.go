@@ -79,6 +79,10 @@ func main() {
 						schema.UseStruct(&tictactoemanage.JoinGameSessionCMD{}),
 					),
 					schema.WhenPath(
+						[]string{"GameSessionWithBotCMD"},
+						schema.UseStruct(&tictactoemanage.GameSessionWithBotCMD{}),
+					),
+					schema.WhenPath(
 						[]string{"NewGameCMD"},
 						schema.UseStruct(&tictactoemanage.NewGameCMD{}),
 					),

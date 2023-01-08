@@ -16,6 +16,14 @@ export function JoinGameSessionCMD(sid, pid) {
     }
 }
 
+export function GameSessionWithBotCMD(sid) {
+    return {
+        "GameSessionWithBotCMD": {
+            SessionID: sid,
+        },
+    }
+}
+
 export function NewGameCMD(sid, gid) {
     return {
         "NewGameCMD": {

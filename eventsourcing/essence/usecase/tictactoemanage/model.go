@@ -18,7 +18,12 @@ type (
 	}
 	JoinGameSessionCMD struct {
 		SessionID SessionID
-		PlayerID  PlayerID
+
+		// TODO: PlayerID should be set on server!
+		PlayerID PlayerID
+	}
+	GameSessionWithBotCMD struct {
+		SessionID SessionID
 	}
 	LeaveGameSessionCMD struct {
 		SessionID SessionID

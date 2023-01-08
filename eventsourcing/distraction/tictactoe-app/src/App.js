@@ -6,6 +6,7 @@ import {Link, Outlet, useNavigate, useParams, useRoutes} from "react-router-dom"
 import QRCode from "react-qr-code";
 import {GiveUpCMD, MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
+import {GameSessionWithBotCMD} from "./cmd.manage";
 
 /*
 * TODO
@@ -277,6 +278,11 @@ export function Game() {
         }
     }
 
+    function playWithBot() {
+        sendJsonMessage(manage.GameSessionWithBotCMD(sessionID))
+        playAgain()
+    }
+
     return (
         <>
             <ul className="nav">
@@ -299,12 +305,16 @@ export function Game() {
                            squareStyle={squareStyle}
                            playerID={cookies.playerID}/>
                 </div>
+                {currentGameState?.SessionWaitingForPlayers &&
                 <div className="game-share">
-                    <p>Ask friend to scan code to join</p>
+                    <p>
+                        Ask friend to scan code to join<br/>
+                        or <button className="button-text" onClick={() => playWithBot()}>play with bot </button> 🤖
+                    </p>
                     <QRCode value={gameURL(sessionID)}
                             style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
 
-                </div>
+                </div>}
                 <div className="game-debug">
                     <p>Player: {cookies.playerID}</p>
                     <p>SessionID: {sessionID}</p>

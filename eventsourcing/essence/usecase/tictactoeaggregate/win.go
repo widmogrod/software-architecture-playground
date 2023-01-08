@@ -35,9 +35,19 @@ func Wining3x3() [][]Move {
 			append(verticalWins, diagonalWins...)...)...)
 }
 
+var winningPositionsCache = map[string][][]Move{}
+
+func CachedGenerateWiningPositions(rows, cols, winseq int) [][]Move {
+	key := fmt.Sprintf("%d-%d-%d", rows, cols, winseq)
+	if v, ok := winningPositionsCache[key]; ok {
+		return v
+	}
+	winningPositionsCache[key] = GenerateWiningPositions(winseq, rows, cols)
+	return winningPositionsCache[key]
+}
+
 func GenerateWiningPositions(inline int, rows, columns int) [][]Move {
 	var winseq [][]Move
-
 	// horizontal column shiftC of winning sequences
 	maxShiftC := (columns - inline)
 	maxShiftR := (rows - inline)
@@ -146,4 +156,16 @@ func PrintGameRC(w io.Writer, movesTaken map[Move]PlayerID, rows, cols int) {
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintln(w)
+}
+
+func ToMovesTaken(moves []Move) map[Move]PlayerID {
+	mm := map[Move]PlayerID{}
+	for i, m := range moves {
+		if i%2 == 0 {
+			mm[m] = "O"
+		} else {
+			mm[m] = "X"
+		}
+	}
+	return mm
 }
