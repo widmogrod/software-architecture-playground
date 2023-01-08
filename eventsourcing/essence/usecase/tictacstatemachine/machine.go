@@ -14,6 +14,7 @@ var (
 	ErrNotYourTurn        = errors.New("not your turn")
 	ErrPositionTaken      = errors.New("position is taken")
 	ErrGameFinished       = errors.New("game is finished")
+	ErrInputInvalid       = errors.New("input is invalid")
 )
 
 func NewMachine() *Machine {
@@ -111,12 +112,17 @@ func (o *Machine) Handle(cmd Command) {
 				panic(ErrNotYourTurn)
 			}
 
-			if _, ok := state.MovesTaken[x.Position]; ok {
+			move, err := ParsePosition(x.Position, state.BoardRows, state.BoardCols)
+			if err != nil {
+				panic(err)
+			}
+
+			if _, ok := state.MovesTaken[move]; ok {
 				panic(ErrPositionTaken)
 			}
 
 			state.MovesTaken[x.Position] = x.PlayerID
-			state.MovesOrder = append(state.MovesOrder, x.Position)
+			state.MovesOrder = append(state.MovesOrder, move)
 
 			if x.PlayerID == state.FirstPlayerID {
 				state.NextMovePlayerID = state.SecondPlayerID
@@ -143,6 +149,24 @@ func (o *Machine) Handle(cmd Command) {
 			return state
 		},
 	)
+}
+
+func ParsePosition(position Move, boardRows int, boardCols int) (Move, error) {
+	var r, c int
+	_, err := fmt.Sscanf(position, "%d.%d", &r, &c)
+	if err != nil {
+		return "", fmt.Errorf("move cannot be parsed %w; %s", ErrInputInvalid, err)
+	}
+
+	if r < 1 ||
+		c < 1 ||
+		r > boardRows ||
+		c > boardCols {
+		return "", fmt.Errorf("move position is out of bounds %w", ErrInputInvalid)
+	}
+
+	return tictactoeaggregate.MkMove(r, c), nil
+
 }
 
 func GameRules(rows int, cols int, length int) (int, int, int) {

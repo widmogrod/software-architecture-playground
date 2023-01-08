@@ -564,6 +564,68 @@ func TestNewMachine(t *testing.T) {
 				},
 			},
 		},
+		"makgin move that is not properly formatted": {
+			commands: []Command{
+				&StartGameCMD{
+					FirstPlayerID:  "1",
+					SecondPlayerID: "2",
+					BoardRows:      5,
+					BoardCols:      5,
+					WinningLength:  3,
+				},
+				&MoveCMD{
+					PlayerID: "1",
+					Position: "", // empty
+				},
+				&MoveCMD{
+					PlayerID: "1",
+					Position: "1.f", // not digit
+				},
+			},
+			err: []error{
+				nil,
+				ErrInputInvalid,
+				ErrInputInvalid,
+			},
+			states: []State{
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      5,
+						BoardCols:      5,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "1",
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
+				},
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      5,
+						BoardCols:      5,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "1",
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
+				},
+				&GameProgress{
+					TicTacToeBaseState: TicTacToeBaseState{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+						BoardRows:      5,
+						BoardCols:      5,
+						WinningLength:  3,
+					},
+					NextMovePlayerID: "1",
+					MovesTaken:       map[Move]PlayerID{},
+					MovesOrder:       []Move{},
+				},
+			},
+		},
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
@@ -571,7 +633,7 @@ func TestNewMachine(t *testing.T) {
 			for i, cmd := range uc.commands {
 				m.Handle(cmd)
 				assert.Equal(t, uc.states[i], m.State(), "state at index: %d", i)
-				assert.Equal(t, uc.err[i], m.LastErr(), "error at index: %d", i)
+				assert.ErrorIs(t, m.LastErr(), uc.err[i], "error at index: %d", i)
 			}
 		})
 	}
