@@ -2,6 +2,7 @@ package tictactoeaggregate
 
 import (
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -17,6 +18,82 @@ func NextMoveNaive(taken map[Move]PlayerID, rows, cols, len int) Move {
 
 	return ""
 }
+
+//func SlidingBoards(moves []Move, rows, cols int) ([][][]PlayerID, PlayerID) {
+//
+//	masterBoard := make([][]PlayerID, rows)
+//	for r := 1; r <= rows; r++ {
+//		masterBoard[r-1] = make([]PlayerID, cols)
+//		for c := 1; c <= cols; c++ {
+//			masterBoard[r-1][c-1] = ""
+//		}
+//	}
+//
+//	var lastPlayer = PlayerID("O")
+//
+//	for i, m := range moves {
+//		var r, c int
+//		_, err := fmt.Sscanf(m, "%d.%d", &r, &c)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		if i%2 == 0 {
+//			masterBoard[r-1][c-1] = "O"
+//		} else {
+//			masterBoard[r-1][c-1] = "X"
+//		}
+//
+//		lastPlayer = masterBoard[r-1][c-1]
+//	}
+//
+//	var boards [][][]PlayerID
+//	len := 3
+//	for shiftR := 0; shiftR < rows-len; shiftR++ {
+//		for shiftC := 0; shiftC < cols-len; shiftC++ {
+//			board := make([][]PlayerID, len)
+//			for r := shiftR; r <= shiftR+len; r++ {
+//				row := make([]PlayerID, len)
+//				for c := shiftC; c <= shiftC+len; c++ {
+//					row = append(row, masterBoard[r][c])
+//				}
+//				board = append(board, row)
+//			}
+//
+//			boards = append(boards, board)
+//		}
+//	}
+//
+//	return boards, lastPlayer
+//}
+//
+//func SlidingNextMoveMinMax(moves []Move, rows, cols int) Move {
+//	boards, lastPlayer := SlidingBoards(moves, rows, cols)
+//
+//	var (
+//		bestMove  Move
+//		bestScore float64 = -1000
+//	)
+//
+//	for _, board := range boards {
+//		for r := 1; r <= rows; r++ {
+//			for c := 1; c <= cols; c++ {
+//				m := MkMove(r, c)
+//				if board[r-1][c-1] == "" {
+//					board[r-1][c-1] = nextPlayer(lastPlayer)
+//					score := minimax(board, nextPlayer(lastPlayer), true, 0)
+//					board[r-1][c-1] = ""
+//					if score > bestScore {
+//						bestScore = score
+//						bestMove = m
+//					}
+//				}
+//			}
+//		}
+//	}
+//
+//	return bestMove
+//}
 
 func NextMoveMinMax(moves []Move, rows, cols int) Move {
 	var (
@@ -49,16 +126,12 @@ func NextMoveMinMax(moves []Move, rows, cols int) Move {
 		lastPlayer = board[r-1][c-1]
 	}
 
-	//if lastPlayer != "O" {
-	//	panic("last player must be O")
-	//}
-
 	for r := 1; r <= rows; r++ {
 		for c := 1; c <= cols; c++ {
 			m := MkMove(r, c)
 			if board[r-1][c-1] == "" {
 				board[r-1][c-1] = nextPlayer(lastPlayer)
-				score := minmax(board, nextPlayer(lastPlayer), true, 0)
+				score := minimax(board, nextPlayer(lastPlayer), true, 6, -1000, 1000)
 				board[r-1][c-1] = ""
 				if score > bestScore {
 					bestScore = score
@@ -71,7 +144,11 @@ func NextMoveMinMax(moves []Move, rows, cols int) Move {
 	return bestMove
 }
 
-func minmax(board [][]PlayerID, player PlayerID, isMaximising bool, depth float64) float64 {
+func minimax(board [][]PlayerID, player PlayerID, isMaximising bool, depth int, a, b float64) float64 {
+	if depth == 0 {
+		return 0
+	}
+
 	if won, winner := isWin(board); won {
 		var score float64
 		if winner == player {
@@ -84,45 +161,49 @@ func minmax(board [][]PlayerID, player PlayerID, isMaximising bool, depth float6
 			score = -score
 		}
 
-		return score
+		return score * float64(depth)
 	} else if isTie(board) {
 		return 0
 	}
 
-	if depth > 4 {
-		return 0
-	}
-
 	if !isMaximising {
-		var bestScore float64 = -1000
+		var maxEval float64 = -1000
 		for r := 1; r <= len(board); r++ {
 			for c := 1; c <= len(board[r-1]); c++ {
 				if board[r-1][c-1] == "" {
 					board[r-1][c-1] = nextPlayer(player)
-					score := minmax(board, nextPlayer(player), true, depth+1)
+					eval := minimax(board, nextPlayer(player), !isMaximising, depth-1, a, b)
 					board[r-1][c-1] = ""
-					if score > bestScore {
-						bestScore = score
+
+					maxEval = math.Max(maxEval, eval)
+					if maxEval >= b {
+						break
 					}
+
+					a = math.Max(a, eval)
 				}
 			}
 		}
-		return bestScore
+		return maxEval
 	} else {
-		var bestScore float64 = 1000
+		var minEval float64 = 1000
 		for r := 1; r <= len(board); r++ {
 			for c := 1; c <= len(board[r-1]); c++ {
 				if board[r-1][c-1] == "" {
 					board[r-1][c-1] = nextPlayer(player)
-					score := minmax(board, nextPlayer(player), false, depth+1)
+					eval := minimax(board, nextPlayer(player), !isMaximising, depth-1, a, b)
 					board[r-1][c-1] = ""
-					if score < bestScore {
-						bestScore = score
+
+					minEval = math.Min(minEval, eval)
+					if minEval <= a {
+						break
 					}
+
+					b = math.Min(b, eval)
 				}
 			}
 		}
-		return bestScore
+		return minEval
 	}
 }
 

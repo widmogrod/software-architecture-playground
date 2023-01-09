@@ -211,6 +211,7 @@ func (o *Machine) Handle(cmd Command) {
 				if _, ok := action.(*tictacstatemachine.MoveCMD); ok {
 					if progress, ok := game.State().(*tictacstatemachine.GameProgress); ok {
 						if IsBot(progress.NextMovePlayerID) {
+							//nextMove := tictactoeaggregate.SlidingNextMoveMinMax(
 							nextMove := tictactoeaggregate.NextMoveMinMax(
 								progress.MovesOrder,
 								progress.BoardRows,
