@@ -6,7 +6,6 @@ import {Link, Outlet, useNavigate, useParams, useRoutes} from "react-router-dom"
 import QRCode from "react-qr-code";
 import {GiveUpCMD, MoveCMD, StartGameCMD} from "./cmd.game";
 import * as manage from "./cmd.manage";
-import {GameSessionWithBotCMD} from "./cmd.manage";
 
 /*
 * TODO
@@ -169,7 +168,7 @@ export function Game() {
     const navigate = useNavigate();
     let {sessionID, widthAndHeight, lengthToWin} = useParams();
 
-    const [squareStyle, setSquareStyle] = useState(["🧜‍", "🖤"]);
+    const [squareStyle] = useState(["🧜‍", "🖤"]);
     const [settings, setSettings] = useState({
         WidthAndHeight: widthAndHeight,
         LengthToWin: lengthToWin
@@ -216,22 +215,23 @@ export function Game() {
             // Automatically create a game if the playerID is already set
             // sendJsonMessage(CreateGameCMD(cookies.playerID))
         } else if (currentGameState?.SessionWaitingForPlayers) {
-            if (!currentGameState?.SessionWaitingForPlayers?.Players.find((x) => x == cookies.playerID)) {
+            if (!currentGameState?.SessionWaitingForPlayers?.Players.find((x) => x === cookies.playerID)) {
                 // Automatically join the game if the playerID is already set
                 // sendJsonMessage(JoinGameCMD(cookies.playerID))
                 sendJsonMessage(manage.JoinGameSessionCMD(sessionID, cookies.playerID))
             }
         } else if (currentGameState?.SessionReady) {
-            currentGameState?.SessionReady?.Players.find((x, i) => {
-                if (x == cookies.playerID) {
+            currentGameState?.SessionReady?.Players.forEach((x, i) => {
+                if (x === cookies.playerID) {
                     setPlayerNo(i)
                 }
             })
-            if (currentGameState?.SessionReady?.Players[0] == cookies.playerID) {
+            if (currentGameState?.SessionReady?.Players[0] === cookies.playerID) {
                 newGame(widthAndHeight, lengthToWin)
             }
         }
 
+        //eslint-disable-next-line
     }, [readyState, currentGameState, cookies, sendJsonMessage]);
 
 
@@ -280,7 +280,7 @@ export function Game() {
                 <li>
                     <button className="button-close" onClick={giveUpOrBack}></button>
                 </li>
-                <li>You are {squareStyle[playerNo]} <b>vs</b> {squareStyle.filter((_, i) => i != playerNo)}</li>
+                <li>You are {squareStyle[playerNo]} <b>vs</b> {squareStyle.filter((_, i) => i !== playerNo)}</li>
             </ul>
             <div className="game">
                 <div className="game-info">
@@ -297,15 +297,15 @@ export function Game() {
                            playerID={cookies.playerID}/>
                 </div>
                 {currentGameState?.SessionWaitingForPlayers &&
-                <div className="game-share">
-                    <p>
-                        Ask friend to scan code to join<br/>
-                        or <button className="button-text" onClick={() => playWithBot()}>play with bot </button> 🤖
-                    </p>
-                    <QRCode value={gameURL(sessionID)}
-                            style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
+                    <div className="game-share">
+                        <p>
+                            Ask friend to scan code to join<br/>
+                            or <button className="button-text" onClick={() => playWithBot()}>play with bot </button> 🤖
+                        </p>
+                        <QRCode value={gameURL(sessionID)}
+                                style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
 
-                </div>}
+                    </div>}
                 <div className="game-debug">
                     <p>Player: {cookies.playerID}</p>
                     <p>SessionID: {sessionID}</p>
