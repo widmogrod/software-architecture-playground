@@ -63,15 +63,6 @@ export function Info() {
                 </Link>
             </div>
             <div className="game-option">
-                <h2>Tic-tac-toe but <b>bigger</b></h2>
-                <p>Board has 5x5 dimensions, but still 3 in a row wins</p>
-                <Board2 cols={5} rows={5}
-                        winingSequence={["2.2", "3.3", "4.4"]}/>
-                <Link className={"button-action"} to={"game/" + uuid() + "/5/3"}>
-                    Play
-                </Link>
-            </div>
-            <div className="game-option">
                 <h2>4 in a row</h2>
                 <p>Much more demanding variant of tic tac toe. Board has 8x8 dimensions, and four in row wins </p>
                 <Board2 cols={8} rows={8}
@@ -171,7 +162,7 @@ function serverURL(sessionID) {
 }
 
 function gameURL(sessionID) {
-    return 'http://' + document.location.hostname + ':3000/#/game/' + sessionID
+    return 'http://' + document.location.hostname + '/#/game/' + sessionID
 }
 
 export function Game() {
@@ -333,11 +324,6 @@ function ChangeGameActions({newGame}) {
             <button className="button-text"
                     onClick={() => newGame(3, 3)}>
                 3x3
-            </button>
-            <span> or </span>
-            <button className="button-text"
-                    onClick={() => newGame(5, 3)}>
-                3x5
             </button>
             <span> or </span>
             <button className="button-text"
