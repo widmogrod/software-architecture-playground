@@ -33,7 +33,7 @@ export const handler = async (event: APIGatewayProxyEvent) => {
     const postCalls = (connectionData.Items ?? []).map(async ({connectionId}) => {
         try {
             await apigwManagementApi.postToConnection({ConnectionId: connectionId, Data: postData}).promise();
-        } catch (e : any) {
+        } catch (e: any) {
             if (e.statusCode === 410) {
                 console.log(`Found stale connection, deleting ${connectionId}`);
                 await ddb.delete({TableName: tableName, Key: {connectionId}}).promise();
