@@ -1,18 +1,18 @@
 import * as cdk from "aws-cdk-lib";
-import * as iam from "aws-cdk-lib/aws-iam";
-// import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdanodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2-alpha';
 import * as apigatewayv2integrations from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
-import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import {SqsEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as golang from '@aws-cdk/aws-lambda-go-alpha';
+
 export class WebsocketSqSStack extends cdk.Stack {
     // constructor for the stack
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
 
-        const queue  = new sqs.Queue(this, 'tic-tac-toe-queue-sqs', {
+        const queue = new sqs.Queue(this, 'tic-tac-toe-queue-sqs', {
             queueName: 'tictactoe-sqs-queue',
             // visibilityTimeout: cdk.Duration.seconds(20),
             // receiveMessageWaitTime: cdk.Duration.seconds(5),
@@ -78,20 +78,6 @@ export class WebsocketSqSStack extends cdk.Stack {
         table.grantReadWriteData(receiveHandler)
         queue.grantSendMessages(receiveHandler)
 
-        // const helloLambda = new golang.GoFunction(this, 'hello-func-1', {
-        //     entry: 'functions/hello',
-        //     // bundling: {
-        //     //     commandHooks: {
-        //     //         beforeBundling(inputDir: string, outputDir: string): string[] {
-        //     //             return ['go test ./' + inputDir];
-        //     //         },
-        //     //         afterBundling(inputDir: string, outputDir: string): string[] {
-        //     //             return ['go build -o ' + outputDir + '/hello ' + inputDir];
-        //     //         }
-        //     //     }
-        //     // }
-        // });
-
         // define the websocket API
         const webSocketApi = new apigatewayv2.WebSocketApi(this, "Tic", {
             connectRouteOptions: {
@@ -111,8 +97,8 @@ export class WebsocketSqSStack extends cdk.Stack {
             autoDeploy: true,
         });
 
-        const queueHandler = new lambdanodejs.NodejsFunction(this, "SQSQueueHandler", {
-            entry: 'lambda/queueHandler.ts',
+        const queueHandler = new golang.GoFunction(this, 'SQSQueueHandlerGo', {
+            entry: 'lambda/go-tic-reciver',
             environment: {
                 TABLE_NAME: table.tableName,
             },
@@ -123,6 +109,7 @@ export class WebsocketSqSStack extends cdk.Stack {
         }))
         queue.grantConsumeMessages(queueHandler)
         webSocketApi.grantManageConnections(queueHandler)
+
 
         // define the websocket API endpoint
         new cdk.CfnOutput(this, "WebsocketSQSEndpoint", {
