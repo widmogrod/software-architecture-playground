@@ -195,9 +195,9 @@ func TestNewMachine(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := NewMachine()
 			for i, cmd := range uc.commands {
-				m.Handle(cmd)
+				err := m.Handle(cmd)
 				assert.Equal(t, uc.states[i], m.State(), "state at index: %d", i)
-				assert.Equal(t, uc.err[i], m.LastErr(), "error at index: %d", i)
+				assert.Equal(t, uc.err[i], err, "error at index: %d", i)
 			}
 		})
 	}

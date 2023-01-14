@@ -2,6 +2,7 @@ package tictactoemanage
 
 import (
 	"errors"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/machine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
 	"math/rand"
@@ -19,59 +20,32 @@ var (
 	ErrNotTheSameGame                   = errors.New("not the same game")
 )
 
-func NewMachine() *Machine {
-	return &Machine{
-		state: nil,
-	}
-}
-
-type Machine struct {
-	state   State
-	lastErr error
-}
-
-func (o *Machine) State() State {
-	return o.state
-}
-
-func (o *Machine) LastErr() error {
-	return o.lastErr
-}
-
-func (o *Machine) Handle(cmd Command) {
-	o.lastErr = nil
-
-	defer func() {
-		if r := recover(); r != nil {
-			o.lastErr = r.(error)
-		}
-	}()
-
-	o.state = MustMatchCommand(cmd,
-		func(x *CreateSessionCMD) State {
-			if o.state != nil {
-				panic(ErrSessionAlreadyCreated)
+func Transition(cmd Command, state State) (State, error) {
+	return MustMatchCommandR2(cmd,
+		func(x *CreateSessionCMD) (State, error) {
+			if state != nil {
+				return nil, ErrSessionAlreadyCreated
 			}
 
 			return &SessionWaitingForPlayers{
 				ID:           x.SessionID,
 				NeedsPlayers: x.NeedsPlayers,
 				Players:      []PlayerID{},
-			}
+			}, nil
 		},
-		func(x *JoinGameSessionCMD) State {
-			state, ok := o.state.(*SessionWaitingForPlayers)
+		func(x *JoinGameSessionCMD) (State, error) {
+			state, ok := state.(*SessionWaitingForPlayers)
 			if !ok {
-				panic(ErrSessionNotWaitingForPlayers)
+				return nil, ErrSessionNotWaitingForPlayers
 			}
 
 			if state.ID != x.SessionID {
-				panic(ErrNotTheSameSessions)
+				return nil, ErrNotTheSameSessions
 			}
 
 			for _, player := range state.Players {
 				if player == x.PlayerID {
-					panic(ErrPlayerAlreadyJoined)
+					return nil, ErrPlayerAlreadyJoined
 				}
 			}
 
@@ -82,27 +56,25 @@ func (o *Machine) Handle(cmd Command) {
 			}
 
 			if newState.NeedsPlayers > 0 {
-				return newState
+				return newState, nil
 			}
 
 			return &SessionReady{
 				ID:      state.ID,
 				Players: newState.Players,
-			}
+			}, nil
 		},
-		func(x *GameSessionWithBotCMD) State {
-			o.Handle(&JoinGameSessionCMD{
+		func(x *GameSessionWithBotCMD) (State, error) {
+			return Transition(&JoinGameSessionCMD{
 				SessionID: x.SessionID,
 				PlayerID:  BotPlayerID,
-			})
-
-			return o.state
+			}, state)
 		},
-		func(x *LeaveGameSessionCMD) State {
-			switch state := o.state.(type) {
+		func(x *LeaveGameSessionCMD) (State, error) {
+			switch state := state.(type) {
 			case *SessionWaitingForPlayers:
 				if state.ID != x.SessionID {
-					panic(ErrNotTheSameSessions)
+					return nil, ErrNotTheSameSessions
 				}
 
 				var players []PlayerID
@@ -116,11 +88,11 @@ func (o *Machine) Handle(cmd Command) {
 					ID:           state.ID,
 					NeedsPlayers: state.NeedsPlayers + float64(len(state.Players)-len(players)),
 					Players:      players,
-				}
+				}, nil
 
 			case *SessionReady:
 				if state.ID != x.SessionID {
-					panic(ErrNotTheSameSessions)
+					return nil, ErrNotTheSameSessions
 				}
 
 				var players []PlayerID
@@ -134,27 +106,27 @@ func (o *Machine) Handle(cmd Command) {
 					ID:           state.ID,
 					NeedsPlayers: float64(len(players)),
 					Players:      players,
-				}
+				}, nil
 			}
 
 			panic("not implemented, TODO: error!")
 		},
-		func(x *NewGameCMD) State {
-			switch state := o.state.(type) {
+		func(x *NewGameCMD) (State, error) {
+			switch state := state.(type) {
 			case *SessionReady:
 				if state.ID != x.SessionID {
-					panic(ErrNotTheSameSessions)
+					return nil, ErrNotTheSameSessions
 				}
 
 				return &SessionInGame{
 					ID:      state.ID,
 					Players: state.Players,
 					GameID:  x.GameID,
-				}
+				}, nil
 
 			case *SessionInGame:
 				if state.ID != x.SessionID {
-					panic(ErrNotTheSameSessions)
+					return nil, ErrNotTheSameSessions
 				}
 				//if state.GameID != x.GameID {
 				//	panic(ErrNotTheSameGame)
@@ -164,22 +136,24 @@ func (o *Machine) Handle(cmd Command) {
 					ID:      state.ID,
 					Players: state.Players,
 					GameID:  x.GameID,
-				}
+				}, nil
+
 			default:
-				panic(ErrSessionNotReadyToStartGame)
+				return nil, ErrSessionNotReadyToStartGame
 			}
-		}, func(x *GameActionCMD) State {
-			state, ok := o.state.(*SessionInGame)
+		},
+		func(x *GameActionCMD) (State, error) {
+			state, ok := state.(*SessionInGame)
 			if !ok {
-				panic(ErrSessionNotReadyToAcceptGameInput)
+				return nil, ErrSessionNotReadyToAcceptGameInput
 			}
 
 			if state.ID != x.SessionID {
-				panic(ErrNotTheSameSessions)
+				return nil, ErrNotTheSameSessions
 			}
 
 			if state.GameID != x.GameID {
-				panic(ErrNotTheSameGame)
+				return nil, ErrNotTheSameGame
 			}
 
 			game := tictacstatemachine.NewMachineWithState(state.GameState)
@@ -248,8 +222,12 @@ func (o *Machine) Handle(cmd Command) {
 				newState.GameProblem = &msg
 			}
 
-			return newState
+			return newState, nil
 		})
+}
+
+func NewMachine() *machine.Machine[Command, State] {
+	return machine.NewSimpleMachine(Transition)
 }
 
 func IsBot(id PlayerID) bool {
