@@ -19,8 +19,60 @@ import (
 
 type ma = map[string]interface{}
 
+type Repository[A any] struct {
+	store sync.Map
+	new   func() A
+}
+
+var ErrNotFound = fmt.Errorf("not found")
+
+func (r *Repository[A]) Get(key string) (A, error) {
+	v, ok := r.store.Load(key)
+	if !ok {
+		var a A
+		return a, ErrNotFound
+	}
+	return v.(A), nil
+}
+
+func (r *Repository[A]) Set(key string, value A) error {
+	r.store.Store(key, value)
+	return nil
+}
+
+func (r *Repository[A]) GetOrNew(s string) (A, error) {
+	v, err := r.Get(s)
+	if err == nil {
+		return v, nil
+	}
+
+	if err != nil && err != ErrNotFound {
+		var a A
+		return a, err
+	}
+
+	v = r.new()
+
+	err = r.Set(s, v)
+	if err != nil {
+		var a A
+		return a, err
+	}
+
+	return v, nil
+}
+
 func main() {
-	registry := sync.Map{}
+
+	reg := Repository[*tictactoemanage.Machine]{
+		store: sync.Map{},
+		new: func() *tictactoemanage.Machine {
+			return tictactoemanage.NewMachine()
+		},
+		//do: func(m *tictactoemanage.Machine, cmd tictactoemanage.Command) error {
+		//	m.Handle(cmd)
+		//},
+	}
 	peers := sync.Map{}
 
 	mux := http.NewServeMux()
@@ -43,8 +95,10 @@ func main() {
 			connections.Store(conn, conn)
 			defer connections.Delete(conn)
 
-			manageAny, _ := registry.LoadOrStore(uuid, tictactoemanage.NewMachine())
-			manage := manageAny.(*tictactoemanage.Machine)
+			manage, err := reg.GetOrNew(uuid)
+			if err != nil {
+				panic(err)
+			}
 
 			for {
 				msg, op, err := wsutil.ReadClientData(conn)
