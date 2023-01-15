@@ -5,38 +5,50 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/machine"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
 	"log"
 	"net"
 	"sync"
 )
 
-func NewProtocol[C, S any](reg *storage.RepositoryInMemory[*machine.Machine[C, S]]) *Protocol[C, S] {
+func NewProtocol[C, S any]() *Protocol[C, S] {
 	return &Protocol[C, S]{
-		sessions: reg,
-		publish:  make(chan Item),
+		publish: make(chan Item),
 	}
 }
+
+type ConnectionID = string
 
 type Protocol[C, S any] struct {
 	publish             chan Item
 	connections         sync.Map
 	sessionToConnection sync.Map
-	sessions            *storage.RepositoryInMemory[*machine.Machine[C, S]]
 
 	UnmarshalCommand func(msg []byte) (C, error)
 	MarshalState     func(state S) ([]byte, error)
 	ExtractSessionID func(cmd C) string
+	OnMessage        func(connectionID string, data []byte) error
 }
 
 func (s *Protocol[C, S]) ConnectionOpen(conn net.Conn) {
 	s.connections.Store(conn, uuid.Must(uuid.NewUUID()).String())
 }
 
+func (s *Protocol[C, S]) ConnectionID(conn net.Conn) (string, error) {
+	connectionID, ok := s.connections.Load(conn)
+	if !ok {
+		return "", fmt.Errorf("connection not found")
+	}
+	return connectionID.(string), nil
+}
+
 func (s *Protocol[C, S]) ConnectionClose(conn net.Conn) {
+	connectionID, err := s.ConnectionID(conn)
+	if err != nil {
+		return
+	}
+
 	s.connections.Delete(conn)
-	s.sessionToConnection.Delete(conn)
+	s.sessionToConnection.Delete(connectionID)
 }
 
 func (s *Protocol[C, S]) ConnectionReceiveData(conn net.Conn) error {
@@ -46,80 +58,38 @@ func (s *Protocol[C, S]) ConnectionReceiveData(conn net.Conn) error {
 		return err
 	}
 
-	cmd, err := s.UnmarshalCommand(msg)
+	connectionID, err := s.ConnectionID(conn)
 	if err != nil {
 		return err
 	}
 
-	connectionAny, ok := s.connections.Load(conn)
-	if !ok {
-		return fmt.Errorf("connection not found")
-	}
-	connectionID := connectionAny.(string)
-
-	sessionID := s.ExtractSessionID(cmd)
-	s.AssociateConnectionWithSession(conn, sessionID)
-
-	machine, err := s.sessions.GetOrNew(sessionID)
-	if err != nil {
-		return err
-	}
-
-	err = machine.Handle(cmd)
-	if err != nil {
-		log.Println("Handle error continued:", err)
-		//return err
-	}
-
-	state := machine.State()
-
-	msg, err = s.MarshalState(state)
-	if err != nil {
-		return err
-	}
-	log.Println("state", string(msg))
-
-	shouldBroadcast := true
-	if shouldBroadcast {
-		s.BroadcastToSession(sessionID, msg)
-	} else {
-		s.SendBackToSender(connectionID, msg)
-	}
-
-	return nil
+	return s.OnMessage(connectionID, msg)
 }
 
 func (s *Protocol[C, S]) BroadcastToSession(sessionID string, msg []byte) {
-	var conns []net.Conn
-	s.sessionToConnection.Range(func(conn, connSessionID interface{}) bool {
+	var conns []ConnectionID
+	s.sessionToConnection.Range(func(connectionID, connSessionID interface{}) bool {
 		if connSessionID == sessionID {
-			conns = append(conns, conn.(net.Conn))
+			conns = append(conns, connectionID.(ConnectionID))
 		}
 		return true
 	})
 
-	for _, conn := range conns {
+	for _, connectionID := range conns {
 		i := Item{
-			Conn: conn,
-			Op:   ws.OpText,
-			Data: msg,
+			ConnectionID: connectionID,
+			Data:         msg,
 		}
 		s.pub(i)
 	}
 }
 
 func (s *Protocol[C, S]) SendBackToSender(connectionID string, msg []byte) {
-	s.connections.Range(func(conn, connConnectionID interface{}) bool {
-		if connConnectionID == connectionID {
-			i := Item{
-				Conn: conn.(net.Conn),
-				Op:   ws.OpText,
-				Data: msg,
-			}
-			s.pub(i)
-		}
-		return true
-	})
+	i := Item{
+		ConnectionID: connectionID,
+		Data:         msg,
+	}
+	s.pub(i)
 }
 
 func (s *Protocol[C, S]) pub(i Item) {
@@ -131,26 +101,50 @@ func (s *Protocol[C, S]) ToPublish() chan Item {
 	return s.publish
 }
 
-func (s *Protocol[C, S]) AssociateConnectionWithSession(conn net.Conn, sessionID string) {
-	s.sessionToConnection.Store(conn, sessionID)
+func (s *Protocol[C, S]) AssociateConnectionWithSession(connectionID, sessionID string) {
+	s.sessionToConnection.Store(connectionID, sessionID)
 }
 
 func (s *Protocol[C, S]) PublishLoop() {
 	for {
 		select {
 		case pub := <-s.publish:
-			err := wsutil.WriteServerMessage(pub.Conn, pub.Op, pub.Data)
+			conn, err := s.ConnByID(pub.ConnectionID)
 			if err != nil {
-				log.Println("WriteServerMessage:", err)
-				s.ConnectionClose(pub.Conn)
+				log.Println("PublishLoop: ConnByID error", err)
+				continue
 			}
-			log.Println("published:", string(pub.Data))
+
+			err = wsutil.WriteServerMessage(conn, ws.OpText, pub.Data)
+			if err != nil {
+				log.Println("PublishLoop: WriteServerMessage:", err)
+				s.ConnectionClose(conn)
+			}
+
+			log.Println("PublishLoop: published:", string(pub.Data))
 		}
 	}
 }
 
+func (s *Protocol[C, S]) ConnByID(connectionID ConnectionID) (net.Conn, error) {
+	var conn net.Conn
+	s.connections.Range(func(key, value interface{}) bool {
+		if value == connectionID {
+			conn = key.(net.Conn)
+			return false
+		}
+		return true
+	})
+
+	if conn == nil {
+		return nil, fmt.Errorf("connection not found")
+	}
+
+	return conn, nil
+
+}
+
 type Item struct {
-	Conn net.Conn
-	Op   ws.OpCode
-	Data []byte
+	ConnectionID ConnectionID
+	Data         []byte
 }

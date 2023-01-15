@@ -15,7 +15,7 @@ import (
 
 func main() {
 	reg := storage.NewRepositoryInMemory(tictactoemanage.NewMachine)
-	proto := websockproto.NewProtocol[tictactoemanage.Command, tictactoemanage.State](reg)
+	proto := websockproto.NewProtocol[tictactoemanage.Command, tictactoemanage.State]()
 
 	proto.UnmarshalCommand = func(msg []byte) (tictactoemanage.Command, error) {
 		sch, err := schema.FromJSON(msg)
@@ -58,6 +58,44 @@ func main() {
 				return x.SessionID
 			},
 		)
+	}
+	proto.OnMessage = func(connectionID string, data []byte) error {
+		cmd, err := proto.UnmarshalCommand(data)
+		if err != nil {
+			return err
+		}
+
+		sessionID := proto.ExtractSessionID(cmd)
+		proto.AssociateConnectionWithSession(connectionID, sessionID)
+
+		machine, err := reg.GetOrNew(sessionID)
+		if err != nil {
+			return err
+		}
+
+		err = machine.Handle(cmd)
+		if err != nil {
+			log.Println("Handle error continued:", err)
+			//return err
+		}
+
+		state := machine.State()
+
+		msg, err := proto.MarshalState(state)
+		if err != nil {
+			return err
+		}
+		log.Println("state", string(msg))
+
+		shouldBroadcast := true
+		if shouldBroadcast {
+			proto.BroadcastToSession(sessionID, msg)
+		} else {
+			proto.SendBackToSender(connectionID, msg)
+		}
+
+		return nil
+
 	}
 
 	go proto.PublishLoop()
