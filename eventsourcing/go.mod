@@ -13,6 +13,7 @@ require (
 	github.com/gobwas/ws v1.1.0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/golang/protobuf v1.5.0
+	github.com/google/uuid v1.1.2
 	github.com/rs/cors v1.8.3
 	github.com/segmentio/ksuid v1.0.3
 	github.com/stretchr/testify v1.8.1
