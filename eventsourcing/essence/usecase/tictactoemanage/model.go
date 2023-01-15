@@ -56,7 +56,7 @@ type (
 		Players       []PlayerID
 		GameID        GameID
 		GameState     tictacstatemachine.State
-		GameProblem   string
+		GameProblem   *string
 		PreviousGames []GameID
 	}
 )
