@@ -87,9 +87,9 @@ function Square({value, isWin, onSquareClick}) {
 
 function Board({state, transition, playerID, squareStyle}) {
     let {
-        MovesTaken, WiningSequence,
-        FirstPlayerID, SecondPlayerID,
-        BoardRows, BoardCols
+        MovesTaken,
+        WiningSequence,
+        TicTacToeBaseState,
     } = (() => {
         if (state?.GameProgress) {
             return state?.GameProgress
@@ -101,6 +101,11 @@ function Board({state, transition, playerID, squareStyle}) {
 
         return {}
     })()
+
+    let {
+        FirstPlayerID, SecondPlayerID,
+        BoardRows, BoardCols
+    } = TicTacToeBaseState || {}
 
     return (
         <Board2 rows={BoardRows}
@@ -157,6 +162,7 @@ function Board2({movesTaken, playersStyle, rows, cols, winingSequence, onSquareC
 
 
 function serverURL(sessionID) {
+    // return 'wss://al0ofi3lke.execute-api.eu-west-1.amazonaws.com/dev'
     return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
 }
 

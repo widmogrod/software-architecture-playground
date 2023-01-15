@@ -164,9 +164,6 @@ func Transition(cmd Command, state State) (State, error) {
 			//	})
 			//}
 			action := x.Action
-			if cmd, ok := action.(*tictacstatemachine.CommandOneOf); ok {
-				action = cmd.Unwrap()
-			}
 
 			if sg, ok := action.(*tictacstatemachine.StartGameCMD); ok {
 				if HasBotPlayer(state.Players) ||
@@ -219,7 +216,7 @@ func Transition(cmd Command, state State) (State, error) {
 
 			if game.LastErr() != nil {
 				msg := game.LastErr().Error()
-				newState.GameProblem = &msg
+				newState.GameProblem = msg
 			}
 
 			return newState, nil
