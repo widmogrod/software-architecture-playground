@@ -23,18 +23,16 @@ type ConnectionToSession struct {
 	SessionID    string
 }
 
-func NewInMemoryBroadcaster(publisher Publisher) *InMemoryBroadcaster {
+func NewBroadcaster(publisher Publisher, repository storage.Repository[ConnectionToSession]) *InMemoryBroadcaster {
 	return &InMemoryBroadcaster{
-		repository: storage.NewRepositoryInMemory(func() ConnectionToSession {
-			panic("not supported creation of ConnectionToSession")
-		}),
-		publisher: publisher,
+		publisher:  publisher,
+		repository: repository,
 	}
 }
 
 type InMemoryBroadcaster struct {
 	publisher  Publisher
-	repository *storage.RepositoryInMemory[ConnectionToSession]
+	repository storage.Repository[ConnectionToSession]
 }
 
 func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string, sessionID string) {

@@ -6,12 +6,21 @@ import (
 	"sync"
 )
 
+type Repository[A any] interface {
+	Get(key string) (A, error)
+	Set(key string, value A) error
+	GetOrNew(s string) (A, error)
+	FindAllKeyEqual(key string, value string) (PageResult[A], error)
+}
+
 func NewRepositoryInMemory[A any](new func() A) *RepositoryInMemory[A] {
 	return &RepositoryInMemory[A]{
 		store: sync.Map{},
 		new:   new,
 	}
 }
+
+var _ Repository[any] = (*RepositoryInMemory[any])(nil)
 
 type RepositoryInMemory[A any] struct {
 	store sync.Map

@@ -124,8 +124,11 @@ func main() {
 		return nil
 	})
 
+	storage := storage.NewRepositoryInMemory(func() websockproto.ConnectionToSession {
+		panic("not supported creation of ConnectionToSession")
+	})
 	proto := websockproto.NewInMemoryProtocol()
-	broadcaster := websockproto.NewInMemoryBroadcaster(proto)
+	broadcaster := websockproto.NewBroadcaster(proto, storage)
 
 	game := &Game{
 		broadcast:       broadcaster,
