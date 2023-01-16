@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
 )
 
@@ -53,4 +54,35 @@ func (r *RepositoryInMemory[A]) GetOrNew(s string) (A, error) {
 	}
 
 	return v, nil
+}
+
+type PageResult[A any] struct {
+	Items []A
+	Next  string
+}
+
+func (a PageResult[A]) HasNext() bool {
+	return a.Next != ""
+}
+
+func (r *RepositoryInMemory[A]) FindAllKeyEqual(key string, value string) (PageResult[A], error) {
+	result := PageResult[A]{
+		Next: "",
+	}
+
+	r.store.Range(func(k, v interface{}) bool {
+		sch := schema.FromGo(v)
+		if m, ok := sch.(*schema.Map); ok {
+			for _, kv := range m.Field {
+				valueOfKey := schema.ToGo(kv.Value)
+				if kv.Name == key && valueOfKey == value {
+					result.Items = append(result.Items, v.(A))
+				}
+			}
+		}
+
+		return true
+	})
+
+	return result, nil
 }

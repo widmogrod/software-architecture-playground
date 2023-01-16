@@ -10,30 +10,47 @@ import (
 	"sync"
 )
 
-func NewProtocol[C, S any]() *Protocol[C, S] {
-	return &Protocol[C, S]{
+type OnMessageFunc func(id ConnectionID, data []byte) error
+type OnConnectFunc func(id ConnectionID) error
+type OnDisconnectFunc func(id ConnectionID) error
+
+func NewInMemoryProtocol() *InMemoryProtocol {
+	return &InMemoryProtocol{
 		publish: make(chan Item),
+
+		connections: sync.Map{},
 	}
 }
 
 type ConnectionID = string
 
-type Protocol[C, S any] struct {
-	publish             chan Item
-	connections         sync.Map
-	sessionToConnection sync.Map
-
-	UnmarshalCommand func(msg []byte) (C, error)
-	MarshalState     func(state S) ([]byte, error)
-	ExtractSessionID func(cmd C) string
-	OnMessage        func(connectionID string, data []byte) error
+type Item struct {
+	ConnectionID ConnectionID
+	Data         []byte
 }
 
-func (s *Protocol[C, S]) ConnectionOpen(conn net.Conn) {
-	s.connections.Store(conn, uuid.Must(uuid.NewUUID()).String())
+type InMemoryProtocol struct {
+	publish     chan Item
+	connections sync.Map
+
+	OnMessage    OnMessageFunc
+	OnConnect    OnConnectFunc
+	OnDisconnect OnDisconnectFunc
 }
 
-func (s *Protocol[C, S]) ConnectionID(conn net.Conn) (string, error) {
+func (s *InMemoryProtocol) ConnectionOpen(conn net.Conn) {
+	connectionID := uuid.Must(uuid.NewUUID()).String()
+	err := s.OnConnect(connectionID)
+
+	if err != nil {
+		log.Printf("ConnectionOpen: OnConnect(%s) error: %v ", connectionID, err)
+		return
+	}
+
+	s.connections.Store(conn, connectionID)
+}
+
+func (s *InMemoryProtocol) GetConnectionIDFromConn(conn net.Conn) (string, error) {
 	connectionID, ok := s.connections.Load(conn)
 	if !ok {
 		return "", fmt.Errorf("connection not found")
@@ -41,24 +58,27 @@ func (s *Protocol[C, S]) ConnectionID(conn net.Conn) (string, error) {
 	return connectionID.(string), nil
 }
 
-func (s *Protocol[C, S]) ConnectionClose(conn net.Conn) {
-	connectionID, err := s.ConnectionID(conn)
+func (s *InMemoryProtocol) ConnectionClose(conn net.Conn) {
+	s.connections.Delete(conn)
+
+	connectionID, err := s.GetConnectionIDFromConn(conn)
 	if err != nil {
 		return
 	}
-
-	s.connections.Delete(conn)
-	s.sessionToConnection.Delete(connectionID)
+	err = s.OnDisconnect(connectionID)
+	if err != nil {
+		log.Printf("ConnectionClose: OnDisconnect(%s) error %v \n", connectionID, err)
+	}
 }
 
-func (s *Protocol[C, S]) ConnectionReceiveData(conn net.Conn) error {
+func (s *InMemoryProtocol) ConnectionReceiveData(conn net.Conn) error {
 	msg, _, err := wsutil.ReadClientData(conn)
 	log.Println("msg", string(msg))
 	if err != nil {
 		return err
 	}
 
-	connectionID, err := s.ConnectionID(conn)
+	connectionID, err := s.GetConnectionIDFromConn(conn)
 	if err != nil {
 		return err
 	}
@@ -66,52 +86,17 @@ func (s *Protocol[C, S]) ConnectionReceiveData(conn net.Conn) error {
 	return s.OnMessage(connectionID, msg)
 }
 
-func (s *Protocol[C, S]) BroadcastToSession(sessionID string, msg []byte) {
-	var conns []ConnectionID
-	s.sessionToConnection.Range(func(connectionID, connSessionID interface{}) bool {
-		if connSessionID == sessionID {
-			conns = append(conns, connectionID.(ConnectionID))
-		}
-		return true
-	})
-
-	for _, connectionID := range conns {
-		i := Item{
-			ConnectionID: connectionID,
-			Data:         msg,
-		}
-		s.pub(i)
-	}
-}
-
-func (s *Protocol[C, S]) SendBackToSender(connectionID string, msg []byte) {
-	i := Item{
-		ConnectionID: connectionID,
-		Data:         msg,
-	}
-	s.pub(i)
-}
-
-func (s *Protocol[C, S]) pub(i Item) {
-	log.Println("chan pub.Data == ", string(i.Data))
-	s.publish <- i
-}
-
-func (s *Protocol[C, S]) ToPublish() chan Item {
+func (s *InMemoryProtocol) ToPublish() chan Item {
 	return s.publish
 }
 
-func (s *Protocol[C, S]) AssociateConnectionWithSession(connectionID, sessionID string) {
-	s.sessionToConnection.Store(connectionID, sessionID)
-}
-
-func (s *Protocol[C, S]) PublishLoop() {
+func (s *InMemoryProtocol) PublishLoop() {
 	for {
 		select {
 		case pub := <-s.publish:
-			conn, err := s.ConnByID(pub.ConnectionID)
+			conn, err := s.connByID(pub.ConnectionID)
 			if err != nil {
-				log.Println("PublishLoop: ConnByID error", err)
+				log.Println("PublishLoop: connByID error", err)
 				continue
 			}
 
@@ -126,7 +111,7 @@ func (s *Protocol[C, S]) PublishLoop() {
 	}
 }
 
-func (s *Protocol[C, S]) ConnByID(connectionID ConnectionID) (net.Conn, error) {
+func (s *InMemoryProtocol) connByID(connectionID ConnectionID) (net.Conn, error) {
 	var conn net.Conn
 	s.connections.Range(func(key, value interface{}) bool {
 		if value == connectionID {
@@ -144,7 +129,11 @@ func (s *Protocol[C, S]) ConnByID(connectionID ConnectionID) (net.Conn, error) {
 
 }
 
-type Item struct {
-	ConnectionID ConnectionID
-	Data         []byte
+func (s *InMemoryProtocol) Publish(connectionID string, msg []byte) error {
+	i := Item{
+		ConnectionID: connectionID,
+		Data:         msg,
+	}
+	s.publish <- i
+	return nil
 }

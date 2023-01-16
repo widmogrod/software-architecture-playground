@@ -227,6 +227,10 @@ func NewMachine() *machine.Machine[Command, State] {
 	return machine.NewSimpleMachine(Transition)
 }
 
+func NewMachineWithState(state State) *machine.Machine[Command, State] {
+	return machine.NewSimpleMachineWithState(Transition, state)
+}
+
 func IsBot(id PlayerID) bool {
 	return id == BotPlayerID
 }
