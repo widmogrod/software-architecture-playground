@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gobwas/ws"
 	"github.com/rs/cors"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
-	"io"
 	"log"
 	"net/http"
 )
@@ -127,49 +125,23 @@ func main() {
 	storage := storage.NewRepositoryInMemory(func() websockproto.ConnectionToSession {
 		panic("not supported creation of ConnectionToSession")
 	})
-	proto := websockproto.NewInMemoryProtocol()
-	broadcaster := websockproto.NewBroadcaster(proto, storage)
+	wshandler := websockproto.NewInMemoryProtocol()
+	broadcaster := websockproto.NewBroadcaster(wshandler, storage)
 
 	game := &Game{
 		broadcast:       broadcaster,
 		stateRepository: reg,
 	}
 
-	proto.OnMessage = game.OnMessage
-	proto.OnConnect = game.OnConnect
-	proto.OnDisconnect = game.OnDisconnect
+	wshandler.OnMessage = game.OnMessage
+	wshandler.OnConnect = game.OnConnect
+	wshandler.OnDisconnect = game.OnDisconnect
 
-	go proto.PublishLoop()
+	go wshandler.PublishLoop()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.FileServer(http.Dir("../tictactoe-app/build")).ServeHTTP)
-	mux.HandleFunc("/play/", func(w http.ResponseWriter, r *http.Request) {
-		conn, _, _, err := ws.UpgradeHTTP(r, w)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
-
-		proto.ConnectionOpen(conn)
-
-		go func() {
-			defer proto.ConnectionClose(conn)
-			defer conn.Close()
-
-			for {
-				err = proto.ConnectionReceiveData(conn)
-				if err != nil {
-					if err == io.EOF {
-						log.Println("ConnectionReceiveData: CLOSED")
-						break
-					}
-					log.Println("ConnectionReceiveData:", err)
-					continue
-				}
-			}
-		}()
-	})
+	mux.HandleFunc("/play/", wshandler.ServeHTTP)
 
 	handler := cors.AllowAll().Handler(mux)
 	err := http.ListenAndServe(":8080", handler)

@@ -5,8 +5,10 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 )
 
@@ -136,4 +138,32 @@ func (s *InMemoryProtocol) Publish(connectionID string, msg []byte) error {
 	}
 	s.publish <- i
 	return nil
+}
+
+func (s *InMemoryProtocol) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+
+	s.ConnectionOpen(conn)
+
+	go func() {
+		defer s.ConnectionClose(conn)
+		defer conn.Close()
+
+		for {
+			err = s.ConnectionReceiveData(conn)
+			if err != nil {
+				if err == io.EOF {
+					log.Println("ConnectionReceiveData: CLOSED")
+					break
+				}
+				log.Println("ConnectionReceiveData:", err)
+				continue
+			}
+		}
+	}()
 }
