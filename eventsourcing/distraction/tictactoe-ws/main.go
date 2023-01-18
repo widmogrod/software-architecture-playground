@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/rs/cors"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
@@ -9,6 +12,7 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"log"
 	"net/http"
+	"os"
 )
 
 func UnmarshalCommand(msg []byte) (tictactoemanage.Command, error) {
@@ -76,8 +80,8 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 	sessionID := ExtractSessionID(cmd)
 	g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
-	state, err := g.stateRepository.GetOrNew(sessionID)
-	if err != nil {
+	state, err := g.stateRepository.Get(sessionID)
+	if err != nil && err != storage.ErrNotFound {
 		return err
 	}
 
@@ -89,9 +93,11 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 	}
 
 	newState := machine.State()
-	err = g.stateRepository.Set(sessionID, newState)
-	if err != nil {
-		return err
+	if newState != nil {
+		err = g.stateRepository.Set(sessionID, newState)
+		if err != nil {
+			return err
+		}
 	}
 
 	msg, err := MarshalState(newState)
@@ -111,26 +117,47 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 }
 func (g *Game) OnConnect(connectionID string) error {
-	return nil
+	return g.broadcast.RegisterConnectionID(connectionID)
 }
 func (g *Game) OnDisconnect(connectionID string) error {
-	return nil
+	return g.broadcast.UnregisterConnectionID(connectionID)
 }
 
 func main() {
-	reg := storage.NewRepositoryInMemory(func() tictactoemanage.State {
-		return nil
-	})
+	os.Setenv("AWS_PROFILE", "gh-dev")
+	os.Setenv("AWS_DEFAULT_REGION", "eu-west-1")
+	//stateRepo := storage.NewRepositoryInMemory(func() tictactoemanage.State {
+	//	return nil
+	//})
 
-	storage := storage.NewRepositoryInMemory(func() websockproto.ConnectionToSession {
-		panic("not supported creation of ConnectionToSession")
-	})
+	var err error
+	//storage := storage.NewRepositoryInMemory(func() websockproto.ConnectionToSession {
+	//	panic("not supported creation of ConnectionToSession")
+	//})
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	connRepo := storage.NewDynamoDBRepository(
+		dynamodb.NewFromConfig(cfg),
+		"test-repo",
+		func() websockproto.ConnectionToSession {
+			panic("not supported creation of ConnectionToSession")
+		})
+
+	stateRepo := storage.NewDynamoDBRepository(
+		dynamodb.NewFromConfig(cfg),
+		"test-repo",
+		func() tictactoemanage.State {
+			return nil
+		})
+
 	wshandler := websockproto.NewInMemoryProtocol()
-	broadcaster := websockproto.NewBroadcaster(wshandler, storage)
+	broadcaster := websockproto.NewBroadcaster(wshandler, connRepo)
 
 	game := &Game{
 		broadcast:       broadcaster,
-		stateRepository: reg,
+		stateRepository: stateRepo,
 	}
 
 	wshandler.OnMessage = game.OnMessage
@@ -144,7 +171,7 @@ func main() {
 	mux.HandleFunc("/play/", wshandler.ServeHTTP)
 
 	handler := cors.AllowAll().Handler(mux)
-	err := http.ListenAndServe(":8080", handler)
+	err = http.ListenAndServe(":8080", handler)
 	if err != nil {
 		log.Fatal(err)
 	}

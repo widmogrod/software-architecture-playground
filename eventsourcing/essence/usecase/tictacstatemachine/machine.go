@@ -121,6 +121,10 @@ func (o *Machine) Handle(cmd Command) {
 				panic(ErrPositionTaken)
 			}
 
+			if state.MovesTaken == nil {
+				state.MovesTaken = map[Move]PlayerID{}
+			}
+
 			state.MovesTaken[x.Position] = x.PlayerID
 			state.MovesOrder = append(state.MovesOrder, move)
 

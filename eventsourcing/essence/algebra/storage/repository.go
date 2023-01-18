@@ -6,9 +6,14 @@ import (
 	"sync"
 )
 
+var (
+	ErrNotFound = fmt.Errorf("not found")
+)
+
 type Repository[A any] interface {
 	Get(key string) (A, error)
 	Set(key string, value A) error
+	Delete(key string) error
 	GetOrNew(s string) (A, error)
 	FindAllKeyEqual(key string, value string) (PageResult[A], error)
 }
@@ -27,8 +32,6 @@ type RepositoryInMemory[A any] struct {
 	new   func() A
 }
 
-var ErrNotFound = fmt.Errorf("not found")
-
 func (r *RepositoryInMemory[A]) Get(key string) (A, error) {
 	v, ok := r.store.Load(key)
 	if !ok {
@@ -40,6 +43,11 @@ func (r *RepositoryInMemory[A]) Get(key string) (A, error) {
 
 func (r *RepositoryInMemory[A]) Set(key string, value A) error {
 	r.store.Store(key, value)
+	return nil
+}
+
+func (r *RepositoryInMemory[A]) Delete(key string) error {
+	r.store.Delete(key)
 	return nil
 }
 

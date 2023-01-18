@@ -8,6 +8,8 @@ type Broadcaster interface {
 	AssociateConnectionWithSession(connectionID string, sessionID string)
 	BroadcastToSession(sessionID string, msg []byte)
 	SendBackToSender(connectionID string, msg []byte)
+	RegisterConnectionID(connectionID string) error
+	UnregisterConnectionID(connectionID string) error
 }
 
 type Publisher interface {
@@ -33,6 +35,20 @@ func NewBroadcaster(publisher Publisher, repository storage.Repository[Connectio
 type InMemoryBroadcaster struct {
 	publisher  Publisher
 	repository storage.Repository[ConnectionToSession]
+}
+
+func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {
+	return i.repository.Set(connectionID, ConnectionToSession{
+		ConnectionID: connectionID,
+	})
+}
+
+func (i *InMemoryBroadcaster) UnregisterConnectionID(connectionID string) error {
+	err := i.repository.Delete(connectionID)
+	if err == storage.ErrNotFound {
+		return nil
+	}
+	return err
 }
 
 func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string, sessionID string) {

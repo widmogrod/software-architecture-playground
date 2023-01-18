@@ -42,17 +42,16 @@ type InMemoryProtocol struct {
 
 func (s *InMemoryProtocol) ConnectionOpen(conn net.Conn) {
 	connectionID := uuid.Must(uuid.NewUUID()).String()
-	err := s.OnConnect(connectionID)
+	s.connections.Store(conn, connectionID)
 
+	err := s.OnConnect(connectionID)
 	if err != nil {
 		log.Printf("ConnectionOpen: OnConnect(%s) error: %v ", connectionID, err)
 		return
 	}
-
-	s.connections.Store(conn, connectionID)
 }
 
-func (s *InMemoryProtocol) GetConnectionIDFromConn(conn net.Conn) (string, error) {
+func (s *InMemoryProtocol) getConnectionIDFromConn(conn net.Conn) (string, error) {
 	connectionID, ok := s.connections.Load(conn)
 	if !ok {
 		return "", fmt.Errorf("connection not found")
@@ -61,12 +60,13 @@ func (s *InMemoryProtocol) GetConnectionIDFromConn(conn net.Conn) (string, error
 }
 
 func (s *InMemoryProtocol) ConnectionClose(conn net.Conn) {
-	s.connections.Delete(conn)
-
-	connectionID, err := s.GetConnectionIDFromConn(conn)
+	connectionID, err := s.getConnectionIDFromConn(conn)
 	if err != nil {
 		return
 	}
+
+	s.connections.Delete(conn)
+
 	err = s.OnDisconnect(connectionID)
 	if err != nil {
 		log.Printf("ConnectionClose: OnDisconnect(%s) error %v \n", connectionID, err)
@@ -80,7 +80,7 @@ func (s *InMemoryProtocol) ConnectionReceiveData(conn net.Conn) error {
 		return err
 	}
 
-	connectionID, err := s.GetConnectionIDFromConn(conn)
+	connectionID, err := s.getConnectionIDFromConn(conn)
 	if err != nil {
 		return err
 	}
@@ -88,14 +88,11 @@ func (s *InMemoryProtocol) ConnectionReceiveData(conn net.Conn) error {
 	return s.OnMessage(connectionID, msg)
 }
 
-func (s *InMemoryProtocol) ToPublish() chan Item {
-	return s.publish
-}
-
 func (s *InMemoryProtocol) PublishLoop() {
 	for {
 		select {
 		case pub := <-s.publish:
+			fmt.Printf("PublishLoop: %s %s \n", pub.ConnectionID, string(pub.Data))
 			conn, err := s.connByID(pub.ConnectionID)
 			if err != nil {
 				log.Println("PublishLoop: connByID error", err)
@@ -148,9 +145,8 @@ func (s *InMemoryProtocol) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.ConnectionOpen(conn)
-
 	go func() {
+		s.ConnectionOpen(conn)
 		defer s.ConnectionClose(conn)
 		defer conn.Close()
 
