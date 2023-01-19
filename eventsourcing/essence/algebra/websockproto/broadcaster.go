@@ -2,6 +2,7 @@ package websockproto
 
 import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"log"
 )
 
 type Broadcaster interface {
@@ -57,7 +58,7 @@ func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string
 		SessionID:    sessionID,
 	})
 	if err != nil {
-		panic(err)
+		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession error:", err)
 	}
 }
 
@@ -65,14 +66,14 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 	for {
 		result, err := i.repository.FindAllKeyEqual("SessionID", sessionID)
 		if err != nil {
-			panic(err)
+			log.Println("InMemoryBroadcaster.BroadcastToSession FindAllKeyEqual error:", err)
 		}
 
 		for _, item := range result.Items {
 			err = i.publisher.Publish(item.ConnectionID, msg)
 			// TODO handle this differently
 			if err != nil {
-				panic(err)
+				log.Println("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
 			}
 		}
 
@@ -85,11 +86,11 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 func (i *InMemoryBroadcaster) SendBackToSender(connectionID string, msg []byte) {
 	item, err := i.repository.Get(connectionID)
 	if err != nil {
-		panic(err)
+		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 
 	err = i.publisher.Publish(item.ConnectionID, msg)
 	if err != nil {
-		panic(err)
+		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 }

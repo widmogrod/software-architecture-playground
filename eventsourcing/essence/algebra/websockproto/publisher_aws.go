@@ -2,39 +2,41 @@ package websockproto
 
 import (
 	"context"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
+	"log"
 	"net/url"
 )
 
-var _ Publisher = (*AWSPublisher)(nil)
-
-type AWSPublisher struct {
-	DomainName string
-	Stage      string
-	cfg        aws.Config
-}
-
-func (a *AWSPublisher) Publish(connectionID string, msg []byte) error {
+func NewPublisher(domainName, stage string, cfg aws.Config) *AWSPublisher {
 	callbackURL := url.URL{
 		Scheme: "https",
-		Host:   a.DomainName,
-		Path:   a.Stage,
+		Host:   domainName,
+		Path:   stage,
 	}
 
-	fmt.Printf("callbackURL: %s \n", callbackURL.String())
-
 	api := apigatewaymanagementapi.NewFromConfig(
-		a.cfg,
+		cfg,
 		apigatewaymanagementapi.WithEndpointResolver(
 			apigatewaymanagementapi.EndpointResolverFromURL(
 				callbackURL.String(),
 			),
 		),
 	)
+	return &AWSPublisher{
+		client: api,
+	}
+}
 
-	_, err := api.PostToConnection(context.Background(), &apigatewaymanagementapi.PostToConnectionInput{
+var _ Publisher = (*AWSPublisher)(nil)
+
+type AWSPublisher struct {
+	client *apigatewaymanagementapi.Client
+}
+
+func (a *AWSPublisher) Publish(connectionID string, msg []byte) error {
+	log.Println("Publishing to connectionID:", connectionID, "msg:", string(msg))
+	_, err := a.client.PostToConnection(context.Background(), &apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: &connectionID,
 		Data:         msg,
 	})

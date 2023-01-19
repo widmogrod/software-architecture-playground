@@ -14,7 +14,7 @@ export const handler = async (event: APIGatewayProxyEvent) => {
     const deleteParams = {
         TableName: tableName,
         Key: {
-            connectionId: event.requestContext.connectionId,
+            key: event.requestContext.connectionId,
         },
     };
 

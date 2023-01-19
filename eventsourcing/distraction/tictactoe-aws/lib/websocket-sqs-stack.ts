@@ -20,7 +20,7 @@ export class WebsocketSqSStack extends cdk.Stack {
 
         const table = new dynamodb.Table(this, 'WebsocketSQSConnections', {
             partitionKey: {
-                name: 'connectionId',
+                name: 'key',
                 type: dynamodb.AttributeType.STRING
             },
             // sortKey: {
@@ -98,7 +98,8 @@ export class WebsocketSqSStack extends cdk.Stack {
         });
 
         const queueHandler = new golang.GoFunction(this, 'SQSQueueHandlerGo', {
-            entry: 'lambda/go-tic-reciver',
+            // entry: 'lambda/go-tic-reciver',
+            entry: 'lambda/go-tic-game-handler',
             environment: {
                 TABLE_NAME: table.tableName,
             },
@@ -109,6 +110,7 @@ export class WebsocketSqSStack extends cdk.Stack {
         }))
         queue.grantConsumeMessages(queueHandler)
         webSocketApi.grantManageConnections(queueHandler)
+        table.grantReadWriteData(queueHandler)
 
 
         // define the websocket API endpoint
