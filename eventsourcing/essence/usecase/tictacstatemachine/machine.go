@@ -99,7 +99,9 @@ func (o *Machine) Handle(cmd Command) {
 				BoardCols:     x.BoardCols,
 				WinningLength: x.WinningLength,
 			})
-			o.Handle(&JoinGameCMD{SecondPlayerID: x.SecondPlayerID})
+			if o.lastErr == nil {
+				o.Handle(&JoinGameCMD{SecondPlayerID: x.SecondPlayerID})
+			}
 			return o.state
 		},
 		func(x *MoveCMD) State {

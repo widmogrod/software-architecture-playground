@@ -162,8 +162,8 @@ function Board2({movesTaken, playersStyle, rows, cols, winingSequence, onSquareC
 
 
 function serverURL(sessionID) {
-    // return 'wss://al0ofi3lke.execute-api.eu-west-1.amazonaws.com/dev'
-    return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
+    return 'wss://al0ofi3lke.execute-api.eu-west-1.amazonaws.com/dev'
+    // return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
 }
 
 function gameURL(sessionID) {
@@ -392,6 +392,15 @@ function Actions({state, playerID, newGame, playAgain}) {
             <div>
                 <p><b>DRAW!</b> 🤝. Good game!</p>
                 <PostGameActions newGame={newGame} playAgain={playAgain}/>
+            </div>
+        )
+    } else {
+        return (
+            <div>
+                <p>Game needs to be started</p>
+                <button className="button-action"
+                        onClick={() => playAgain()}>Play again
+                </button>
             </div>
         )
     }

@@ -42,7 +42,7 @@ func main() {
 				continue
 			}
 
-			log.Println("payload: ", payload)
+			log.Printf("payload: %#v \n", payload)
 
 			connRepo := storage.NewDynamoDBRepository(
 				dynamodb.NewFromConfig(cfg),
