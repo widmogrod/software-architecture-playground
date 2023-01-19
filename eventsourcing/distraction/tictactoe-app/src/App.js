@@ -394,12 +394,11 @@ function Actions({state, playerID, newGame, playAgain}) {
                 <PostGameActions newGame={newGame} playAgain={playAgain}/>
             </div>
         )
-    } else {
         return (
             <div>
-                <p>Game needs to be started</p>
+                <p>Taking to long?</p>
                 <button className="button-action"
-                        onClick={() => playAgain()}>Play again
+                        onClick={() => playAgain()}>Play!
                 </button>
             </div>
         )
