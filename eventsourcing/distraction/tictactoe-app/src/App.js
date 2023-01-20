@@ -245,8 +245,28 @@ export function Game() {
         //eslint-disable-next-line
     }, [readyState, currentGameState, cookies, sendJsonMessage]);
 
+    const setProperty = (obj, path, value) => {
+        const [head, ...rest] = path.split('#')
+
+        return {
+            ...obj,
+            [head]: rest.length
+                ? setProperty(obj[head], rest.join('#'), value)
+                : value
+        }
+    }
 
     function transition(cmd) {
+
+        // this is a hack for optimistic concurrency
+        if (currentGameState.SessionInGame?.GameState?.GameProgress?.MovesTaken && cmd.MoveCMD?.Position) {
+            setGameState(setProperty(
+                currentGameState,
+                "SessionInGame#GameState#GameProgress#MovesTaken#" + cmd.MoveCMD?.Position,
+                cmd.MoveCMD?.PlayerID
+            ))
+        }
+
         let gid = currentGameState?.SessionInGame?.GameID
         sendJsonMessage(manage.GameActionCMD(sessionID, gid, cmd))
     }

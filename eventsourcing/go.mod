@@ -19,7 +19,7 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/segmentio/ksuid v1.0.3
 	github.com/stretchr/testify v1.8.1
-	github.com/widmogrod/mkunion v1.7.12
+	github.com/widmogrod/mkunion v1.7.13
 	google.golang.org/grpc v1.40.0
 	google.golang.org/protobuf v1.27.1
 )
