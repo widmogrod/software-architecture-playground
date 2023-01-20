@@ -190,7 +190,55 @@ func TestNewMachine(t *testing.T) {
 				},
 			},
 		},
+
+		"sequence of commands must have at least two": {
+			commands: []Command{
+				&SequenceCMD{
+					Commands: []Command{
+						&CreateSessionCMD{
+							SessionID:    "s1",
+							NeedsPlayers: 2,
+						},
+					},
+				},
+			},
+			states: []State{
+				nil,
+			},
+			err: []error{
+				ErrNotExpectedListsOfCommands,
+			},
+		},
+		"sequence of commands works": {
+			commands: []Command{
+				&SequenceCMD{
+					Commands: []Command{
+						&CreateSessionCMD{
+							SessionID:    "a",
+							NeedsPlayers: 2,
+						},
+						&JoinGameSessionCMD{
+							SessionID: "a",
+							PlayerID:  "1",
+						},
+					},
+				},
+			},
+			states: []State{
+				&SessionWaitingForPlayers{
+					ID:           "a",
+					NeedsPlayers: 1,
+					Players: []PlayerID{
+						"1",
+					},
+				},
+			},
+			err: []error{
+				nil,
+			},
+		},
 	}
+
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			m := NewMachine()

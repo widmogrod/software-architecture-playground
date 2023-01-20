@@ -43,3 +43,11 @@ export function GameActionCMD(sid, gid, action) {
         },
     }
 }
+
+export function SequenceCMD(cmds) {
+    return {
+        "SequenceCMD": {
+            Commands: cmds || [],
+        },
+    }
+}

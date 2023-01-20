@@ -25,6 +25,7 @@ export const handler = async (event: APIGatewayProxyEvent) => {
     });
 
     try {
+        console.log('event.body', event.body);
         await sqs.sendMessage({
             MessageBody: JSON.stringify({
                 requestContext: event.requestContext,

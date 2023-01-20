@@ -29,6 +29,22 @@ func main() {
 		panic(err)
 	}
 
+	tableName := os.Getenv("TABLE_NAME")
+
+	connRepo := storage.NewDynamoDBRepository(
+		dynamodb.NewFromConfig(cfg),
+		tableName,
+		func() websockproto.ConnectionToSession {
+			panic("not supported creation of ConnectionToSession")
+		})
+
+	stateRepo := storage.NewDynamoDBRepository(
+		dynamodb.NewFromConfig(cfg),
+		tableName,
+		func() tictactoemanage.State {
+			return nil
+		})
+
 	lambda.Start(func(ctx context.Context, event events.SQSEvent) {
 		tableName := os.Getenv("TABLE_NAME")
 		log.Println("TABLE_NAME: ", tableName)
@@ -43,20 +59,6 @@ func main() {
 			}
 
 			log.Printf("payload: %#v \n", payload)
-
-			connRepo := storage.NewDynamoDBRepository(
-				dynamodb.NewFromConfig(cfg),
-				tableName,
-				func() websockproto.ConnectionToSession {
-					panic("not supported creation of ConnectionToSession")
-				})
-
-			stateRepo := storage.NewDynamoDBRepository(
-				dynamodb.NewFromConfig(cfg),
-				tableName,
-				func() tictactoemanage.State {
-					return nil
-				})
 
 			wshandler := websockproto.NewPublisher(
 				payload.RequestContext.DomainName,

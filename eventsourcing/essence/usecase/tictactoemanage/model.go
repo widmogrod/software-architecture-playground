@@ -38,6 +38,12 @@ type (
 		GameID    GameID
 		Action    tictacstatemachine.Command
 	}
+	// SequenceCMD helps to address problem where
+	// individual commands acn be sent in order 1,2,
+	// but they are processed in order 2,1
+	SequenceCMD struct {
+		Commands []Command
+	}
 )
 
 //go:generate mkunion -name=State

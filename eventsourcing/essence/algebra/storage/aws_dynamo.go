@@ -34,7 +34,8 @@ func (d *DynamoDBRepository[A]) Get(key string) (A, error) {
 				Value: key,
 			},
 		},
-		TableName: &d.tableName,
+		TableName:      &d.tableName,
+		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
 		return a, err
@@ -138,6 +139,7 @@ func (d *DynamoDBRepository[A]) FindAllKeyEqual(key string, value string) (PageR
 			},
 		},
 		FilterExpression: aws.String(fmt.Sprintf("%s = :value", key)),
+		ConsistentRead:   aws.Bool(true),
 	})
 
 	if err != nil {

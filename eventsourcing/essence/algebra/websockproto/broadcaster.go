@@ -70,6 +70,7 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 		}
 
 		for _, item := range result.Items {
+			log.Println("BroadcastToSession connectionID:", item.ConnectionID)
 			err = i.publisher.Publish(item.ConnectionID, msg)
 			// TODO handle this differently
 			if err != nil {

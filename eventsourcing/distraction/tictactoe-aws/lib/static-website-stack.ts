@@ -28,6 +28,14 @@ export class StaticWebsiteStack extends cdk.Stack {
                 origin: new cfo.S3Origin(bucket, {
                     originAccessIdentity: originAccessIdentity,
                 }),
+                cachePolicy: new cf.CachePolicy(this, 'CachePolicy', {
+                    minTtl: cdk.Duration.minutes(5),
+                    defaultTtl: cdk.Duration.minutes(20),
+                    maxTtl: cdk.Duration.minutes(10),
+                    // cookieBehavior: cf.CacheCookieBehavior.none(),
+                    // headerBehavior: cf.CacheHeaderBehavior.allowList('Authorization'),
+                    // queryStringBehavior: cf.CacheQueryStringBehavior.all(),
+                }),
             },
         })
 

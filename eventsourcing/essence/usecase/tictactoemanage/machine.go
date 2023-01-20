@@ -18,6 +18,7 @@ var (
 	ErrNotTheSameSessions               = errors.New("not the same sessions")
 	ErrSessionNotReadyToAcceptGameInput = errors.New("session is not ready to accept game input")
 	ErrNotTheSameGame                   = errors.New("not the same game")
+	ErrNotExpectedListsOfCommands       = errors.New("not expected lists of commands")
 )
 
 func Transition(cmd Command, state State) (State, error) {
@@ -217,6 +218,22 @@ func Transition(cmd Command, state State) (State, error) {
 			if game.LastErr() != nil {
 				msg := game.LastErr().Error()
 				newState.GameProblem = &msg
+			}
+
+			return newState, nil
+		}, func(x *SequenceCMD) (State, error) {
+			if len(x.Commands) < 2 || len(x.Commands) > 5 {
+				return nil, ErrNotExpectedListsOfCommands
+			}
+
+			var newState = state
+			var err error
+
+			for _, cmd := range x.Commands {
+				newState, err = Transition(cmd, newState)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			return newState, nil

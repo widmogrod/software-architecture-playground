@@ -51,6 +51,14 @@ func ExtractSessionID(cmd tictactoemanage.Command) string {
 		func(x *tictactoemanage.GameActionCMD) string {
 			return x.SessionID
 		},
+		func(x *tictactoemanage.SequenceCMD) string {
+			for _, cmd := range x.Commands {
+				return ExtractSessionID(cmd)
+			}
+
+			// TODO convert to error
+			return "SequenceCMD(no session id)"
+		},
 	)
 }
 
@@ -73,16 +81,21 @@ type Game struct {
 }
 
 func (g *Game) OnMessage(connectionID string, data []byte) error {
+	log.Println("command", string(data))
 	cmd, err := UnmarshalCommand(data)
 	if err != nil {
+		log.Println("command err", err)
 		return err
 	}
+
+	fmt.Printf("command go %#v \n", cmd)
 
 	sessionID := ExtractSessionID(cmd)
 	g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
 	state, err := g.stateRepository.Get(sessionID)
 	if err != nil && err != storage.ErrNotFound {
+		log.Println("OnMessage: Get: err", err)
 		return err
 	}
 
@@ -97,12 +110,14 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 	if newState != nil {
 		err = g.stateRepository.Set(sessionID, newState)
 		if err != nil {
+			log.Println("OnMessage: Set: err", err)
 			return err
 		}
 	}
 
 	msg, err := MarshalState(newState)
 	if err != nil {
+		log.Println("OnMessage: MarshalState: err", err)
 		return err
 	}
 	log.Println("state", string(msg))
@@ -114,6 +129,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 		g.broadcast.SendBackToSender(connectionID, msg)
 	}
 
+	log.Println("OnMessage: done")
 	return nil
 
 }

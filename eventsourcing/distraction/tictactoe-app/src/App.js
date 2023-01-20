@@ -167,7 +167,7 @@ function serverURL(sessionID) {
 }
 
 function gameURL(sessionID) {
-    return 'http://' + document.location.hostname + '/#/game/' + sessionID
+    return 'https://' + document.location.hostname + '/#/game/' + sessionID
 }
 
 export function Game() {
@@ -186,7 +186,10 @@ export function Game() {
 
     const [socketUrl, setSocketUrl] = useState(null)
 
-    const {sendJsonMessage, lastJsonMessage, readyState} = useWebSocket(socketUrl);
+    const {sendJsonMessage, lastJsonMessage, readyState} = useWebSocket(socketUrl, {
+        reconnectAttempts: 10,
+        reconnectInterval: 3000,
+    });
 
     const connectionStatus = {
         [ReadyState.CONNECTING]: '🌀Connecting',
@@ -216,8 +219,10 @@ export function Game() {
             return
         }
         if (!currentGameState) {
-            sendJsonMessage(manage.CreateSessionCMD(sessionID, 2))
-            sendJsonMessage(manage.JoinGameSessionCMD(sessionID, cookies.playerID))
+            sendJsonMessage(manage.SequenceCMD([
+                manage.CreateSessionCMD(sessionID, 2),
+                manage.JoinGameSessionCMD(sessionID, cookies.playerID)
+            ]))
             // Automatically create a game if the playerID is already set
             // sendJsonMessage(CreateGameCMD(cookies.playerID))
         } else if (currentGameState?.SessionWaitingForPlayers) {
@@ -258,13 +263,15 @@ export function Game() {
             LengthToWin: l,
         })
 
-        sendJsonMessage(manage.NewGameCMD(sessionID, gameId))
-        sendJsonMessage(manage.GameActionCMD(sessionID, gameId, StartGameCMD(
-            "",
-            "",
-            wh,
-            l,
-        )))
+        sendJsonMessage(manage.SequenceCMD([
+            manage.NewGameCMD(sessionID, gameId),
+            manage.GameActionCMD(sessionID, gameId, StartGameCMD(
+                "",
+                "",
+                wh,
+                l,
+            )),
+        ]))
     }
 
     function giveUpOrBack() {
@@ -277,7 +284,7 @@ export function Game() {
 
     function playWithBot() {
         sendJsonMessage(manage.GameSessionWithBotCMD(sessionID))
-        playAgain()
+        // playAgain()
     }
 
     return (
@@ -394,11 +401,13 @@ function Actions({state, playerID, newGame, playAgain}) {
                 <PostGameActions newGame={newGame} playAgain={playAgain}/>
             </div>
         )
+
+    } else if (state === null) {
         return (
             <div>
                 <p>Taking to long?</p>
                 <button className="button-action"
-                        onClick={() => playAgain()}>Play!
+                        onClick={() => playAgain()}>Play
                 </button>
             </div>
         )
