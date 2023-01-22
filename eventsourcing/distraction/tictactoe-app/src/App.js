@@ -307,6 +307,11 @@ export function Game() {
         // playAgain()
     }
 
+
+    function playLocally() {
+       alert("Not implemented yet")
+    }
+
     return (
         <>
             <ul className="nav">
@@ -332,11 +337,16 @@ export function Game() {
                 {currentGameState?.SessionWaitingForPlayers &&
                     <div className="game-share">
                         <p>
-                            Ask friend to scan code to join<br/>
-                            or <button className="button-text" onClick={() => playWithBot()}>play with bot </button> 🤖
+                            Ask friend to scan code to join the game
                         </p>
-                        <QRCode value={gameURL(sessionID)}
-                                style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
+                        <p>
+                            <QRCode value={gameURL(sessionID)}
+                                    style={{height: "auto", maxWidth: "200px", width: "100%"}}/>
+                        </p>
+                        <p>
+                            or play <button className="button-text" onClick={() => playWithBot()}>with bot 🤖 </button>
+                            &nbsp;or <button className="button-text" onClick={() => playLocally()}> locally</button> on device
+                        </p>
 
                     </div>}
                 <div className="game-debug">
