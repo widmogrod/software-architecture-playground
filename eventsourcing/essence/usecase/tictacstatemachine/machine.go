@@ -3,7 +3,7 @@ package tictacstatemachine
 import (
 	"errors"
 	"fmt"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/machine"
+	"github.com/widmogrod/mkunion/x/machine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
 )
 
