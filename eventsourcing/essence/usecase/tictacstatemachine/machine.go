@@ -3,6 +3,7 @@ package tictacstatemachine
 import (
 	"errors"
 	"fmt"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/machine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
 )
 
@@ -17,48 +18,12 @@ var (
 	ErrInputInvalid       = errors.New("input is invalid")
 )
 
-func NewMachine() *Machine {
-	return NewMachineWithState(nil)
-}
-
-func NewMachineWithState(s State) *Machine {
-	return &Machine{
-		state: s,
-	}
-}
-
-type Machine struct {
-	state   State
-	lastErr error
-}
-
-func (o *Machine) State() State {
-	return o.state
-}
-
-func (o *Machine) LastErr() error {
-	return o.lastErr
-}
-
-func (o *Machine) Handle(cmd Command) {
-	o.lastErr = nil
-
-	defer func() {
-		if r := recover(); r != nil {
-			o.lastErr = r.(error)
-		}
-	}()
-
-	if _, ok := o.state.(*GameEndWithWin); ok {
-		// Game is over, no more commands can be applied
-		panic(ErrGameFinished)
-	}
-
-	o.state = MustMatchCommand(
+func Transition(cmd Command, state State) (State, error) {
+	return MustMatchCommandR2(
 		cmd,
-		func(x *CreateGameCMD) State {
-			if o.state != nil {
-				panic(ErrGameAlreadyStarted)
+		func(x *CreateGameCMD) (State, error) {
+			if state != nil {
+				return nil, ErrGameAlreadyStarted
 			}
 
 			rows, cols, length := GameRules(x.BoardRows, x.BoardCols, x.WinningLength)
@@ -70,108 +35,124 @@ func (o *Machine) Handle(cmd Command) {
 					BoardCols:     cols,
 					WinningLength: length,
 				},
-			}
+			}, nil
 		},
-		func(x *JoinGameCMD) State {
-			state, ok := o.state.(*GameWaitingForPlayer)
+		func(x *JoinGameCMD) (State, error) {
+			newState, ok := state.(*GameWaitingForPlayer)
 			if !ok {
-				panic(ErrGameHasAllPlayers)
+				return nil, ErrGameHasAllPlayers
 			}
 
-			if state.FirstPlayerID == x.SecondPlayerID {
-				panic(ErrUniquePlayers)
+			if newState.FirstPlayerID == x.SecondPlayerID {
+				return nil, ErrUniquePlayers
 			}
 
-			base := state.TicTacToeBaseState
+			base := newState.TicTacToeBaseState
 			base.SecondPlayerID = x.SecondPlayerID
 
 			return &GameProgress{
 				TicTacToeBaseState: base,
 				MovesTaken:         map[Move]PlayerID{},
 				MovesOrder:         []Move{},
-				NextMovePlayerID:   state.FirstPlayerID,
-			}
+				NextMovePlayerID:   newState.FirstPlayerID,
+			}, nil
 		},
-		func(x *StartGameCMD) State {
-			o.Handle(&CreateGameCMD{
+		func(x *StartGameCMD) (State, error) {
+			newState, err := Transition(&CreateGameCMD{
 				FirstPlayerID: x.FirstPlayerID,
 				BoardRows:     x.BoardRows,
 				BoardCols:     x.BoardCols,
 				WinningLength: x.WinningLength,
-			})
-			if o.lastErr == nil {
-				o.Handle(&JoinGameCMD{SecondPlayerID: x.SecondPlayerID})
-			}
-			return o.state
-		},
-		func(x *MoveCMD) State {
-			state, ok := o.state.(*GameProgress)
-			if !ok {
-				panic(ErrGameNotInProgress)
-			}
+			}, state)
 
-			if state.NextMovePlayerID != x.PlayerID {
-				panic(ErrNotYourTurn)
-			}
-
-			move, err := ParsePosition(x.Position, state.BoardRows, state.BoardCols)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
-			if _, ok := state.MovesTaken[move]; ok {
-				panic(ErrPositionTaken)
+			return Transition(&JoinGameCMD{
+				SecondPlayerID: x.SecondPlayerID,
+			}, newState)
+		},
+		func(x *MoveCMD) (State, error) {
+			if IsGameFinished(state) {
+				return nil, ErrGameFinished
 			}
 
-			if state.MovesTaken == nil {
-				state.MovesTaken = map[Move]PlayerID{}
+			newState, ok := state.(*GameProgress)
+			if !ok {
+				return nil, ErrGameNotInProgress
 			}
 
-			state.MovesTaken[x.Position] = x.PlayerID
-			state.MovesOrder = append(state.MovesOrder, move)
+			if newState.NextMovePlayerID != x.PlayerID {
+				return nil, ErrNotYourTurn
+			}
 
-			if x.PlayerID == state.FirstPlayerID {
-				state.NextMovePlayerID = state.SecondPlayerID
+			move, err := ParsePosition(x.Position, newState.BoardRows, newState.BoardCols)
+			if err != nil {
+				return nil, err
+			}
+
+			if _, ok := newState.MovesTaken[move]; ok {
+				return nil, ErrPositionTaken
+			}
+
+			if newState.MovesTaken == nil {
+				newState.MovesTaken = map[Move]PlayerID{}
+			}
+
+			newState.MovesTaken[x.Position] = x.PlayerID
+			newState.MovesOrder = append(newState.MovesOrder, move)
+
+			if x.PlayerID == newState.FirstPlayerID {
+				newState.NextMovePlayerID = newState.SecondPlayerID
 			} else {
-				state.NextMovePlayerID = state.FirstPlayerID
+				newState.NextMovePlayerID = newState.FirstPlayerID
 			}
 
 			// Check if there is a winner
-			winseq := tictactoeaggregate.GenerateWiningPositions(state.WinningLength, state.BoardRows, state.BoardCols)
-			if seq, win := tictactoeaggregate.CheckIfMoveWin(state.MovesOrder, winseq); win {
+			winseq := tictactoeaggregate.GenerateWiningPositions(newState.WinningLength, newState.BoardRows, newState.BoardCols)
+			if seq, win := tictactoeaggregate.CheckIfMoveWin(newState.MovesOrder, winseq); win {
 				return &GameEndWithWin{
-					TicTacToeBaseState: state.TicTacToeBaseState,
+					TicTacToeBaseState: newState.TicTacToeBaseState,
 					Winner:             x.PlayerID,
 					WiningSequence:     seq,
-					MovesTaken:         state.MovesTaken,
-				}
-			} else if len(state.MovesTaken) == (state.BoardRows * state.BoardCols) {
+					MovesTaken:         newState.MovesTaken,
+				}, nil
+			} else if len(newState.MovesTaken) == (newState.BoardRows * newState.BoardCols) {
 				return &GameEndWithDraw{
-					TicTacToeBaseState: state.TicTacToeBaseState,
-					MovesTaken:         state.MovesTaken,
-				}
+					TicTacToeBaseState: newState.TicTacToeBaseState,
+					MovesTaken:         newState.MovesTaken,
+				}, nil
 			}
 
-			return state
+			return newState, nil
 		},
-		func(x *GiveUpCMD) State {
-			state, ok := o.state.(*GameProgress)
+		func(x *GiveUpCMD) (State, error) {
+			newState, ok := state.(*GameProgress)
 			if !ok {
-				panic(ErrGameNotInProgress)
+				return nil, ErrGameNotInProgress
 			}
 
-			winnerID := state.FirstPlayerID
-			if x.PlayerID == state.FirstPlayerID {
-				winnerID = state.SecondPlayerID
+			winnerID := newState.FirstPlayerID
+			if x.PlayerID == newState.FirstPlayerID {
+				winnerID = newState.SecondPlayerID
 			}
 
 			return &GameEndWithWin{
-				TicTacToeBaseState: state.TicTacToeBaseState,
+				TicTacToeBaseState: newState.TicTacToeBaseState,
 				Winner:             winnerID,
-				MovesTaken:         state.MovesTaken,
-			}
+				MovesTaken:         newState.MovesTaken,
+			}, nil
 		},
 	)
+}
+
+func NewMachine() *machine.Machine[Command, State] {
+	return machine.NewSimpleMachine(Transition)
+}
+
+func NewMachineWithState(s State) *machine.Machine[Command, State] {
+	return machine.NewSimpleMachineWithState(Transition, s)
 }
 
 func ParsePosition(position Move, boardRows int, boardCols int) (Move, error) {
@@ -212,16 +193,6 @@ func GameRules(rows int, cols int, length int) (int, int, int) {
 	}
 
 	return r, c, l
-}
-
-func NewAvailableMoves(rows, cols int) map[Move]struct{} {
-	m := map[Move]struct{}{}
-	for i := 1; i <= rows; i++ {
-		for j := 1; j <= cols; j++ {
-			m[fmt.Sprintf("%d.%d", i, j)] = struct{}{}
-		}
-	}
-	return m
 }
 
 func IsGameFinished(x State) bool {

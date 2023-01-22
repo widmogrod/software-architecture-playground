@@ -177,9 +177,8 @@ func Transition(cmd Command, state State) (State, error) {
 				}
 			}
 
-			game.Handle(action)
-
-			if game.LastErr() == nil {
+			err := game.Handle(action)
+			if err == nil {
 				if _, ok := action.(*tictacstatemachine.MoveCMD); ok {
 					if progress, ok := game.State().(*tictacstatemachine.GameProgress); ok {
 						if IsBot(progress.NextMovePlayerID) {
@@ -191,7 +190,7 @@ func Transition(cmd Command, state State) (State, error) {
 							)
 
 							if nextMove != "" {
-								game.Handle(&tictacstatemachine.MoveCMD{
+								err = game.Handle(&tictacstatemachine.MoveCMD{
 									PlayerID: progress.NextMovePlayerID,
 									Position: nextMove,
 								})
@@ -201,13 +200,6 @@ func Transition(cmd Command, state State) (State, error) {
 				}
 			}
 
-			//if tictacstatemachine.IsGameFinished(game.State()) {
-			//	return &SessionReady{
-			//		ID:      state.ID,
-			//		Players: state.Players,
-			//	}
-			//}
-
 			newState := &SessionInGame{
 				ID:        state.ID,
 				Players:   state.Players,
@@ -215,8 +207,8 @@ func Transition(cmd Command, state State) (State, error) {
 				GameState: game.State(),
 			}
 
-			if game.LastErr() != nil {
-				msg := game.LastErr().Error()
+			if err != nil {
+				msg := err.Error()
 				newState.GameProblem = &msg
 			}
 
