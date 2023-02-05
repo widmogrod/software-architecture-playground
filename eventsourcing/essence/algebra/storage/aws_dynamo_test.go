@@ -5,7 +5,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/stretchr/testify/assert"
-	"os"
 	"testing"
 )
 
@@ -15,16 +14,7 @@ type ConnectionToSession struct {
 }
 
 func TestDynamoDBRepository(t *testing.T) {
-	//schema.RegisterTransformations([]schema.TransformFunc{
-	//	schema.WrapStruct(ConnectionToSession{}, "ConnectionToSession"),
-	//})
-	//schema.RegisterRules([]schema.RuleMatcher{
-	//	schema.UnwrapStruct(ConnectionToSession{}, "ConnectionToSession"),
-	//})
-
-	os.Setenv("AWS_PROFILE", "gh-dev")
-	os.Setenv("AWS_DEFAULT_REGION", "eu-west-1")
-
+	//TODO inject name of the table!
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	assert.NoError(t, err)
 

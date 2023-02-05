@@ -64,20 +64,27 @@ func ExtractSessionID(cmd tictactoemanage.Command) string {
 
 type Repository[A any] interface {
 	Get(key string) (A, error)
+	GetAs(key string, x *A) error
 	GetOrNew(s string) (A, error)
 	Set(key string, value A) error
+	UpdateRecords(s storage.UpdateRecords[any]) error
+}
+
+type SessionWithGame struct {
+	SessionID     string
+	CurrentGameID string
 }
 
 func NewGame(b websockproto.Broadcaster, r Repository[tictactoemanage.State]) *Game {
 	return &Game{
-		broadcast:       b,
-		stateRepository: r,
+		broadcast:           b,
+		gameStateRepository: r,
 	}
 }
 
 type Game struct {
-	broadcast       websockproto.Broadcaster
-	stateRepository Repository[tictactoemanage.State]
+	broadcast           websockproto.Broadcaster
+	gameStateRepository Repository[tictactoemanage.State]
 }
 
 func (g *Game) OnMessage(connectionID string, data []byte) error {
@@ -93,7 +100,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 	sessionID := ExtractSessionID(cmd)
 	g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
-	state, err := g.stateRepository.Get(sessionID)
+	state, err := storage.RetriveID[tictactoemanage.State](g.gameStateRepository, "session#"+sessionID)
 	if err != nil && err != storage.ErrNotFound {
 		log.Println("OnMessage: Get: err", err)
 		return err
@@ -108,7 +115,19 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 	newState := machine.State()
 	if newState != nil {
-		err = g.stateRepository.Set(sessionID, newState)
+		// session has also latest state
+		update := storage.UpdateRecords[any]{
+			Saving: map[string]any{
+				"session#" + sessionID: newState,
+			},
+		}
+
+		// but pass game state are also valuable, for example to calculate leaderboards and stats
+		if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
+			update.Saving["game#"+inGame.GameID] = inGame
+		}
+
+		err = g.gameStateRepository.UpdateRecords(update)
 		if err != nil {
 			log.Println("OnMessage: Set: err", err)
 			return err

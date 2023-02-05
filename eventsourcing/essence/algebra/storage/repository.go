@@ -7,14 +7,19 @@ import (
 )
 
 var (
-	ErrNotFound = fmt.Errorf("not found")
+	ErrNotFound    = fmt.Errorf("not found")
+	ErrInvalidType = fmt.Errorf("invalid type")
 )
 
 type Repository[A any] interface {
+	GetAs(key string, x *A) error
+	UpdateRecords(s UpdateRecords[any]) error
+
 	Get(key string) (A, error)
 	Set(key string, value A) error
 	Delete(key string) error
 	GetOrNew(s string) (A, error)
+
 	FindAllKeyEqual(key string, value string) (PageResult[A], error)
 }
 
@@ -32,13 +37,38 @@ type RepositoryInMemory[A any] struct {
 	new   func() A
 }
 
-func (r *RepositoryInMemory[A]) Get(key string) (A, error) {
+func (r *RepositoryInMemory[A]) GetAs(key string, x *A) error {
 	v, ok := r.store.Load(key)
 	if !ok {
-		var a A
-		return a, ErrNotFound
+		return ErrNotFound
 	}
-	return v.(A), nil
+
+	y, ok := v.(*A)
+	if !ok {
+		return fmt.Errorf("GetAs: %w want %T, got %T", ErrInvalidType, x, v)
+	}
+
+	x = y
+
+	return nil
+
+}
+
+func (r *RepositoryInMemory[A]) UpdateRecords(s UpdateRecords[any]) error {
+	for id, record := range s.Saving {
+		err := r.Set(id, record.(A))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *RepositoryInMemory[A]) Get(key string) (A, error) {
+	var a A
+	err := r.GetAs(key, &a)
+	return a, err
 }
 
 func (r *RepositoryInMemory[A]) Set(key string, value A) error {

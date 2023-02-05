@@ -25,9 +25,7 @@ type DynamoDBRepository[A any] struct {
 	new       func() A
 }
 
-func (d *DynamoDBRepository[A]) Get(key string) (A, error) {
-	var a A
-
+func (d *DynamoDBRepository[A]) GetAs(key string, x *A) error {
 	item, err := d.client.GetItem(context.Background(), &dynamodb.GetItemInput{
 		Key: map[string]types.AttributeValue{
 			"key": &types.AttributeValueMemberS{
@@ -38,18 +36,62 @@ func (d *DynamoDBRepository[A]) Get(key string) (A, error) {
 		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
-		return a, err
+		return err
 	}
 
 	if len(item.Item) == 0 {
-		return a, ErrNotFound
+		return ErrNotFound
 	}
 
-	return d.toStruct(item.Item)
+	r, err := d.toStruct(item.Item, *x)
+	if err != nil {
+		return err
+	}
+
+	*x = r
+	return nil
 }
 
-func (d *DynamoDBRepository[A]) toStruct(item map[string]types.AttributeValue) (A, error) {
-	var a A
+func (d *DynamoDBRepository[A]) UpdateRecords(s UpdateRecords[any]) error {
+	var transact []types.TransactWriteItem
+	for id, value := range s.Saving {
+		sch := schema.FromGo(value)
+		item := schema.ToDynamoDB(sch)
+		if _, ok := item.(*types.AttributeValueMemberM); !ok {
+			return fmt.Errorf("DynamoDBRepository.Set: unsupported type: %T", item)
+		}
+
+		final := item.(*types.AttributeValueMemberM)
+		final.Value["key"] = &types.AttributeValueMemberS{
+			Value: id,
+		}
+
+		transact = append(transact, types.TransactWriteItem{
+			Put: &types.Put{
+				TableName: aws.String(d.tableName),
+				Item:      final.Value,
+			},
+		})
+	}
+
+	_, err := d.client.TransactWriteItems(context.Background(), &dynamodb.TransactWriteItemsInput{
+		TransactItems: transact,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DynamoDBRepository[A]) Get(key string) (A, error) {
+	var x A
+	err := d.GetAs(key, &x)
+	return x, err
+}
+
+func (d *DynamoDBRepository[A]) toStruct(item map[string]types.AttributeValue, a A) (A, error) {
 	delete(item, "key")
 
 	i := &types.AttributeValueMemberM{
@@ -77,23 +119,11 @@ func (d *DynamoDBRepository[A]) toStruct(item map[string]types.AttributeValue) (
 }
 
 func (d *DynamoDBRepository[A]) Set(key string, value A) error {
-	sch := schema.FromGo(value)
-	item := schema.ToDynamoDB(sch)
-
-	if _, ok := item.(*types.AttributeValueMemberM); !ok {
-		return fmt.Errorf("DynamoDBRepository.Set: unsupported type: %T", item)
-	}
-
-	final := item.(*types.AttributeValueMemberM)
-	final.Value["key"] = &types.AttributeValueMemberS{
-		Value: key,
-	}
-
-	_, err := d.client.PutItem(context.Background(), &dynamodb.PutItemInput{
-		Item:      final.Value,
-		TableName: &d.tableName,
+	return d.UpdateRecords(UpdateRecords[any]{
+		Saving: map[string]any{
+			key: value,
+		},
 	})
-	return err
 }
 
 func (d *DynamoDBRepository[A]) Delete(key string) error {
@@ -151,7 +181,8 @@ func (d *DynamoDBRepository[A]) FindAllKeyEqual(key string, value string) (PageR
 	}
 
 	for _, item := range items.Items {
-		r, err := d.toStruct(item)
+		var a A
+		r, err := d.toStruct(item, a)
 		if err != nil {
 			return PageResult[A]{}, err
 		}

@@ -33,8 +33,8 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	broadcaster := websockproto.NewBroadcaster(wshandler, connRepo)
 
 	game := &Game{
-		broadcast:       broadcaster,
-		stateRepository: stateRepo,
+		broadcast:           broadcaster,
+		gameStateRepository: stateRepo,
 	}
 
 	wshandler.OnMessage = game.OnMessage
