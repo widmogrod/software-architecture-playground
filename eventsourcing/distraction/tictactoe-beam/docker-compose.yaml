@@ -1,0 +1,59 @@
+version: '3.9'
+services:
+  spark:
+    image: docker.io/bitnami/spark:3.1.2
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - '8080:8080'
+      - '7077:7077'
+  spark-worker:
+    image: docker.io/bitnami/spark:3.1.2-debian-10-r0
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      # By default Beam expects workers (of the SDK worker pool) to connect to a Spark worker on `localhost`. When running
+      # the worker pool in docker on a Mac this isn't possible due to the lack of `host` networking. Using
+      # BEAM_WORKER_POOL_IN_DOCKER_VM=1, Beam will use `host.docker.internal` to communicate via the docker host instead.
+      - BEAM_WORKER_POOL_IN_DOCKER_VM=1
+      # DOCKER_MAC_CONTAINER=1 limits the ports on a Spark worker for communication with SDK workers to the range 8100 - 8200
+      # instead of using random ports. Ports of the range are used in a round-robin fashion and have to be published.
+      - DOCKER_MAC_CONTAINER=1
+    ports:
+      - '8081:8081'
+      - "8100-8200:8100-8200"
+    depends_on:
+      - spark
+  spark-job-server:
+    image: docker.io/apache/beam_spark3_job_server:latest
+    command: "--spark-master-url=spark://spark:7077"
+    environment:
+      # By default Beam expects workers (of the SDK worker pool) to connect to a Spark worker on `localhost`. When running
+      # the worker pool in docker on a Mac this isn't possible due to the lack of `host` networking. Using
+      # BEAM_WORKER_POOL_IN_DOCKER_VM=1, Beam will use `host.docker.internal` to communicate via the docker host instead.
+      - BEAM_WORKER_POOL_IN_DOCKER_VM=1
+      # DOCKER_MAC_CONTAINER=1 limits the ports on a Spark worker for communication with SDK workers to the range 8100 - 8200
+      # instead of using random ports. Ports of the range are used in a round-robin fashion and have to be published.
+#      - DOCKER_MAC_CONTAINER=1
+    ports:
+      # Spark job UI on the driver
+      - "4040:4040"
+      # Job endpoint
+      - "8099:8099"
+      # Artifact endpoint
+      - "8098:8098"
+      # Java ExpansionService
+      - '8097:8097'
+    depends_on:
+      - spark
+      - spark-worker
