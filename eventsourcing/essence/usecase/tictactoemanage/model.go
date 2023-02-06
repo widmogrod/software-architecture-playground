@@ -58,11 +58,26 @@ type (
 		Players []PlayerID
 	}
 	SessionInGame struct {
-		ID            SessionID
-		Players       []PlayerID
-		GameID        GameID
-		GameState     tictacstatemachine.State
-		GameProblem   *string
-		PreviousGames []GameID
+		ID          SessionID
+		Players     []PlayerID
+		GameID      GameID
+		GameState   tictacstatemachine.State
+		GameProblem *string
+	}
+)
+
+// go:generate mkunion -name=Query
+type (
+	SessionStatsQuery struct {
+		SessionID SessionID
+	}
+)
+
+type (
+	SessionStatsResult struct {
+		ID         SessionID
+		TotalGames int
+		TotalDraws int
+		PlayerWins map[PlayerID]float64
 	}
 )
