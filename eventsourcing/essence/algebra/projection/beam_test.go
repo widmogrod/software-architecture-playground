@@ -158,7 +158,7 @@ func TestLatestGames(t *testing.T) {
 }
 
 func TestStatsInMemory(t *testing.T) {
-	result := tictactoemanage.SessionStats{
+	result := tictactoemanage.SessionStatsResult{
 		ID:         "",
 		TotalGames: 0,
 		TotalDraws: 0,
@@ -182,7 +182,7 @@ func TestStatsInMemory(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, tictactoemanage.SessionStats{
+	assert.Equal(t, tictactoemanage.SessionStatsResult{
 		ID:         "session-1",
 		TotalGames: 4, // TODO: 3
 		TotalDraws: 1,
@@ -222,7 +222,7 @@ func TestStatsInBeam(t *testing.T) {
 		if !ok {
 			return fmt.Errorf("error while converting to tictactoemanage.SessionInGame")
 		}
-		result := tictactoemanage.SessionStats{
+		result := tictactoemanage.SessionStatsResult{
 			ID:         inProgress.ID,
 			TotalGames: 1,
 		}
@@ -256,22 +256,22 @@ func TestStatsInBeam(t *testing.T) {
 			panic(err)
 		}
 
-		xVal := schema.ToGo(xSch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStats{})))
-		yVal := schema.ToGo(ySch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStats{})))
+		xVal := schema.ToGo(xSch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{})))
+		yVal := schema.ToGo(ySch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{})))
 
-		wins := xVal.(*tictactoemanage.SessionStats).PlayerWins
+		wins := xVal.(*tictactoemanage.SessionStatsResult).PlayerWins
 		if wins == nil {
 			wins = make(map[tictactoemanage.PlayerID]float64)
 		}
 
-		for k, v := range yVal.(*tictactoemanage.SessionStats).PlayerWins {
+		for k, v := range yVal.(*tictactoemanage.SessionStatsResult).PlayerWins {
 			wins[k] = v
 		}
 
-		result := tictactoemanage.SessionStats{
-			ID:         xVal.(*tictactoemanage.SessionStats).ID,
-			TotalGames: xVal.(*tictactoemanage.SessionStats).TotalGames + yVal.(*tictactoemanage.SessionStats).TotalGames,
-			TotalDraws: xVal.(*tictactoemanage.SessionStats).TotalDraws + yVal.(*tictactoemanage.SessionStats).TotalDraws,
+		result := tictactoemanage.SessionStatsResult{
+			ID:         xVal.(*tictactoemanage.SessionStatsResult).ID,
+			TotalGames: xVal.(*tictactoemanage.SessionStatsResult).TotalGames + yVal.(*tictactoemanage.SessionStatsResult).TotalGames,
+			TotalDraws: xVal.(*tictactoemanage.SessionStatsResult).TotalDraws + yVal.(*tictactoemanage.SessionStatsResult).TotalDraws,
 			PlayerWins: wins,
 		}
 
@@ -379,7 +379,7 @@ func TestStatsInBeam(t *testing.T) {
 //			//
 //			//}
 //
-//			result := tictactoemanage.SessionStats{
+//			result := tictactoemanage.SessionStatsResult{
 //				TotalGames: draws + len(wins),
 //				TotalDraws: draws,
 //				PlayerWins: wins,

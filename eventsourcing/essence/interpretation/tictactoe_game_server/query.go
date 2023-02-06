@@ -93,12 +93,12 @@ func (os *OpenSearchStorage) Query(query tictactoemanage.SessionStatsQuery) (*ti
 
 	stats := &tictactoemanage.SessionStatsResult{
 		ID:         query.SessionID,
-		TotalDraws: As[int](Get("aggregations.draws.buckets.[0].doc_count", data), 0),
+		TotalDraws: As[int](Get(data, "aggregations.draws.buckets.[0].doc_count"), 0),
 		PlayerWins: Reduce[map[tictactoemanage.PlayerID]float64](
-			Get("aggregations.wins.buckets", data),
+			Get(data, "aggregations.wins.buckets"),
 			func(x schema.Schema, agg map[tictactoemanage.PlayerID]float64) map[tictactoemanage.PlayerID]float64 {
-				playerID := As[tictactoemanage.PlayerID](Get("key", x), "n/a")
-				winds := As[float64](Get("doc_count", x), 0)
+				playerID := As[tictactoemanage.PlayerID](Get(x, "key"), "n/a")
+				winds := As[float64](Get(x, "doc_count"), 0)
 
 				if agg == nil {
 					agg = map[tictactoemanage.PlayerID]float64{}
@@ -162,7 +162,7 @@ func As[A int | float64 | bool | string](x schema.Schema, def A) A {
 		})
 }
 
-func Get(location string, data schema.Schema) schema.Schema {
+func Get(data schema.Schema, location string) schema.Schema {
 	path := strings.Split(location, ".")
 	for _, p := range path {
 		if p == "" {
