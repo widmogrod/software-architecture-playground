@@ -1,11 +1,16 @@
 import * as cdk from "aws-cdk-lib";
+import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdanodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2-alpha';
 import * as apigatewayv2integrations from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
-import {SqsEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
+import {SqsEventSource, DynamoEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as golang from '@aws-cdk/aws-lambda-go-alpha';
+import * as python from '@aws-cdk/aws-lambda-python-alpha';
+import * as opensearchservice from "aws-cdk-lib/aws-opensearchservice";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class WebsocketSqSStack extends cdk.Stack {
     // constructor for the stack
@@ -23,14 +28,82 @@ export class WebsocketSqSStack extends cdk.Stack {
                 name: 'key',
                 type: dynamodb.AttributeType.STRING
             },
-            // sortKey: {
-            //     name: 'sessionId',
-            //     type: dynamodb.AttributeType.STRING,
-            // },
             removalPolicy: cdk.RemovalPolicy.DESTROY, // not recommended for production code!
             billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
             pointInTimeRecovery: false,
+            stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+
         });
+
+        const domain = new opensearchservice.Domain(this, 'DynamoDBProjection', {
+            domainName: 'dynamodb-projection',
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+            version: opensearchservice.EngineVersion.OPENSEARCH_1_3,
+            fineGrainedAccessControl: {
+                masterUserName: 'admin',
+                masterUserPassword: cdk.SecretValue.unsafePlainText('nile!DISLODGE5clause')
+            },
+            capacity: {
+                masterNodes: 3,
+                dataNodes: 2,
+                dataNodeInstanceType: ec2.InstanceType.of(
+                    ec2.InstanceClass.T3,
+                    ec2.InstanceSize.SMALL
+                ).toString() + ".search",
+                masterNodeInstanceType: ec2.InstanceType.of(
+                    ec2.InstanceClass.T3,
+                    ec2.InstanceSize.SMALL
+                ).toString() + ".search",
+            },
+            ebs: {
+                volumeSize: 20,
+            },
+            zoneAwareness: {
+                availabilityZoneCount: 2,
+            },
+            logging: {
+                slowSearchLogEnabled: true,
+                appLogEnabled: true,
+                slowIndexLogEnabled: true,
+            },
+            enforceHttps: true,
+            encryptionAtRest: {enabled: true},
+            nodeToNodeEncryption: true,
+            // advancedOptions: {
+            //     'rest.action.multi.allow_explicit_index': 'false',
+            //     'indices.fielddata.cache.size': '25',
+            //     'indices.query.bool.max_clause_count': '2048',
+            // },
+        });
+
+        domain.addAccessPolicies(
+            new iam.PolicyStatement({
+                actions: ['es:*'],
+                effect: iam.Effect.ALLOW,
+                principals: [new iam.AnyPrincipal],
+                resources: [domain.domainArn, `${domain.domainArn}/*`],
+            })
+        );
+
+        const openSearchSync = new python.PythonFunction(this, 'DynamoDB2OpenSearch', {
+            entry: './lambda/dynamo-db-to-open-search/',
+            runtime: lambda.Runtime.PYTHON_3_8,
+            index: 'main.py',
+            handler: 'handler',
+            environment: {
+                OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+            },
+            timeout: cdk.Duration.minutes(1)
+        });
+        openSearchSync.addEventSource(new DynamoEventSource(table, {
+            startingPosition: lambda.StartingPosition.LATEST,
+        }));
+        // TODO: Kibana requires to have backend user added to allow indexation of documents - manually!
+        // fix this and make sure it's automatic
+        domain.grantReadWrite( openSearchSync);
+        domain.grantIndexReadWrite("*", openSearchSync);
+        domain.grantIndexReadWrite("lambda-index", openSearchSync);
+
         // table.addGlobalSecondaryIndex({
         //     indexName: 'sessionId-index',
         //     partitionKey: {
