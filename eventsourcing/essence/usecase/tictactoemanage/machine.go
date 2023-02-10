@@ -87,7 +87,7 @@ func Transition(cmd Command, state State) (State, error) {
 
 				return &SessionWaitingForPlayers{
 					ID:           state.ID,
-					NeedsPlayers: state.NeedsPlayers + float64(len(state.Players)-len(players)),
+					NeedsPlayers: state.NeedsPlayers + len(state.Players) - len(players),
 					Players:      players,
 				}, nil
 
@@ -105,7 +105,7 @@ func Transition(cmd Command, state State) (State, error) {
 
 				return &SessionWaitingForPlayers{
 					ID:           state.ID,
-					NeedsPlayers: float64(len(players)),
+					NeedsPlayers: len(players),
 					Players:      players,
 				}, nil
 			}

@@ -14,7 +14,7 @@ type (
 type (
 	CreateSessionCMD struct {
 		SessionID    SessionID
-		NeedsPlayers float64
+		NeedsPlayers int
 	}
 	JoinGameSessionCMD struct {
 		SessionID SessionID
@@ -50,7 +50,7 @@ type (
 type (
 	SessionWaitingForPlayers struct {
 		ID           SessionID
-		NeedsPlayers float64
+		NeedsPlayers int
 		Players      []PlayerID
 	}
 	SessionReady struct {

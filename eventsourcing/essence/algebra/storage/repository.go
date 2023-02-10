@@ -121,7 +121,7 @@ func (r *RepositoryInMemory[A]) FindAllKeyEqual(key string, value string) (PageR
 		sch := schema.FromGo(v)
 		if m, ok := sch.(*schema.Map); ok {
 			for _, kv := range m.Field {
-				valueOfKey := schema.ToGo(kv.Value)
+				valueOfKey := schema.MustToGo(kv.Value)
 				if kv.Name == key && valueOfKey == value {
 					result.Items = append(result.Items, v.(A))
 				}

@@ -96,14 +96,10 @@ func (os *OpenSearchStorage) Query(query tictactoemanage.SessionStatsQuery) (*ti
 		TotalDraws: As[int](Get(data, "aggregations.draws.buckets.[0].doc_count"), 0),
 		PlayerWins: Reduce[map[tictactoemanage.PlayerID]float64](
 			Get(data, "aggregations.wins.buckets"),
+			map[tictactoemanage.PlayerID]float64{},
 			func(x schema.Schema, agg map[tictactoemanage.PlayerID]float64) map[tictactoemanage.PlayerID]float64 {
 				playerID := As[tictactoemanage.PlayerID](Get(x, "key"), "n/a")
 				winds := As[float64](Get(x, "doc_count"), 0)
-
-				if agg == nil {
-					agg = map[tictactoemanage.PlayerID]float64{}
-				}
-
 				agg[playerID] = winds
 
 				return agg
@@ -208,9 +204,7 @@ func Get(data schema.Schema, location string) schema.Schema {
 	return data
 }
 
-func Reduce[B any](data schema.Schema, fn func(schema.Schema, B) B) B {
-	var agg B
-
+func Reduce[B any](data schema.Schema, agg B, fn func(schema.Schema, B) B) B {
 	if data == nil {
 		return agg
 	}

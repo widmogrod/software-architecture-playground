@@ -122,7 +122,7 @@ func TestLatestGames(t *testing.T) {
 			panic(err)
 		}
 
-		xValue := schema.ToGo(xSchema)
+		xValue := schema.MustToGo(xSchema)
 		state, ok := xValue.(tictactoemanage.State)
 		if !ok {
 			panic(fmt.Errorf("error while converting to tictactoemanage.State"))
@@ -216,7 +216,7 @@ func TestStatsInBeam(t *testing.T) {
 			return err
 		}
 
-		xValue := schema.ToGo(xSchema)
+		xValue := schema.MustToGo(xSchema)
 
 		inProgress, ok := xValue.(*tictactoemanage.SessionInGame)
 		if !ok {
@@ -256,8 +256,10 @@ func TestStatsInBeam(t *testing.T) {
 			panic(err)
 		}
 
-		xVal := schema.ToGo(xSch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{})))
-		yVal := schema.ToGo(ySch, schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{})))
+		xVal := schema.MustToGo(xSch, schema.WithOnlyTheseRules(
+			schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{}))))
+		yVal := schema.MustToGo(ySch, schema.WithExtraRules(
+			schema.WhenPath(nil, schema.UseStruct(&tictactoemanage.SessionStatsResult{}))))
 
 		wins := xVal.(*tictactoemanage.SessionStatsResult).PlayerWins
 		if wins == nil {

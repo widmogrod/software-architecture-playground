@@ -106,9 +106,9 @@ func (d *DynamoDBRepository[A]) toStruct(item map[string]types.AttributeValue, a
 
 	// TODO fix me!!!
 	if any(a) == nil {
-		obj = schema.ToGo(sch)
+		obj = schema.MustToGo(sch)
 	} else {
-		obj = schema.ToGo(sch, schema.WhenPath(nil, schema.UseStruct(a)))
+		obj = schema.MustToGo(sch, schema.WithExtraRules(schema.WhenPath(nil, schema.UseStruct(a))))
 	}
 
 	if result, ok := obj.(A); ok {

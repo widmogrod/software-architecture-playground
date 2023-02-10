@@ -9,13 +9,17 @@ import (
 	"log"
 )
 
+func init() {
+	schema.SetDefaultUnionTypeFormatter(schema.FormatUnionNameUsingTypeName)
+}
+
 func UnmarshalCommand(msg []byte) (tictactoemanage.Command, error) {
 	sch, err := schema.FromJSON(msg)
 	if err != nil {
 		return nil, fmt.Errorf("UnmarshalCommand: %s", err)
 	}
 
-	goo := schema.ToGo(sch)
+	goo := schema.MustToGo(sch)
 
 	cmd, ok := goo.(tictactoemanage.Command)
 	if !ok {

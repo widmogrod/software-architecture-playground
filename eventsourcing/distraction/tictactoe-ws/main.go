@@ -6,13 +6,9 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/interpretation/tictactoe_game_server"
 	"log"
 	"net/http"
-	"os"
 )
 
 func main() {
-	os.Setenv("AWS_PROFILE", "gh-dev")
-	os.Setenv("AWS_DEFAULT_REGION", "eu-west-1")
-
 	wshandler, err := tictactoe_game_server.NewWebSocket(context.Background())
 	if err != nil {
 		panic(err)
