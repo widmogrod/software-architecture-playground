@@ -79,6 +79,6 @@ type (
 		ID         SessionID
 		TotalGames int
 		TotalDraws int
-		PlayerWins map[PlayerID]float64
+		PlayerWins map[PlayerID]int
 	}
 )

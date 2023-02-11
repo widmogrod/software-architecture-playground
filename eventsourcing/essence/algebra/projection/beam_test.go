@@ -176,7 +176,7 @@ func TestStatsInMemory(t *testing.T) {
 			result.TotalDraws++
 		} else if win, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithWin); ok {
 			if result.PlayerWins == nil {
-				result.PlayerWins = make(map[tictactoemanage.PlayerID]float64)
+				result.PlayerWins = make(map[tictactoemanage.PlayerID]int)
 			}
 			result.PlayerWins[win.Winner]++
 		}
@@ -186,7 +186,7 @@ func TestStatsInMemory(t *testing.T) {
 		ID:         "session-1",
 		TotalGames: 4, // TODO: 3
 		TotalDraws: 1,
-		PlayerWins: map[tictactoemanage.PlayerID]float64{
+		PlayerWins: map[tictactoemanage.PlayerID]int{
 			"player-1": 2,
 		},
 	}, result)
@@ -230,7 +230,7 @@ func TestStatsInBeam(t *testing.T) {
 			result.TotalDraws++
 		} else if win, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithWin); ok {
 			if result.PlayerWins == nil {
-				result.PlayerWins = make(map[tictactoemanage.PlayerID]float64)
+				result.PlayerWins = make(map[tictactoemanage.PlayerID]int)
 			}
 			result.PlayerWins[win.Winner]++
 		}
@@ -263,7 +263,7 @@ func TestStatsInBeam(t *testing.T) {
 
 		wins := xVal.(*tictactoemanage.SessionStatsResult).PlayerWins
 		if wins == nil {
-			wins = make(map[tictactoemanage.PlayerID]float64)
+			wins = make(map[tictactoemanage.PlayerID]int)
 		}
 
 		for k, v := range yVal.(*tictactoemanage.SessionStatsResult).PlayerWins {
