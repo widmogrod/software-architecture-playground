@@ -66,13 +66,14 @@ type (
 	}
 )
 
-// go:generate mkunion -name=Query
+//go:generate mkunion -name=Query
 type (
 	SessionStatsQuery struct {
 		SessionID SessionID
 	}
 )
 
+//go:generate mkunion -name=QueryResult
 type (
 	SessionStatsResult struct {
 		ID         SessionID

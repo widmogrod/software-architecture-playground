@@ -175,6 +175,7 @@ export class WebsocketSqSStack extends cdk.Stack {
             entry: 'lambda/go-tic-game-handler',
             environment: {
                 TABLE_NAME: table.tableName,
+                OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
             },
         });
         queueHandler.addEventSource(new SqsEventSource(queue, {

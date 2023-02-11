@@ -45,6 +45,17 @@ func main() {
 			return nil
 		})
 
+	openSearchHost := os.Getenv("OPENSEARCH_HOST")
+
+	query, err := tictactoe_game_server.NewQuery(
+		openSearchHost,
+		"lambda-index",
+	)
+	if err != nil {
+		fmt.Printf("ERR: tictactoe_game_server.NewQuery: %s \n", err)
+		panic(err)
+	}
+
 	lambda.Start(func(ctx context.Context, event events.SQSEvent) {
 		tableName := os.Getenv("TABLE_NAME")
 		log.Println("TABLE_NAME: ", tableName)
@@ -67,7 +78,7 @@ func main() {
 			)
 			broadcaster := websockproto.NewBroadcaster(wshandler, connRepo)
 
-			game := tictactoe_game_server.NewGame(broadcaster, stateRepo)
+			game := tictactoe_game_server.NewGame(broadcaster, stateRepo, query)
 			err = game.OnMessage(payload.ConnectionID, []byte(payload.Body))
 			if err != nil {
 				fmt.Printf("ERR: OnMessage: %s \n", err)

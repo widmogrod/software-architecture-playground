@@ -26,6 +26,7 @@
     "@aws-cdk-containers/ecs-service-extensions:enableDefaultLogDriver": true,
     "@aws-cdk/core:target-partitions": [
       "aws"
-    ]
+    ],
+    "@aws-cdk/customresources:installLatestAwsSdkDefault": false
   }
 }

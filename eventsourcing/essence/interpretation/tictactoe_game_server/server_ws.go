@@ -2,6 +2,7 @@ package tictactoe_game_server
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
@@ -29,12 +30,22 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 			return nil
 		})
 
+	query, err := NewQuery(
+		"https://search-dynamodb-projection-vggyq7lvwooliwe65oddc5gyse.eu-west-1.es.amazonaws.com/",
+		"lambda-index",
+	)
+	if err != nil {
+		fmt.Printf("ERR: tictactoe_game_server.NewQuery: %s \n", err)
+		panic(err)
+	}
+
 	wshandler := websockproto.NewInMemoryProtocol()
 	broadcaster := websockproto.NewBroadcaster(wshandler, connRepo)
 
 	game := &Game{
 		broadcast:           broadcaster,
 		gameStateRepository: stateRepo,
+		query:               query,
 	}
 
 	wshandler.OnMessage = game.OnMessage

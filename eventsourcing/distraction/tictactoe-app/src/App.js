@@ -182,6 +182,7 @@ export function Game() {
     const [playerNo, setPlayerNo] = useState(0)
 
     const [currentGameState, setGameState] = useState({});
+    const [currentStats, setStats] = useState({});
     const [cookies, setCookie] = useCookies(['playerID']);
 
     const [socketUrl, setSocketUrl] = useState(null)
@@ -208,7 +209,11 @@ export function Game() {
     }, [sessionID]);
 
     useEffect(() => {
-        setGameState(lastJsonMessage)
+        if (lastJsonMessage?.SessionStatsResult) {
+            setStats(lastJsonMessage)
+        } else {
+            setGameState(lastJsonMessage)
+        }
     }, [lastJsonMessage]);
 
     useEffect(() => {
@@ -223,6 +228,7 @@ export function Game() {
                 manage.CreateSessionCMD(sessionID, 2),
                 manage.JoinGameSessionCMD(sessionID, cookies.playerID)
             ]))
+            sendJsonMessage(manage.SessionStatsQuery(sessionID))
             // Automatically create a game if the playerID is already set
             // sendJsonMessage(CreateGameCMD(cookies.playerID))
         } else if (currentGameState?.SessionWaitingForPlayers) {
@@ -240,6 +246,11 @@ export function Game() {
             if (currentGameState?.SessionReady?.Players[0] === cookies.playerID) {
                 newGame(widthAndHeight, lengthToWin)
             }
+        } else if (
+            currentGameState?.SessionInGame?.GameState?.GameEndWithWin
+            || currentGameState?.SessionInGame?.GameState?.GameEndWithDraw
+        ) {
+            sendJsonMessage(manage.SessionStatsQuery(sessionID))
         }
 
         //eslint-disable-next-line
@@ -319,6 +330,9 @@ export function Game() {
                     <button className="button-close" onClick={giveUpOrBack}></button>
                 </li>
                 <li>You are {squareStyle[playerNo]} <b>vs</b> {squareStyle.filter((_, i) => i !== playerNo)}</li>
+                {currentStats &&
+                    <li>{currentStats?.SessionStatsResult?.PlayerWins[cookies.playerID] || 0} wins, {currentStats?.SessionStatsResult?.TotalDraws} draws in {currentStats?.SessionStatsResult?.TotalGames} matches</li>
+                }
             </ul>
             <div className="game">
                 <div className="game-info">
@@ -348,7 +362,8 @@ export function Game() {
                             &nbsp;or <button className="button-text" onClick={() => playLocally()}> locally</button> on device
                         </p>
 
-                    </div>}
+                    </div>
+                }
                 <div className="game-debug">
                     <p>Player: {cookies.playerID}</p>
                     <p>SessionID: {sessionID}</p>

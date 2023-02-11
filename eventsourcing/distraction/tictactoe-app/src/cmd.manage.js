@@ -51,3 +51,11 @@ export function SequenceCMD(cmds) {
         },
     }
 }
+
+export function SessionStatsQuery(sessionID) {
+    return {
+        "SessionStatsQuery": {
+            "SessionID": sessionID,
+        },
+    }
+}
