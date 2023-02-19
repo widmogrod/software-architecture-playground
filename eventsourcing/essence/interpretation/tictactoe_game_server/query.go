@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func NewQuery(endpoint, index string) (*OpenSearchStorage, error) {
@@ -51,6 +52,11 @@ const queryTemplate = `{
               "value": "%s"
             }
           }
+        },
+		{
+          "prefix": {
+            "key.S.keyword":  "game:"
+          }
         }
       ]
     }
@@ -71,10 +77,10 @@ const queryTemplate = `{
 
 func (os *OpenSearchStorage) Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error) {
 	response, err := os.client.Search(func(request *opensearchapi.SearchRequest) {
+		request.Timeout = 100 * time.Microsecond
+		request.Pretty = false
 		request.Index = []string{os.indexName}
-
 		request.Body = strings.NewReader(fmt.Sprintf(queryTemplate, query.SessionID))
-		request.Pretty = true
 	})
 	if err != nil {
 		return nil, err
