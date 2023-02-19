@@ -75,6 +75,25 @@ const queryTemplate = `{
   }
 }`
 
+func (os *OpenSearchStorage) SetupIndex() error {
+	_, err := os.client.Indices.Create(
+		os.indexName,
+		func(request *opensearchapi.IndicesCreateRequest) {
+			request.Body = strings.NewReader(`{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "100ms"
+    }
+  }
+}
+`)
+		})
+
+	return err
+}
+
 func (os *OpenSearchStorage) Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error) {
 	response, err := os.client.Search(func(request *opensearchapi.SearchRequest) {
 		request.Timeout = 100 * time.Microsecond
