@@ -7,8 +7,10 @@ import (
 )
 
 var (
-	ErrNotFound    = fmt.Errorf("not found")
-	ErrInvalidType = fmt.Errorf("invalid type")
+	ErrNotFound        = fmt.Errorf("not found")
+	ErrInvalidType     = fmt.Errorf("invalid type")
+	ErrVersionConflict = fmt.Errorf("Version conflict")
+	ErrInternalError   = fmt.Errorf("internal error")
 )
 
 type Repository[A any] interface {
