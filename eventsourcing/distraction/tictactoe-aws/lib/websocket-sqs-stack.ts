@@ -44,22 +44,19 @@ export class WebsocketSqSStack extends cdk.Stack {
                 masterUserPassword: cdk.SecretValue.unsafePlainText('nile!DISLODGE5clause')
             },
             capacity: {
-                masterNodes: 3,
-                dataNodes: 2,
+                masterNodes: 0,
+                dataNodes: 1,
                 dataNodeInstanceType: ec2.InstanceType.of(
-                    ec2.InstanceClass.T3,
-                    ec2.InstanceSize.SMALL
-                ).toString() + ".search",
-                masterNodeInstanceType: ec2.InstanceType.of(
                     ec2.InstanceClass.T3,
                     ec2.InstanceSize.SMALL
                 ).toString() + ".search",
             },
             ebs: {
                 volumeSize: 20,
+                volumeType: ec2.EbsDeviceVolumeType.GENERAL_PURPOSE_SSD,
             },
             zoneAwareness: {
-                availabilityZoneCount: 2,
+                enabled:false,
             },
             logging: {
                 slowSearchLogEnabled: true,
@@ -69,11 +66,6 @@ export class WebsocketSqSStack extends cdk.Stack {
             enforceHttps: true,
             encryptionAtRest: {enabled: true},
             nodeToNodeEncryption: true,
-            // advancedOptions: {
-            //     'rest.action.multi.allow_explicit_index': 'false',
-            //     'indices.fielddata.cache.size': '25',
-            //     'indices.query.bool.max_clause_count': '2048',
-            // },
         });
 
         domain.addAccessPolicies(
@@ -81,7 +73,7 @@ export class WebsocketSqSStack extends cdk.Stack {
                 actions: ['es:*'],
                 effect: iam.Effect.ALLOW,
                 principals: [new iam.AnyPrincipal],
-                resources: [domain.domainArn, `${domain.domainArn}/*`],
+                resources: [`${domain.domainArn}/*`],
             })
         );
 

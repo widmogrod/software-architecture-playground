@@ -27,6 +27,11 @@ def handler(event, context):
         else:
             document = record['dynamodb']['NewImage']
             r = requests.put(url + id, auth=awsauth, json=document, headers=headers)
+            # this is needed to make the document immediately available for search
+            # but because open search is build from dynamo db stream, it is not needed
+            # since, data will always eventually be available
+            # synchronous indexing it's a different story
+            # r = requests.put(url + id + "?refresh=true", auth=awsauth, json=document, headers=headers)
             print("new: ", r.text)
         count += 1
     return str(count) + ' records processed.'
