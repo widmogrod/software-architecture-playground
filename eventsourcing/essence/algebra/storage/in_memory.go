@@ -4,18 +4,72 @@ import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
 	"log"
+	"strings"
 	"sync"
 )
 
+func NewInMemorySchemaStore() *InMemorySchemaStore {
+	return &InMemorySchemaStore{
+		store: make(map[string]Record[schema.Schema]),
+	}
+}
+
+var _ Repository2[schema.Schema] = &InMemorySchemaStore{}
+
+type InMemorySchemaStore struct {
+	store map[string]Record[schema.Schema]
+	mux   sync.Mutex
+}
+
+func (s *InMemorySchemaStore) Get(key string) (Record[schema.Schema], error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	v, ok := s.store[key]
+	if !ok {
+		return Record[schema.Schema]{}, ErrNotFound
+	}
+
+	return v, nil
+}
+
+func (s *InMemorySchemaStore) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	for id, record := range x.Saving {
+		stored, ok := s.store[id]
+		if !ok {
+			continue
+		}
+
+		if stored.Version > record.Version {
+			return fmt.Errorf("store.InMemorySchemaStore.UpdateRecords id=%s %d > %d %w",
+				id, stored.Version, record.Version, ErrVersionConflict)
+		}
+	}
+
+	for id, record := range x.Saving {
+		s.store[id] = record
+	}
+
+	return nil
+}
+
 func NewRepositoryInMemory2[B, C any](
-	indexer *Indexer[B, C],
+	storage Repository2[schema.Schema],
+	indexer Indexerr[B, C],
 ) *RepositoryInMemory2[B, C] {
 	return &RepositoryInMemory2[B, C]{
-		store:   make(map[string]schema.Schema),
+		storage: storage,
 		indexer: indexer,
 	}
 }
 
+// Record could have two types (to think about it more):
+// data records, which is current implementation
+// index records, which is future implementation
+//   - when two replicas have same indexer rules, then during replication of logs, index can be reused
 type Record[A any] struct {
 	ID      string
 	Data    A
@@ -34,79 +88,92 @@ func (u *UpdateRecords2[B]) Save(x Record[B]) error {
 	return nil
 }
 
-type Repository2[B any, C any] interface {
+type Repository2[B any] interface {
+	Get(key string) (Record[B], error)
 	UpdateRecords(s UpdateRecords[Record[B]]) error
 }
 
-var _ Repository2[any, any] = &RepositoryInMemory2[any, any]{}
+var _ Repository2[any] = &RepositoryInMemory2[any, any]{}
 
 type RepositoryInMemory2[B any, C any] struct {
-	store   map[string]schema.Schema
 	mux     sync.Mutex
-	indexer *Indexer[B, C]
+	storage Repository2[schema.Schema]
+	indexer Indexerr[B, C]
 }
 
-//	func (r *RepositoryInMemory2[B, C]) GetAs(key string, x *A) error {
-//		v, ok := r.store.Load(key)
-//		if !ok {
-//			return ErrNotFound
-//		}
-//
-//		y, ok := v.(*A)
-//		if !ok {
-//			return fmt.Errorf("GetAs: %w want %T, got %T", ErrInvalidType, x, v)
-//		}
-//
-//		x = y
-//
-//		return nil
-//
-// }
+func (r *RepositoryInMemory2[B, C]) Get(key string) (Record[B], error) {
+	v, err := r.storage.Get(key)
+	if err != nil {
+		return Record[B]{}, fmt.Errorf("store.RepositoryInMemory2.Get storage error id=%s %w", key, err)
+	}
+
+	object, err := schema.ToGo(v.Data)
+	if err != nil {
+		return Record[B]{}, fmt.Errorf("store.RepositoryInMemory2.Get schema conversion error id=%s err=%s %w", key, err, ErrInternalError)
+	}
+
+	typed, ok := object.(B)
+	if !ok {
+		return Record[B]{}, fmt.Errorf("store.RepositoryInMemory2.Get conversion error id=%s %w", key, ErrInternalError)
+
+	}
+
+	return Record[B]{
+		ID:      v.ID,
+		Data:    typed,
+		Version: v.Version,
+	}, nil
+}
+
 func (r *RepositoryInMemory2[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) error {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
-	for id, record := range s.Saving {
-		log.Printf("saving %s %#v\n", id, record)
-		r.indexer.Append(record.Data)
+	schemas := UpdateRecords[Record[schema.Schema]]{
+		Saving: make(map[string]Record[schema.Schema]),
 	}
 
-	// Check if Version are correct
 	for id, record := range s.Saving {
-		stored, ok := r.store[id]
-		if !ok {
-			continue
+
+		// TODO fix me
+		if strings.HasPrefix(id, "game:") {
+			log.Printf("saving %s %#v\n", id, record)
+			r.indexer.Append(record.Data)
 		}
 
-		object, err := schema.ToGo(stored)
-		if err != nil {
-			return fmt.Errorf("store.RepositoryInMemory2.UpdateRecords conversion error id=%s err=%s %w", id, err, ErrInternalError)
-		}
-
-		typed, ok := object.(Record[B])
-		if !ok {
-			return fmt.Errorf("store.RepositoryInMemory2.UpdateRecords conversion error id=%s %w", id, ErrInternalError)
-		}
-
-		if typed.Version > record.Version {
-			return fmt.Errorf("store.RepositoryInMemory2.UpdateRecords id=%s %d > %d %w",
-				id, typed.Version, record.Version, ErrVersionConflict)
-		}
-	}
-
-	// Save
-	for id, record := range s.Saving {
 		schemed := schema.FromGo(record)
-		r.store[id] = schemed
+
+		schemas.Saving[id] = Record[schema.Schema]{
+			ID:      record.ID,
+			Data:    schemed,
+			Version: record.Version + 1,
+		}
 	}
 
-	for index, unversionedData := range r.indexer.dataByKey {
+	for index, unversionedData := range r.indexer.GetIndices() {
+		// load index state from storage
+		// if index is found, then concat with unversionedData
+		// otherwise just use unversionedData.
+
+		// That way, indexes can be versioned as storage implementation
+		// and then's to that, sync and async index building process will work with optimistic locking
+
 		// Index don't need to be unversionedData, because it's constructed from unversionedData that are versioned
 		// if save will be rejected for them, that means that index is not valid anymore
 		// but if save will be accepted, then index is valid
 		log.Printf("index %s %#v\n", index, unversionedData)
 		schemed := schema.FromGo(unversionedData)
-		r.store[index] = schemed
+
+		schemas.Saving[index] = Record[schema.Schema]{
+			ID:      index,
+			Data:    schemed,
+			Version: 1,
+		}
+	}
+
+	err := r.storage.UpdateRecords(schemas)
+	if err != nil {
+		return fmt.Errorf("store.RepositoryInMemory2.UpdateRecords schemas store err %w", err)
 	}
 
 	return nil

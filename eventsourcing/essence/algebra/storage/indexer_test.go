@@ -82,9 +82,81 @@ func InitEmtpy(id tictactoemanage.SessionID) *tictactoemanage.SessionStatsResult
 	}
 }
 
-func TestIndexer(t *testing.T) {
+func GroupByKey(data tictactoemanage.State) ([]string, *tictactoemanage.SessionStatsResult) {
+	return tictactoemanage.MustMatchStateR2(
+		data,
+		func(x *tictactoemanage.SessionWaitingForPlayers) ([]string, *tictactoemanage.SessionStatsResult) {
+			return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
+		},
+		func(x *tictactoemanage.SessionReady) ([]string, *tictactoemanage.SessionStatsResult) {
+			return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
+		},
+		func(x *tictactoemanage.SessionInGame) ([]string, *tictactoemanage.SessionStatsResult) {
+			if x.GameState == nil {
+				return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
+			}
 
-	indexer := NewIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult]()
+			return tictacstatemachine.MustMatchStateR2(
+				x.GameState,
+				func(y *tictacstatemachine.GameWaitingForPlayer) ([]string, *tictactoemanage.SessionStatsResult) {
+					return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
+				},
+				func(y *tictacstatemachine.GameProgress) ([]string, *tictactoemanage.SessionStatsResult) {
+					return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
+				},
+				func(y *tictacstatemachine.GameEndWithWin) ([]string, *tictactoemanage.SessionStatsResult) {
+					return []string{"session-stats", x.ID}, &tictactoemanage.SessionStatsResult{
+						ID:         x.ID,
+						TotalGames: 1,
+						TotalDraws: 0,
+						PlayerWins: map[tictactoemanage.PlayerID]int{
+							y.Winner: 1,
+						},
+					}
+				},
+				func(y *tictacstatemachine.GameEndWithDraw) ([]string, *tictactoemanage.SessionStatsResult) {
+					return []string{"session-stats", x.ID}, &tictactoemanage.SessionStatsResult{
+						ID:         x.ID,
+						TotalGames: 1,
+						TotalDraws: 1,
+						PlayerWins: nil,
+					}
+				},
+			)
+		},
+	)
+}
+
+/*
+CombineByKey is commutative, associative, and distributive.
+
+	commutativity = a * b = b * a
+	associativity = (a * b) * c = a * (b * c)
+	distributivity = a * (b + c) = (a * b) + (a * c)
+*/
+func CombineByKey(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
+	winds := a.PlayerWins
+	if winds == nil {
+		winds = map[tictactoemanage.PlayerID]int{}
+	}
+
+	for k, v := range b.PlayerWins {
+		winds[k] += v
+	}
+
+	return &tictactoemanage.SessionStatsResult{
+		ID:         a.ID,
+		TotalGames: a.TotalGames + b.TotalGames,
+		TotalDraws: a.TotalDraws + b.TotalDraws,
+		PlayerWins: winds,
+	}, nil
+}
+
+func TestIndexer(t *testing.T) {
+	indexer := NewIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+		GroupByKey,
+		CombineByKey,
+	)
 
 	_ = `CREATE QUERY "session-stats" ON games as g WITH 
 		PRIMARY_KEY session-stats.sessionID
@@ -96,75 +168,6 @@ func TestIndexer(t *testing.T) {
 		GROUP BY g.sessionID, g.GameState FIELD_NAME ['GameEndWithWin', 'GameEndWithDraw'] as types
 		WHERE g.GameState HAS_FIELD_IN ['GameEndWithWin', 'GameEndWithDraw']; 
 `
-
-	indexer.GroupByKey(func(data tictactoemanage.State) ([]string, *tictactoemanage.SessionStatsResult) {
-		return tictactoemanage.MustMatchStateR2(
-			data,
-			func(x *tictactoemanage.SessionWaitingForPlayers) ([]string, *tictactoemanage.SessionStatsResult) {
-				return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
-			},
-			func(x *tictactoemanage.SessionReady) ([]string, *tictactoemanage.SessionStatsResult) {
-				return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
-			},
-			func(x *tictactoemanage.SessionInGame) ([]string, *tictactoemanage.SessionStatsResult) {
-				if x.GameState == nil {
-					return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
-				}
-
-				return tictacstatemachine.MustMatchStateR2(
-					x.GameState,
-					func(y *tictacstatemachine.GameWaitingForPlayer) ([]string, *tictactoemanage.SessionStatsResult) {
-						return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
-					},
-					func(y *tictacstatemachine.GameProgress) ([]string, *tictactoemanage.SessionStatsResult) {
-						return []string{"session-stats", x.ID}, InitEmtpy(x.ID)
-					},
-					func(y *tictacstatemachine.GameEndWithWin) ([]string, *tictactoemanage.SessionStatsResult) {
-						return []string{"session-stats", x.ID}, &tictactoemanage.SessionStatsResult{
-							ID:         x.ID,
-							TotalGames: 1,
-							TotalDraws: 0,
-							PlayerWins: map[tictactoemanage.PlayerID]int{
-								y.Winner: 1,
-							},
-						}
-					},
-					func(y *tictacstatemachine.GameEndWithDraw) ([]string, *tictactoemanage.SessionStatsResult) {
-						return []string{"session-stats", x.ID}, &tictactoemanage.SessionStatsResult{
-							ID:         x.ID,
-							TotalGames: 1,
-							TotalDraws: 1,
-							PlayerWins: nil,
-						}
-					},
-				)
-			},
-		)
-	})
-
-	/*
-		CombineByKey is commutative, associative, and distributive.
-			commutativity = a * b = b * a
-			associativity = (a * b) * c = a * (b * c)
-			distributivity = a * (b + c) = (a * b) + (a * c)
-	*/
-	indexer.CombineByKey(func(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
-		winds := a.PlayerWins
-		if winds == nil {
-			winds = map[tictactoemanage.PlayerID]int{}
-		}
-
-		for k, v := range b.PlayerWins {
-			winds[k] += v
-		}
-
-		return &tictactoemanage.SessionStatsResult{
-			ID:         a.ID,
-			TotalGames: a.TotalGames + b.TotalGames,
-			TotalDraws: a.TotalDraws + b.TotalDraws,
-			PlayerWins: winds,
-		}, nil
-	})
 
 	/*
 		In Contrast to CombineByKey, UncombineByKey is not commutative, and not associative.
@@ -229,7 +232,7 @@ func TestIndexer(t *testing.T) {
 		indexer.Append(game)
 	}
 
-	result := indexer.GetKey([]string{"session-stats", "session-1"})
+	result := indexer.GetIndexByKey([]string{"session-stats", "session-1"})
 
 	assert.Equal(t, &tictactoemanage.SessionStatsResult{
 		ID:         "session-1",
@@ -239,8 +242,17 @@ func TestIndexer(t *testing.T) {
 			"player-1": 2,
 		},
 	}, result)
+}
 
-	repo := NewRepositoryInMemory2[tictactoemanage.State](
+func TestIndexingWithRepository(t *testing.T) {
+	indexer := NewIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+		GroupByKey,
+		CombineByKey,
+	)
+	storage := NewInMemorySchemaStore()
+
+	repo := NewRepositoryInMemory2[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+		storage,
 		indexer,
 	)
 	update := UpdateRecords[Record[tictactoemanage.State]]{
@@ -257,11 +269,11 @@ func TestIndexer(t *testing.T) {
 				return x.ID
 			},
 			func(x *tictactoemanage.SessionInGame) string {
-				return x.ID
+				return x.ID + "-" + x.GameID
 			},
 		)
 		update.Saving["game:"+id] = Record[tictactoemanage.State]{
-			ID:      "game" + id,
+			ID:      "game:" + id,
 			Data:    game,
 			Version: 1,
 		}
@@ -274,5 +286,25 @@ func TestIndexer(t *testing.T) {
 
 	err := repo.UpdateRecords(update)
 	assert.NoError(t, err)
-	fmt.Printf("%+v", repo.store)
+	fmt.Printf("storage: %+v \n", storage)
+
+	indexedRepo := NewRepositoryInMemory2[*tictactoemanage.SessionStatsResult, any](
+		storage,
+		NewNoopIndexer[*tictactoemanage.SessionStatsResult, any](),
+	)
+
+	result2, err := indexedRepo.Get("session-stats:session-1")
+	assert.NoError(t, err)
+	assert.Equal(t, Record[*tictactoemanage.SessionStatsResult]{
+		ID: "session-stats:session-1",
+		Data: &tictactoemanage.SessionStatsResult{
+			ID:         "session-1",
+			TotalGames: 3,
+			TotalDraws: 1,
+			PlayerWins: map[tictactoemanage.PlayerID]int{
+				"player-1": 2,
+			},
+		},
+		Version: 1,
+	}, result2)
 }
