@@ -155,7 +155,7 @@ func CombineByKey(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.Se
 func TestIndexer(t *testing.T) {
 	storage := NewInMemorySchemaStore()
 
-	indexer := NewAggregateInMemory[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+	indexer := NewKeyedAggregate[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		GroupByKey,
 		CombineByKey,
 		storage,
@@ -250,7 +250,7 @@ func TestIndexer(t *testing.T) {
 func TestIndexingWithRepository(t *testing.T) {
 	storage := NewInMemorySchemaStore()
 
-	indexer := NewAggregateInMemory[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+	indexer := NewKeyedAggregate[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		GroupByKey,
 		CombineByKey,
 		storage,

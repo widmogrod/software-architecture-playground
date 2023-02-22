@@ -23,12 +23,12 @@ func (n *NoopAggregator[T, R]) GetIndices() map[string]R {
 	return nil
 }
 
-func NewAggregateInMemory[T, R any](
+func NewKeyedAggregate[T, R any](
 	groupByFunc func(data T) ([]string, R),
 	combineByFunc func(a, b R) (R, error),
 	storage Repository2[schema.Schema],
-) *AggregateInMemory[T, R] {
-	return &AggregateInMemory[T, R]{
+) *KayedAggregate[T, R] {
+	return &KayedAggregate[T, R]{
 		dataByKey:    make(map[string]R),
 		groupByKey:   groupByFunc,
 		combineByKey: combineByFunc,
@@ -41,9 +41,9 @@ type Aggregator[T, R any] interface {
 	GetIndices() map[string]R
 }
 
-var _ Aggregator[any, any] = (*AggregateInMemory[any, any])(nil)
+var _ Aggregator[any, any] = (*KayedAggregate[any, any])(nil)
 
-type AggregateInMemory[T, R any] struct {
+type KayedAggregate[T, R any] struct {
 	groupByKey   func(data T) ([]string, R)
 	combineByKey func(a, b R) (R, error)
 
@@ -52,7 +52,7 @@ type AggregateInMemory[T, R any] struct {
 	storage Repository2[schema.Schema]
 }
 
-func (t *AggregateInMemory[T, R]) Append(data T) error {
+func (t *KayedAggregate[T, R]) Append(data T) error {
 	var err error
 	key, result := t.groupByKey(data)
 
@@ -75,20 +75,20 @@ func (t *AggregateInMemory[T, R]) Append(data T) error {
 	return err
 }
 
-func (t *AggregateInMemory[T, R]) GetIndices() map[string]R {
+func (t *KayedAggregate[T, R]) GetIndices() map[string]R {
 	return t.dataByKey
 }
 
-func (t *AggregateInMemory[T, R]) GetIndexByKey(key []string) R {
+func (t *KayedAggregate[T, R]) GetIndexByKey(key []string) R {
 	index := t.indexName(key)
 	return t.dataByKey[index]
 }
 
-func (t *AggregateInMemory[T, R]) indexName(key []string) string {
+func (t *KayedAggregate[T, R]) indexName(key []string) string {
 	return strings.Join(key, ":")
 }
 
-func (t *AggregateInMemory[T, R]) loadIndex(index string) (R, error) {
+func (t *KayedAggregate[T, R]) loadIndex(index string) (R, error) {
 	var r R
 	// load index state from storage
 	// if index is found, then concat with unversionedData
