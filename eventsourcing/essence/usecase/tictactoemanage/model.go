@@ -49,16 +49,16 @@ type (
 //go:generate mkunion -name=State
 type (
 	SessionWaitingForPlayers struct {
-		ID           SessionID
+		SessionID    SessionID
 		NeedsPlayers int
 		Players      []PlayerID
 	}
 	SessionReady struct {
-		ID      SessionID
-		Players []PlayerID
+		SessionID SessionID
+		Players   []PlayerID
 	}
 	SessionInGame struct {
-		ID          SessionID
+		SessionID   SessionID
 		Players     []PlayerID
 		GameID      GameID
 		GameState   tictacstatemachine.State

@@ -35,16 +35,16 @@ func TestProcess(t *testing.T) {
 
 var latestGames = []tictactoemanage.State{
 	&tictactoemanage.SessionInGame{
-		ID:          "session-2",
+		SessionID:   "session-2",
 		Players:     []tictactoemanage.PlayerID{"player-1", "player-2"},
 		GameID:      "game-1",
 		GameState:   nil,
 		GameProblem: nil,
 	},
 	&tictactoemanage.SessionInGame{
-		ID:      "session-1",
-		Players: []tictactoemanage.PlayerID{"player-1", "player-2"},
-		GameID:  "game-2",
+		SessionID: "session-1",
+		Players:   []tictactoemanage.PlayerID{"player-1", "player-2"},
+		GameID:    "game-2",
 		GameState: &tictacstatemachine.GameEndWithDraw{
 			TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
 				FirstPlayerID:  "player-1",
@@ -61,9 +61,9 @@ var latestGames = []tictactoemanage.State{
 		GameProblem: nil,
 	},
 	&tictactoemanage.SessionInGame{
-		ID:      "session-1",
-		Players: []tictactoemanage.PlayerID{"player-1", "player-2"},
-		GameID:  "game-3",
+		SessionID: "session-1",
+		Players:   []tictactoemanage.PlayerID{"player-1", "player-2"},
+		GameID:    "game-3",
 		GameState: &tictacstatemachine.GameEndWithWin{
 			TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
 				FirstPlayerID:  "player-1",
@@ -79,9 +79,9 @@ var latestGames = []tictactoemanage.State{
 		GameProblem: nil,
 	},
 	&tictactoemanage.SessionInGame{
-		ID:      "session-1",
-		Players: []tictactoemanage.PlayerID{"player-1", "player-2"},
-		GameID:  "game-4",
+		SessionID: "session-1",
+		Players:   []tictactoemanage.PlayerID{"player-1", "player-2"},
+		GameID:    "game-4",
 		GameState: &tictacstatemachine.GameEndWithWin{
 			TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
 				FirstPlayerID:  "player-1",
@@ -131,13 +131,13 @@ func TestLatestGames(t *testing.T) {
 		return tictactoemanage.MustMatchStateR2(
 			state,
 			func(y *tictactoemanage.SessionWaitingForPlayers) (string, []byte) {
-				return y.ID, x
+				return y.SessionID, x
 			},
 			func(y *tictactoemanage.SessionReady) (string, []byte) {
-				return y.ID, x
+				return y.SessionID, x
 			},
 			func(y *tictactoemanage.SessionInGame) (string, []byte) {
-				return y.ID, x
+				return y.SessionID, x
 			})
 	}, enchanced)
 
@@ -170,7 +170,7 @@ func TestStatsInMemory(t *testing.T) {
 		if !ok {
 			continue
 		}
-		result.ID = inProgress.ID
+		result.ID = inProgress.SessionID
 		result.TotalGames++
 		if _, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithDraw); ok {
 			result.TotalDraws++
@@ -223,7 +223,7 @@ func TestStatsInBeam(t *testing.T) {
 			return fmt.Errorf("error while converting to tictactoemanage.SessionInGame")
 		}
 		result := tictactoemanage.SessionStatsResult{
-			ID:         inProgress.ID,
+			ID:         inProgress.SessionID,
 			TotalGames: 1,
 		}
 		if _, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithDraw); ok {
@@ -240,7 +240,7 @@ func TestStatsInBeam(t *testing.T) {
 			return err
 		}
 
-		emit(inProgress.ID, data)
+		emit(inProgress.SessionID, data)
 
 		return nil
 	}, enchanced)
@@ -334,9 +334,9 @@ func TestStatsInBeam(t *testing.T) {
 //			}
 //
 //			if _, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithDraw); ok {
-//				emitDraw(inProgress.ID, 1)
+//				emitDraw(inProgress.SessionID, 1)
 //			} else if win, ok := inProgress.GameState.(*tictacstatemachine.GameEndWithWin); ok {
-//				emitWin(inProgress.ID, map[tictactoemanage.PlayerID]float64{win.Winner: 1})
+//				emitWin(inProgress.SessionID, map[tictactoemanage.PlayerID]float64{win.Winner: 1})
 //			}
 //
 //		}, enchanced)

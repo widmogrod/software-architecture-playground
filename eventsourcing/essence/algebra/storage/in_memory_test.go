@@ -11,7 +11,7 @@ type User struct {
 //	err := r.UpdateRecords(UpdateRecords[Record[User]]{
 //		Saving: map[string]Record[User]{
 //			"1": {
-//				ID: "1",
+//				SessionID: "1",
 //			},
 //		},
 //	})

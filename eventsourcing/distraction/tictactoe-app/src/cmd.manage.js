@@ -1,8 +1,8 @@
 export function CreateSessionCMD(sid, players) {
     return {
         "CreateSessionCMD": {
-            SessionID: sid,
-            NeedsPlayers: players || 2,
+            "SessionID": sid,
+            "NeedsPlayers": players || 2,
         },
     }
 }
@@ -10,8 +10,8 @@ export function CreateSessionCMD(sid, players) {
 export function JoinGameSessionCMD(sid, pid) {
     return {
         "JoinGameSessionCMD": {
-            SessionID: sid,
-            PlayerID: pid,
+            "SessionID": sid,
+            "PlayerID": pid,
         },
     }
 }
@@ -19,7 +19,7 @@ export function JoinGameSessionCMD(sid, pid) {
 export function GameSessionWithBotCMD(sid) {
     return {
         "GameSessionWithBotCMD": {
-            SessionID: sid,
+            "SessionID": sid,
         },
     }
 }
@@ -27,8 +27,8 @@ export function GameSessionWithBotCMD(sid) {
 export function NewGameCMD(sid, gid) {
     return {
         "NewGameCMD": {
-            SessionID: sid,
-            GameID: gid,
+            "SessionID": sid,
+            "GameID": gid,
         },
     }
 }
@@ -36,9 +36,9 @@ export function NewGameCMD(sid, gid) {
 export function GameActionCMD(sid, gid, action) {
     return {
         "GameActionCMD": {
-            SessionID: sid,
-            GameID: gid,
-            Action: action,
+            "SessionID": sid,
+            "GameID": gid,
+            "Action": action,
             // Action: JSON.stringify(action),
         },
     }
@@ -47,7 +47,7 @@ export function GameActionCMD(sid, gid, action) {
 export function SequenceCMD(cmds) {
     return {
         "SequenceCMD": {
-            Commands: cmds || [],
+            "Commands": cmds || [],
         },
     }
 }

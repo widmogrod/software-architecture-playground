@@ -29,7 +29,7 @@ func Transition(cmd Command, state State) (State, error) {
 			}
 
 			return &SessionWaitingForPlayers{
-				ID:           x.SessionID,
+				SessionID:    x.SessionID,
 				NeedsPlayers: x.NeedsPlayers,
 				Players:      []PlayerID{},
 			}, nil
@@ -40,7 +40,7 @@ func Transition(cmd Command, state State) (State, error) {
 				return nil, ErrSessionNotWaitingForPlayers
 			}
 
-			if state.ID != x.SessionID {
+			if state.SessionID != x.SessionID {
 				return nil, ErrNotTheSameSessions
 			}
 
@@ -51,7 +51,7 @@ func Transition(cmd Command, state State) (State, error) {
 			}
 
 			newState := &SessionWaitingForPlayers{
-				ID:           state.ID,
+				SessionID:    state.SessionID,
 				NeedsPlayers: state.NeedsPlayers - 1,
 				Players:      append(state.Players, x.PlayerID),
 			}
@@ -61,8 +61,8 @@ func Transition(cmd Command, state State) (State, error) {
 			}
 
 			return &SessionReady{
-				ID:      state.ID,
-				Players: newState.Players,
+				SessionID: state.SessionID,
+				Players:   newState.Players,
 			}, nil
 		},
 		func(x *GameSessionWithBotCMD) (State, error) {
@@ -74,7 +74,7 @@ func Transition(cmd Command, state State) (State, error) {
 		func(x *LeaveGameSessionCMD) (State, error) {
 			switch state := state.(type) {
 			case *SessionWaitingForPlayers:
-				if state.ID != x.SessionID {
+				if state.SessionID != x.SessionID {
 					return nil, ErrNotTheSameSessions
 				}
 
@@ -86,13 +86,13 @@ func Transition(cmd Command, state State) (State, error) {
 				}
 
 				return &SessionWaitingForPlayers{
-					ID:           state.ID,
+					SessionID:    state.SessionID,
 					NeedsPlayers: state.NeedsPlayers + len(state.Players) - len(players),
 					Players:      players,
 				}, nil
 
 			case *SessionReady:
-				if state.ID != x.SessionID {
+				if state.SessionID != x.SessionID {
 					return nil, ErrNotTheSameSessions
 				}
 
@@ -104,7 +104,7 @@ func Transition(cmd Command, state State) (State, error) {
 				}
 
 				return &SessionWaitingForPlayers{
-					ID:           state.ID,
+					SessionID:    state.SessionID,
 					NeedsPlayers: len(players),
 					Players:      players,
 				}, nil
@@ -115,18 +115,18 @@ func Transition(cmd Command, state State) (State, error) {
 		func(x *NewGameCMD) (State, error) {
 			switch state := state.(type) {
 			case *SessionReady:
-				if state.ID != x.SessionID {
+				if state.SessionID != x.SessionID {
 					return nil, ErrNotTheSameSessions
 				}
 
 				return &SessionInGame{
-					ID:      state.ID,
-					Players: state.Players,
-					GameID:  x.GameID,
+					SessionID: state.SessionID,
+					Players:   state.Players,
+					GameID:    x.GameID,
 				}, nil
 
 			case *SessionInGame:
-				if state.ID != x.SessionID {
+				if state.SessionID != x.SessionID {
 					return nil, ErrNotTheSameSessions
 				}
 				//if state.GameID != x.GameID {
@@ -134,9 +134,9 @@ func Transition(cmd Command, state State) (State, error) {
 				//}
 
 				return &SessionInGame{
-					ID:      state.ID,
-					Players: state.Players,
-					GameID:  x.GameID,
+					SessionID: state.SessionID,
+					Players:   state.Players,
+					GameID:    x.GameID,
 				}, nil
 
 			default:
@@ -149,7 +149,7 @@ func Transition(cmd Command, state State) (State, error) {
 				return nil, ErrSessionNotReadyToAcceptGameInput
 			}
 
-			if state.ID != x.SessionID {
+			if state.SessionID != x.SessionID {
 				return nil, ErrNotTheSameSessions
 			}
 
@@ -201,7 +201,7 @@ func Transition(cmd Command, state State) (State, error) {
 			}
 
 			newState := &SessionInGame{
-				ID:        state.ID,
+				SessionID: state.SessionID,
 				Players:   state.Players,
 				GameID:    state.GameID,
 				GameState: game.State(),

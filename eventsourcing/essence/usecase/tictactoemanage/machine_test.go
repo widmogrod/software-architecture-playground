@@ -106,75 +106,75 @@ func TestNewMachine(t *testing.T) {
 			},
 			states: []State{
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 2,
 					Players:      []PlayerID{},
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 2,
 					Players:      []PlayerID{},
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 2,
 					Players:      []PlayerID(nil),
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 1,
 					Players:      []PlayerID{"1"},
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 1,
 					Players:      []PlayerID{"1"},
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 1,
 					Players:      []PlayerID{"1"},
 				},
 				&SessionReady{
-					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					SessionID: "a",
+					Players:   []PlayerID{"1", "2"},
 				},
 				&SessionReady{
-					ID:      "a",
-					Players: []PlayerID{"1", "2"},
+					SessionID: "a",
+					Players:   []PlayerID{"1", "2"},
 				},
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 1,
 					Players:      []PlayerID{"2"},
 				},
 				&SessionReady{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
 				},
 				&SessionReady{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
 				},
 				&SessionInGame{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
-					GameID:  "g1",
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
+					GameID:    "g1",
 				},
 				&SessionInGame{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
-					GameID:  "g1",
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
+					GameID:    "g1",
 				},
 				&SessionInGame{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
-					GameID:  "g1",
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
+					GameID:    "g1",
 				},
 				&SessionInGame{
-					ID:      "a",
-					Players: []PlayerID{"2", "1"},
-					GameID:  "g1",
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
+					GameID:    "g1",
 					GameState: &tictacstatemachine.GameProgress{
 						TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
 							FirstPlayerID:  "1",
@@ -226,7 +226,7 @@ func TestNewMachine(t *testing.T) {
 			},
 			states: []State{
 				&SessionWaitingForPlayers{
-					ID:           "a",
+					SessionID:    "a",
 					NeedsPlayers: 1,
 					Players: []PlayerID{
 						"1",

@@ -60,6 +60,10 @@ func (s *InMemorySchemaStore) UpdateRecords(x UpdateRecords[Record[schema.Schema
 	for id, record := range x.Saving {
 		stored, ok := s.store[id]
 		if !ok {
+			// new record, should have version 1
+			// and since few lines below we increment version
+			// we need to set it to 0
+			record.Version = 0
 			continue
 		}
 
@@ -70,6 +74,7 @@ func (s *InMemorySchemaStore) UpdateRecords(x UpdateRecords[Record[schema.Schema
 	}
 
 	for id, record := range x.Saving {
+		record.Version += 1
 		s.store[id] = record
 	}
 
@@ -169,29 +174,13 @@ func (r *RepositoryInMemory2[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) er
 		schemas.Saving[id] = Record[schema.Schema]{
 			ID:      record.ID,
 			Data:    schemed,
-			Version: record.Version + 1,
+			Version: record.Version,
 		}
 	}
 
-	for index, unversionedData := range r.aggregate.GetIndices() {
-		// load index state from storage
-		// if index is found, then concat with unversionedData
-		// otherwise just use unversionedData.
-
-		// That way, indexes can be versioned as storage implementation
-		// and then's to that, sync and async index building process will work with optimistic locking
-
-		// Index don't need to be unversionedData, because it's constructed from unversionedData that are versioned
-		// if save will be rejected for them, that means that index is not valid anymore
-		// but if save will be accepted, then index is valid
-		log.Printf("index %s %#v\n", index, unversionedData)
-		schemed := schema.FromGo(unversionedData)
-
-		schemas.Saving[index] = Record[schema.Schema]{
-			ID:      index,
-			Data:    schemed,
-			Version: 1,
-		}
+	for index, versionedData := range r.aggregate.GetVersionedIndices() {
+		log.Printf("index %s %#v\n", index, versionedData)
+		schemas.Saving[versionedData.ID] = versionedData
 	}
 
 	err := r.storage.UpdateRecords(schemas)

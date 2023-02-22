@@ -48,7 +48,7 @@ const queryTemplate = `{
       "must": [
         {
           "term": {
-            "SessionInGame.M.ID.S.keyword": {
+            "SessionInGame.M.SessionID.S.keyword": {
               "value": "%s"
             }
           }
