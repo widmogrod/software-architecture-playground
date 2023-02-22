@@ -8,6 +8,26 @@ import (
 	"sync"
 )
 
+func RecordAs[A any](record Record[schema.Schema]) (Record[A], error) {
+	object, err := schema.ToGo(record.Data)
+	if err != nil {
+		var a A
+		return Record[A]{}, fmt.Errorf("store.GetSchemaAs[%T] schema conversion failed. %s. %w", a, err, ErrInternalError)
+	}
+
+	typed, ok := object.(A)
+	if !ok {
+		var a A
+		return Record[A]{}, fmt.Errorf("store.GetSchemaAs[%T] type assertion got %T. %w", a, object, ErrInternalError)
+	}
+
+	return Record[A]{
+		ID:      record.ID,
+		Data:    typed,
+		Version: record.Version,
+	}, nil
+}
+
 func NewInMemorySchemaStore() *InMemorySchemaStore {
 	return &InMemorySchemaStore{
 		store: make(map[string]Record[schema.Schema]),
@@ -43,8 +63,8 @@ func (s *InMemorySchemaStore) UpdateRecords(x UpdateRecords[Record[schema.Schema
 			continue
 		}
 
-		if stored.Version > record.Version {
-			return fmt.Errorf("store.InMemorySchemaStore.UpdateRecords id=%s %d > %d %w",
+		if stored.Version != record.Version {
+			return fmt.Errorf("store.InMemorySchemaStore.UpdateRecords id=%s %d != %d %w",
 				id, stored.Version, record.Version, ErrVersionConflict)
 		}
 	}
@@ -58,18 +78,18 @@ func (s *InMemorySchemaStore) UpdateRecords(x UpdateRecords[Record[schema.Schema
 
 func NewRepositoryInMemory2[B, C any](
 	storage Repository2[schema.Schema],
-	indexer Indexerr[B, C],
+	indexer Aggregator[B, C],
 ) *RepositoryInMemory2[B, C] {
 	return &RepositoryInMemory2[B, C]{
-		storage: storage,
-		indexer: indexer,
+		storage:   storage,
+		aggregate: indexer,
 	}
 }
 
 // Record could have two types (to think about it more):
 // data records, which is current implementation
 // index records, which is future implementation
-//   - when two replicas have same indexer rules, then during replication of logs, index can be reused
+//   - when two replicas have same aggregate rules, then during replication of logs, index can be reused
 type Record[A any] struct {
 	ID      string
 	Data    A
@@ -96,9 +116,9 @@ type Repository2[B any] interface {
 var _ Repository2[any] = &RepositoryInMemory2[any, any]{}
 
 type RepositoryInMemory2[B any, C any] struct {
-	mux     sync.Mutex
-	storage Repository2[schema.Schema]
-	indexer Indexerr[B, C]
+	mux       sync.Mutex
+	storage   Repository2[schema.Schema]
+	aggregate Aggregator[B, C]
 }
 
 func (r *RepositoryInMemory2[B, C]) Get(key string) (Record[B], error) {
@@ -138,7 +158,10 @@ func (r *RepositoryInMemory2[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) er
 		// TODO fix me
 		if strings.HasPrefix(id, "game:") {
 			log.Printf("saving %s %#v\n", id, record)
-			r.indexer.Append(record.Data)
+			err := r.aggregate.Append(record.Data)
+			if err != nil {
+				return fmt.Errorf("store.RepositoryInMemory2.UpdateRecords aggregate.Append %w", err)
+			}
 		}
 
 		schemed := schema.FromGo(record)
@@ -150,7 +173,7 @@ func (r *RepositoryInMemory2[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) er
 		}
 	}
 
-	for index, unversionedData := range r.indexer.GetIndices() {
+	for index, unversionedData := range r.aggregate.GetIndices() {
 		// load index state from storage
 		// if index is found, then concat with unversionedData
 		// otherwise just use unversionedData.
@@ -179,25 +202,25 @@ func (r *RepositoryInMemory2[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) er
 	return nil
 }
 
-// ReindexAll is used to reindex all records with a provided indexer definition
-// Example: when indexer is created, it's empty, so it needs to be filled with all records
-// Example: when indexer definition is changed, it needs to be reindexed
-// Example: when indexer is corrupted, it needs to be reindexed
+// ReindexAll is used to reindex all records with a provided aggregate definition
+// Example: when aggregate is created, it's empty, so it needs to be filled with all records
+// Example: when aggregate definition is changed, it needs to be reindexed
+// Example: when aggregate is corrupted, it needs to be reindexed
 //
 // How it works?
 // 1. It's called by the user
-// 2. It's called by the system when it detects that indexer is corrupted
-// 3. It's called by the system when it detects that indexer definition is changed
+// 2. It's called by the system when it detects that aggregate is corrupted
+// 3. It's called by the system when it detects that aggregate definition is changed
 //
 // How it's implemented?
 //  1. Create index from snapshot of all records. Because it's snapshot, changes are not applied.
 //  2. In parallel process stream of changes from give point of time.
-//  3. Indexer must be idempotent, so same won't be indexed twice.
-//  4. When indexer detects same record with new Version, it retracts old Version and accumulates new Version.
+//  3. AggregateInMemory must be idempotent, so same won't be indexed twice.
+//  4. When aggregate detects same record with new Version, it retracts old Version and accumulates new Version.
 //  5. When it's done, it's ready to be used
 //  6. When indices are set up as synchronous, then every change is indexed immediately.
 //     But, because synchronous index is from point of time, it needs to trigger reindex.
-//     Which imply that indexer myst know when index was created, so it can know when to stop rebuilding process.
+//     Which imply that aggregate myst know when index was created, so it can know when to stop rebuilding process.
 //     This implies control plane. Versions of records should follow monotonically increasing order, that way it will be easier to detect when index is up to date.
 func (r *RepositoryInMemory2[B, C]) ReindexAll() {
 	panic("not implemented")

@@ -153,9 +153,12 @@ func CombineByKey(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.Se
 }
 
 func TestIndexer(t *testing.T) {
-	indexer := NewIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+	storage := NewInMemorySchemaStore()
+
+	indexer := NewAggregateInMemory[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		GroupByKey,
 		CombineByKey,
+		storage,
 	)
 
 	_ = `CREATE QUERY "session-stats" ON games as g WITH 
@@ -179,7 +182,7 @@ func TestIndexer(t *testing.T) {
 
 		Some operations should marked as "substractive"
 	*/
-	//indexer.UncombineByKey(func(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
+	//aggregate.UncombineByKey(func(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
 	//	winds := a.PlayerWins
 	//	for k, v := range b.PlayerWins {
 	//		winds[k] += v
@@ -193,7 +196,7 @@ func TestIndexer(t *testing.T) {
 	//	}, nil
 	//})
 
-	//indexer.Init(func(groupContext GroupContext2[tictactoemanage.SessionID, tictacstatemachine.State]) {
+	//aggregate.Init(func(groupContext GroupContext2[tictactoemanage.SessionID, tictacstatemachine.State]) {
 	//	sessionId, _ := groupContext.GroupKey()
 	//	//groupContext.Unpack()
 	//
@@ -205,7 +208,7 @@ func TestIndexer(t *testing.T) {
 	//	}
 	//})
 
-	//indexer.OnInsert(func(groupContext GroupContext2[tictactoemanage.SessionID, tictacstatemachine.State], stats *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
+	//aggregate.OnInsert(func(groupContext GroupContext2[tictactoemanage.SessionID, tictacstatemachine.State], stats *tictactoemanage.SessionStatsResult) (*tictactoemanage.SessionStatsResult, error) {
 	//	_, gamestate := groupContext.GroupKey()
 	//	return tictacstatemachine.MustMatchStateR2(
 	//		gamestate,
@@ -245,11 +248,13 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestIndexingWithRepository(t *testing.T) {
-	indexer := NewIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+	storage := NewInMemorySchemaStore()
+
+	indexer := NewAggregateInMemory[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		GroupByKey,
 		CombineByKey,
+		storage,
 	)
-	storage := NewInMemorySchemaStore()
 
 	repo := NewRepositoryInMemory2[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		storage,
@@ -290,7 +295,7 @@ func TestIndexingWithRepository(t *testing.T) {
 
 	indexedRepo := NewRepositoryInMemory2[*tictactoemanage.SessionStatsResult, any](
 		storage,
-		NewNoopIndexer[*tictactoemanage.SessionStatsResult, any](),
+		NewNoopAggregator[*tictactoemanage.SessionStatsResult, any](),
 	)
 
 	result2, err := indexedRepo.Get("session-stats:session-1")

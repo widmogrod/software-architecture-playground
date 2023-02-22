@@ -1,74 +1,107 @@
 package storage
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
+	"strings"
+)
 
-func NewNoopIndexer[T, R any]() *NoopIndexer[T, R] {
-	return &NoopIndexer[T, R]{}
+func NewNoopAggregator[T, R any]() *NoopAggregator[T, R] {
+	return &NoopAggregator[T, R]{}
 }
 
-var _ Indexerr[any, any] = (*NoopIndexer[any, any])(nil)
+var _ Aggregator[any, any] = (*NoopAggregator[any, any])(nil)
 
-type NoopIndexer[T, R any] struct{}
+type NoopAggregator[T, R any] struct{}
 
-func (n *NoopIndexer[T, R]) Append(data T) {}
-
-func (n *NoopIndexer[T, R]) GetIndices() map[string]R {
+func (n *NoopAggregator[T, R]) Append(data T) error {
 	return nil
 }
 
-func NewIndexer[T, R any](
+func (n *NoopAggregator[T, R]) GetIndices() map[string]R {
+	return nil
+}
+
+func NewAggregateInMemory[T, R any](
 	groupByFunc func(data T) ([]string, R),
 	combineByFunc func(a, b R) (R, error),
-) *Indexer[T, R] {
-	return &Indexer[T, R]{
+	storage Repository2[schema.Schema],
+) *AggregateInMemory[T, R] {
+	return &AggregateInMemory[T, R]{
 		dataByKey:    make(map[string]R),
 		groupByKey:   groupByFunc,
 		combineByKey: combineByFunc,
+		storage:      storage,
 	}
 }
 
-type Indexerr[T, R any] interface {
-	Append(data T)
+type Aggregator[T, R any] interface {
+	Append(data T) error
 	GetIndices() map[string]R
 }
 
-var _ Indexerr[any, any] = (*Indexer[any, any])(nil)
+var _ Aggregator[any, any] = (*AggregateInMemory[any, any])(nil)
 
-type Indexer[T, R any] struct {
+type AggregateInMemory[T, R any] struct {
 	groupByKey   func(data T) ([]string, R)
 	combineByKey func(a, b R) (R, error)
 
 	dataByKey map[string]R
+
+	storage Repository2[schema.Schema]
 }
 
-func (t *Indexer[T, R]) Append(data T) {
+func (t *AggregateInMemory[T, R]) Append(data T) error {
+	var err error
 	key, result := t.groupByKey(data)
 
 	index := t.indexName(key)
-	// TODO load from storage index, instead assuming it's empty
-	// That way, if index is created by other process, it can be updated with new data.
-	// Interestingly, when asychronouse process will update the same index, to not overwrite, it should
-	// use the same combineByKey function, and it should be idempotent.
-	// and it should have versioning to do this. One ove ways how to approach it is to inject latest version
-	// and durign save when it's rejected, it should be retried with latest version.
-	// Thanks to Combine operation, injecting latest state of index, can be done outside of indexer, in repository layer
-	// This may may non intuitive from this class perspective, but it may be intuitive from repository perspective.
 	if _, ok := t.dataByKey[index]; !ok {
-		t.dataByKey[index] = result
-	} else {
-		t.dataByKey[index], _ = t.combineByKey(t.dataByKey[index], result)
+		initial, err := t.loadIndex(index)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return err
+			}
+
+			t.dataByKey[index] = result
+			return nil
+		}
+
+		t.dataByKey[index] = initial
 	}
+
+	t.dataByKey[index], err = t.combineByKey(t.dataByKey[index], result)
+	return err
 }
 
-func (t *Indexer[T, R]) GetIndices() map[string]R {
+func (t *AggregateInMemory[T, R]) GetIndices() map[string]R {
 	return t.dataByKey
 }
 
-func (t *Indexer[T, R]) GetIndexByKey(key []string) R {
+func (t *AggregateInMemory[T, R]) GetIndexByKey(key []string) R {
 	index := t.indexName(key)
 	return t.dataByKey[index]
 }
 
-func (t *Indexer[T, R]) indexName(key []string) string {
+func (t *AggregateInMemory[T, R]) indexName(key []string) string {
 	return strings.Join(key, ":")
+}
+
+func (t *AggregateInMemory[T, R]) loadIndex(index string) (R, error) {
+	var r R
+	// load index state from storage
+	// if index is found, then concat with unversionedData
+	// otherwise just use unversionedData.
+	initial, err := t.storage.Get(index)
+	if err != nil {
+		return r, fmt.Errorf("store.RepositoryInMemory2.UpdateRecords index(1)=%s %w", index, err)
+	}
+
+	indexValue, err := RecordAs[R](initial)
+	if err != nil {
+		return r, fmt.Errorf("store.RepositoryInMemory2.UpdateRecords index(2)=%s %w", index, err)
+	}
+
+	return indexValue.Data, nil
 }
