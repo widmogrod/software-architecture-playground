@@ -1,5 +1,7 @@
 package storage
 
+import "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+
 // Record could have two types (to think about it more):
 // data records, which is current implementation
 // index records, which is future implementation
@@ -10,7 +12,20 @@ type Record[A any] struct {
 	Version uint64
 }
 
-type Repository2[B any] interface {
-	Get(key string) (Record[B], error)
-	UpdateRecords(s UpdateRecords[Record[B]]) error
+type FindingRecords[T any] struct {
+	Where  *predicate.Where
+	Sort   []SortField
+	Limit  uint8
+	Cursor *Cursor
+}
+
+type SortField struct {
+	Field      string
+	Descending bool
+}
+
+type Repository2[T any] interface {
+	Get(key string) (Record[T], error)
+	UpdateRecords(command UpdateRecords[Record[T]]) error
+	//FindingRecords(query FindingRecords[Record[T]]) (PageResult[Record[T]], error)
 }

@@ -105,9 +105,11 @@ func (r *RepositoryInMemory[A]) GetOrNew(s string) (A, error) {
 	return v, nil
 }
 
+type Cursor = string
+
 type PageResult[A any] struct {
 	Items []A
-	Next  string
+	Next  Cursor
 }
 
 func (a PageResult[A]) HasNext() bool {

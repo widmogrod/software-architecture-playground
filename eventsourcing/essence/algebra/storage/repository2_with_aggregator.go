@@ -59,7 +59,6 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 	}
 
 	for id, record := range s.Saving {
-
 		// TODO fix me
 		if strings.HasPrefix(id, "game:") {
 			log.Printf("saving %s %#v\n", id, record)

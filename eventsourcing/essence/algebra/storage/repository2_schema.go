@@ -3,6 +3,8 @@ package storage
 import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+	"sort"
 	"sync"
 )
 
@@ -57,4 +59,50 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 	}
 
 	return nil
+}
+
+func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
+	records := make([]Record[schema.Schema], 0)
+	for _, v := range s.store {
+		records = append(records, v)
+	}
+
+	if query.Where != nil {
+		newRecords := make([]Record[schema.Schema], 0)
+		for _, record := range s.store {
+			if predicate.Evaluate(query.Where.Predicate, record.Data, query.Where.Params) {
+				newRecords = append(newRecords, record)
+			}
+		}
+		records = newRecords
+	}
+
+	if len(query.Sort) > 0 {
+		records = sortRecords(records, query.Sort)
+	}
+
+	result := PageResult[Record[schema.Schema]]{
+		Items: records,
+		Next:  "",
+	}
+
+	return result, nil
+}
+
+func sortRecords(records []Record[schema.Schema], sortFields []SortField) []Record[schema.Schema] {
+	sort.Slice(records, func(i, j int) bool {
+		for _, sortField := range sortFields {
+			fieldA := schema.Get(records[i].Data, sortField.Field)
+			fieldB := schema.Get(records[j].Data, sortField.Field)
+			cmp := schema.Compare(fieldA, fieldB)
+			if !sortField.Descending {
+				cmp = -cmp
+			}
+			if cmp != 0 {
+				return cmp < 0
+			}
+		}
+		return false
+	})
+	return records
 }
