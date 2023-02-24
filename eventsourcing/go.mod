@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/EventStore/EventStore-Client-Go v0.0.0-20201109153453-2eb2093c8197
+	github.com/alecthomas/participle/v2 v2.0.0-beta.5
 	github.com/apache/beam/sdks/v2 v2.44.0
 	github.com/aws/aws-cdk-go/awscdk/v2 v2.60.0
 	github.com/aws/aws-lambda-go v1.37.0
@@ -21,7 +22,7 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/segmentio/ksuid v1.0.3
 	github.com/stretchr/testify v1.8.1
-	github.com/widmogrod/mkunion v1.9.0
+	github.com/widmogrod/mkunion v1.10.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 )
