@@ -171,7 +171,7 @@ func CombineByKey(a, b *tictactoemanage.SessionStatsResult) (*tictactoemanage.Se
 }
 
 func TestIndexer(t *testing.T) {
-	storage := NewInMemorySchemaStore()
+	storage := NewRepository2WithSchema()
 
 	indexer := NewKeyedAggregate[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		GroupByKey,
@@ -267,7 +267,7 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestIndexingWithRepository(t *testing.T) {
-	storage := NewInMemorySchemaStore()
+	storage := NewRepository2WithSchema()
 
 	// Simulate, that we have a sessions stats already
 	err := storage.UpdateRecords(UpdateRecords[Record[schema.Schema]]{
@@ -297,7 +297,7 @@ func TestIndexingWithRepository(t *testing.T) {
 		storage,
 	)
 
-	repo := NewRepositoryInMemory2[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
+	repo := NewRepositoryWithIndexer[tictactoemanage.State, *tictactoemanage.SessionStatsResult](
 		storage,
 		indexer,
 	)
@@ -334,7 +334,7 @@ func TestIndexingWithRepository(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("storage: %+v \n", storage)
 
-	indexedRepo := NewRepositoryInMemory2[*tictactoemanage.SessionStatsResult, any](
+	indexedRepo := NewRepositoryWithIndexer[*tictactoemanage.SessionStatsResult, any](
 		storage,
 		NewNoopAggregator[*tictactoemanage.SessionStatsResult, any](),
 	)

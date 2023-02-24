@@ -7,7 +7,7 @@ type User struct {
 }
 
 //func TestNewRepositoryInMemory(t *testing.T) {
-//	r := NewRepositoryInMemory2[User]()
+//	r := NewRepositoryWithIndexer[User]()
 //	err := r.UpdateRecords(UpdateRecords[Record[User]]{
 //		Saving: map[string]Record[User]{
 //			"1": {
