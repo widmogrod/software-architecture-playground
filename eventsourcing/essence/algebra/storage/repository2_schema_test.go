@@ -44,9 +44,9 @@ func TestNewRepository2WithSchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	result, err := repo.FindingRecords(FindingRecords[Record[schema.Schema]]{
-		Where: predicate.MustQuery(
+		Where: predicate.MustWhere(
 			"Age > :age",
-			map[string]schema.Schema{
+			predicate.ParamBinds{
 				":age": schema.MkInt(20),
 			}),
 		Sort: []SortField{

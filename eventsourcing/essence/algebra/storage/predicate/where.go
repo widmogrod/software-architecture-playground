@@ -5,7 +5,7 @@ type Where struct {
 	Params    ParamBinds
 }
 
-func MustQuery(query string, params ParamBinds) *Where {
+func MustWhere(query string, params ParamBinds) *Where {
 	predicates, err := Parse(query)
 	if err != nil {
 		panic(err)
