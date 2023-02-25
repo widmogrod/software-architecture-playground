@@ -23,6 +23,35 @@ type UpdateRecords[T any] struct {
 	Deleting map[string]T
 }
 
+func Save[T any](xs ...Record[T]) UpdateRecords[Record[T]] {
+	m := make(map[string]Record[T])
+	for _, x := range xs {
+		m[x.ID] = x
+	}
+
+	return UpdateRecords[Record[T]]{
+		Saving: m,
+	}
+}
+
+func Delete[T any](xs ...Record[T]) UpdateRecords[Record[T]] {
+	m := make(map[string]Record[T])
+	for _, x := range xs {
+		m[x.ID] = x
+	}
+
+	return UpdateRecords[Record[T]]{
+		Deleting: m,
+	}
+}
+
+func SaveAndDelete(saving, deleting UpdateRecords[Record[schema.Schema]]) UpdateRecords[Record[schema.Schema]] {
+	return UpdateRecords[Record[schema.Schema]]{
+		Saving:   saving.Saving,
+		Deleting: deleting.Deleting,
+	}
+}
+
 func RecordAs[A any](record Record[schema.Schema]) (Record[A], error) {
 	var a A
 	var object any
