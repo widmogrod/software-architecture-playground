@@ -8,15 +8,17 @@ import "github.com/widmogrod/software-architecture-playground/eventsourcing/esse
 //   - when two replicas have same aggregate rules, then during replication of logs, index can be reused
 type Record[A any] struct {
 	ID      string
+	Type    string
 	Data    A
 	Version uint64
 }
 
 type FindingRecords[T any] struct {
-	Where *predicate.Where
-	Sort  []SortField
-	Limit uint8
-	After *Cursor
+	RecordType string
+	Where      *predicate.Where
+	Sort       []SortField
+	Limit      uint8
+	After      *Cursor
 	//Before *Cursor
 }
 

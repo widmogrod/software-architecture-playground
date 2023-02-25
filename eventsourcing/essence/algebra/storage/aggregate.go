@@ -5,6 +5,6 @@ import (
 )
 
 type Aggregator[T, R any] interface {
-	Append(data T) error
+	Append(data Record[T]) error
 	GetVersionedIndices() map[string]Record[schema.Schema]
 }

@@ -174,6 +174,8 @@ func TestIndexer(t *testing.T) {
 	storage := NewRepository2WithSchema()
 
 	indexer := NewKeyedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+		"session-stats",
+		[]string{"game"},
 		GroupByKey,
 		CombineByKey,
 		storage,
@@ -250,7 +252,10 @@ func TestIndexer(t *testing.T) {
 	//})
 
 	for _, game := range latestGames {
-		err := indexer.Append(game)
+		err := indexer.Append(Record[tictactoemanage.State]{
+			Type: "game",
+			Data: game,
+		})
 		assert.NoError(t, err)
 	}
 
@@ -292,6 +297,8 @@ func TestIndexingWithRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	indexer := NewKeyedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+		"session-stats",
+		[]string{"game"},
 		GroupByKey,
 		CombineByKey,
 		storage,
@@ -320,11 +327,13 @@ func TestIndexingWithRepository(t *testing.T) {
 		)
 		update.Saving["game:"+id] = Record[tictactoemanage.State]{
 			ID:      "game:" + id,
+			Type:    "game",
 			Data:    game,
 			Version: 1,
 		}
 		update.Saving["session:"+id] = Record[tictactoemanage.State]{
 			ID:      "session:" + id,
+			Type:    "session",
 			Data:    game,
 			Version: 1,
 		}
@@ -342,7 +351,8 @@ func TestIndexingWithRepository(t *testing.T) {
 	result2, err := indexedRepo.Get("session-stats:session-1")
 	assert.NoError(t, err)
 	assert.Equal(t, Record[tictactoemanage.SessionStatsResult]{
-		ID: "session-stats:session-1",
+		ID:   "session-stats:session-1",
+		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
 			ID:         "session-1",
 			TotalGames: 3,
@@ -357,7 +367,8 @@ func TestIndexingWithRepository(t *testing.T) {
 	result3, err := indexedRepo.Get("session-stats:session-2")
 	assert.NoError(t, err)
 	assert.Equal(t, Record[tictactoemanage.SessionStatsResult]{
-		ID: "session-stats:session-2",
+		ID:   "session-stats:session-2",
+		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
 			ID:         "session-2",
 			TotalGames: 666,

@@ -7,11 +7,16 @@ import (
 )
 
 func NewKeyedAggregate[T, R any](
+	recordTypeName string,
+	supportedRecordTypes []string,
 	groupByFunc func(data T) (string, R),
 	combineByFunc func(a, b R) (R, error),
 	storage Repository2[schema.Schema],
 ) *KayedAggregate[T, R] {
 	return &KayedAggregate[T, R]{
+		aggregateRecordTypeName: recordTypeName,
+		supportedRecordTypes:    supportedRecordTypes,
+
 		dataByKey:    make(map[string]Record[R]),
 		groupByKey:   groupByFunc,
 		combineByKey: combineByFunc,
@@ -22,6 +27,9 @@ func NewKeyedAggregate[T, R any](
 var _ Aggregator[any, any] = (*KayedAggregate[any, any])(nil)
 
 type KayedAggregate[T, R any] struct {
+	supportedRecordTypes    []string
+	aggregateRecordTypeName string
+
 	groupByKey   func(data T) (string, R)
 	combineByKey func(a, b R) (R, error)
 
@@ -30,10 +38,14 @@ type KayedAggregate[T, R any] struct {
 	storage Repository2[schema.Schema]
 }
 
-func (t *KayedAggregate[T, R]) Append(data T) error {
+func (t *KayedAggregate[T, R]) Append(data Record[T]) error {
 	var err error
 
-	index, result := t.groupByKey(data)
+	if !t.supportedType(data.Type) {
+		return nil
+	}
+
+	index, result := t.groupByKey(data.Data)
 	if _, ok := t.dataByKey[index]; !ok {
 		initial, err := t.loadIndex(index)
 		if err != nil {
@@ -70,6 +82,7 @@ func (t *KayedAggregate[T, R]) GetVersionedIndices() map[string]Record[schema.Sc
 		schemed := schema.FromGo(v.Data)
 		result[k] = Record[schema.Schema]{
 			ID:      v.ID,
+			Type:    t.aggregateRecordTypeName,
 			Data:    schemed,
 			Version: v.Version,
 		}
@@ -98,4 +111,14 @@ func (t *KayedAggregate[T, R]) loadIndex(index string) (Record[R], error) {
 	}
 
 	return indexValue, nil
+}
+
+func (t *KayedAggregate[T, R]) supportedType(recordType string) bool {
+	for _, v := range t.supportedRecordTypes {
+		if v == recordType {
+			return true
+		}
+	}
+
+	return false
 }

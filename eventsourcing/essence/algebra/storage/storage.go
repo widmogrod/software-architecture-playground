@@ -76,6 +76,7 @@ func RecordAs[A any](record Record[schema.Schema]) (Record[A], error) {
 
 	return Record[A]{
 		ID:      record.ID,
+		Type:    record.Type,
 		Data:    typed,
 		Version: record.Version,
 	}, nil

@@ -8,7 +8,6 @@ import (
 )
 
 type User struct {
-	ID   string
 	Name string
 	Age  int
 }
@@ -19,19 +18,48 @@ type UsersCountByAge struct {
 
 func AgeRangeKey(age int) string {
 	if age < 20 {
-		return "0-20"
+		return "byAge:0-20"
 	} else if age < 30 {
-		return "20-30"
+		return "byAge:20-30"
 	} else if age < 40 {
-		return "30-40"
+		return "byAge:30-40"
 	} else {
-		return "40+"
+		return "byAge:40+"
 	}
 }
+
+var exampleUserRecords = Save(
+	Record[User]{
+		ID:   "1",
+		Type: "user",
+		Data: User{
+			Name: "John",
+			Age:  20,
+		},
+	},
+	Record[User]{
+		ID:   "2",
+		Type: "user",
+		Data: User{
+			Name: "Jane",
+			Age:  30,
+		},
+	},
+	Record[User]{
+		ID:   "3",
+		Type: "user",
+		Data: User{
+			Name: "Alice",
+			Age:  39,
+		},
+	},
+)
 
 func TestNewRepositoryInMemory(t *testing.T) {
 	storage := NewRepository2WithSchema()
 	aggregate := NewKeyedAggregate[User, UsersCountByAge](
+		"byAge",
+		[]string{"user"},
 		func(data User) (string, UsersCountByAge) {
 			return AgeRangeKey(data.Age), UsersCountByAge{
 				Count: 1,
@@ -49,34 +77,7 @@ func TestNewRepositoryInMemory(t *testing.T) {
 		aggregate,
 	)
 
-	err := r.UpdateRecords(UpdateRecords[Record[User]]{
-		Saving: map[string]Record[User]{
-			"1": {
-				ID: "1",
-				Data: User{
-					ID:   "1",
-					Name: "John",
-					Age:  20,
-				},
-			},
-			"2": {
-				ID: "2",
-				Data: User{
-					ID:   "2",
-					Name: "Jane",
-					Age:  30,
-				},
-			},
-			"3": {
-				ID: "3",
-				Data: User{
-					ID:   "3",
-					Name: "Alice",
-					Age:  39,
-				},
-			},
-		},
-	})
+	err := r.UpdateRecords(exampleUserRecords)
 	assert.NoError(t, err)
 
 	result, err := r.FindingRecords(FindingRecords[Record[User]]{
@@ -98,5 +99,28 @@ func TestNewRepositoryInMemory(t *testing.T) {
 	if assert.Len(t, result.Items, 2) {
 		assert.Equal(t, "Alice", result.Items[0].Data.Name)
 		assert.Equal(t, "Jane", result.Items[1].Data.Name)
+	}
+
+	results, err := storage.FindingRecords(FindingRecords[Record[schema.Schema]]{
+		RecordType: "byAge",
+		Sort: []SortField{
+			{
+				Field:      "Count",
+				Descending: true,
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	if assert.Len(t, results.Items, 2) {
+		r, err := RecordAs[UsersCountByAge](results.Items[0])
+		assert.NoError(t, err)
+		assert.Equal(t, "byAge:20-30", r.ID)
+		assert.Equal(t, 1, r.Data.Count)
+
+		r, err = RecordAs[UsersCountByAge](results.Items[1])
+		assert.NoError(t, err)
+		assert.Equal(t, "byAge:30-40", r.ID)
+		assert.Equal(t, 2, r.Data.Count)
 	}
 }

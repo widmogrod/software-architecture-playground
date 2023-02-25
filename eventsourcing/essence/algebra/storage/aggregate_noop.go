@@ -10,7 +10,7 @@ var _ Aggregator[any, any] = (*NoopAggregator[any, any])(nil)
 
 type NoopAggregator[T, R any] struct{}
 
-func (n *NoopAggregator[T, R]) Append(data T) error {
+func (n *NoopAggregator[T, R]) Append(data Record[T]) error {
 	return nil
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
 	"log"
-	"strings"
 	"sync"
 )
 
@@ -49,18 +48,15 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 	}
 
 	for id, record := range s.Saving {
-		// TODO fix me
-		if strings.HasPrefix(id, "game:") {
-			log.Printf("saving %s %#v\n", id, record)
-			err := r.aggregate.Append(record.Data)
-			if err != nil {
-				return fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords aggregate.Append %w", err)
-			}
+		err := r.aggregate.Append(record)
+		if err != nil {
+			return fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords aggregate.Append %w", err)
 		}
 
 		schemed := schema.FromGo(record.Data)
 		schemas.Saving[id] = Record[schema.Schema]{
 			ID:      record.ID,
+			Type:    record.Type,
 			Data:    schemed,
 			Version: record.Version,
 		}

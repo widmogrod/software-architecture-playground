@@ -5,6 +5,7 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -69,6 +70,16 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 	records := make([]Record[schema.Schema], 0)
 	for _, v := range s.store {
 		records = append(records, v)
+	}
+
+	if query.RecordType != "" {
+		newRecords := make([]Record[schema.Schema], 0)
+		for _, record := range records {
+			if strings.HasPrefix(record.ID, query.RecordType) {
+				newRecords = append(newRecords, record)
+			}
+		}
+		records = newRecords
 	}
 
 	if query.Where != nil {
