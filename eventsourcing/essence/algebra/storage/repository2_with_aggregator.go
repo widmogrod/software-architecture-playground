@@ -32,22 +32,12 @@ func (r *RepositoryWithAggregator[B, C]) Get(key string) (Record[B], error) {
 		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get storage error id=%s %w", key, err)
 	}
 
-	object, err := schema.ToGo(v.Data)
+	typed, err := RecordAs[B](v)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get schema conversion error id=%s err=%s %w", key, err, ErrInternalError)
+		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get type assertion error id=%s %w", key, err)
 	}
 
-	typed, ok := object.(B)
-	if !ok {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get conversion error id=%s %w", key, ErrInternalError)
-
-	}
-
-	return Record[B]{
-		ID:      v.ID,
-		Data:    typed,
-		Version: v.Version,
-	}, nil
+	return typed, nil
 }
 
 func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) error {
@@ -68,8 +58,7 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 			}
 		}
 
-		schemed := schema.FromGo(record)
-
+		schemed := schema.FromGo(record.Data)
 		schemas.Saving[id] = Record[schema.Schema]{
 			ID:      record.ID,
 			Data:    schemed,
@@ -88,6 +77,37 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 	}
 
 	return nil
+}
+
+func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Record[B]]) (PageResult[Record[B]], error) {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+	found, err := r.storage.FindingRecords(FindingRecords[Record[schema.Schema]]{
+		Where:  query.Where,
+		Sort:   query.Sort,
+		Limit:  query.Limit,
+		Cursor: query.Cursor,
+	})
+	if err != nil {
+		return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords storage error %w", err)
+	}
+
+	result := PageResult[Record[B]]{
+		Items: nil,
+		Next:  found.Next,
+	}
+
+	for _, item := range found.Items {
+		typed, err := RecordAs[B](item)
+		if err != nil {
+			return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords RecordAs error id=%s %w", item.ID, err)
+		}
+
+		result.Items = append(result.Items, typed)
+	}
+
+	return result, nil
 }
 
 // ReindexAll is used to reindex all records with a provided aggregate definition

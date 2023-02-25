@@ -24,7 +24,16 @@ type UpdateRecords[T any] struct {
 }
 
 func RecordAs[A any](record Record[schema.Schema]) (Record[A], error) {
-	object, err := schema.ToGo(record.Data)
+	var a A
+	var object any
+	var err error
+
+	if any(a) == nil {
+		object, err = schema.ToGo(record.Data)
+	} else {
+		object, err = schema.ToGo(record.Data, schema.WithExtraRules(schema.WhenPath(nil, schema.UseStruct(a))))
+	}
+
 	if err != nil {
 		var a A
 		return Record[A]{}, fmt.Errorf("store.GetSchemaAs[%T] schema conversion failed. %s. %w", a, err, ErrInternalError)

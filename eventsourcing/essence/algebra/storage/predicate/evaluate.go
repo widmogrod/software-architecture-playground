@@ -33,16 +33,6 @@ func Evaluate(predicate Predicate, data schema.Schema, bind ParamBinds) bool {
 
 			// Field value that is not set and equality is not about None is always false.
 			fieldValue := schema.Get(data, x.Location)
-			switch fieldValue.(type) {
-			case *schema.None:
-				switch value.(type) {
-				case *schema.None:
-					return true
-				}
-
-				return false
-			}
-
 			cmp := schema.Compare(fieldValue, value)
 			switch x.Operation {
 			case "=":
