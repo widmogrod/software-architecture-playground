@@ -12,49 +12,51 @@ type exampleRecord struct {
 	Age  int
 }
 
+var exampleUpdateRecords = UpdateRecords[Record[schema.Schema]]{
+	Saving: map[string]Record[schema.Schema]{
+		"123": {
+			ID: "123",
+			Data: schema.FromGo(exampleRecord{
+				Name: "John",
+				Age:  20,
+			}),
+		},
+		"124": {
+			ID: "124",
+			Data: schema.FromGo(exampleRecord{
+				Name: "Jane",
+				Age:  30,
+			}),
+		},
+		"313": {
+			ID: "313",
+			Data: schema.FromGo(exampleRecord{
+				Name: "Alice",
+				Age:  39,
+			}),
+		},
+		"1234": {
+			ID: "1234",
+			Data: schema.FromGo(exampleRecord{
+				Name: "Bob",
+				Age:  40,
+			}),
+		},
+		"3123": {
+			ID: "3123",
+			Data: schema.FromGo(exampleRecord{
+				Name: "Zarlie",
+				Age:  39,
+			}),
+		},
+	},
+}
+
 func TestNewRepository2WithSchema(t *testing.T) {
 	repo := NewRepository2WithSchema()
 	assert.NotNil(t, repo)
 
-	err := repo.UpdateRecords(UpdateRecords[Record[schema.Schema]]{
-		Saving: map[string]Record[schema.Schema]{
-			"123": {
-				ID: "123",
-				Data: schema.FromGo(exampleRecord{
-					Name: "John",
-					Age:  20,
-				}),
-			},
-			"12": {
-				ID: "124",
-				Data: schema.FromGo(exampleRecord{
-					Name: "Jane",
-					Age:  30,
-				}),
-			},
-			"313": {
-				ID: "313",
-				Data: schema.FromGo(exampleRecord{
-					Name: "Alice",
-					Age:  39,
-				}),
-			},
-			"1234": {
-				ID: "1234",
-				Data: schema.FromGo(exampleRecord{
-					Name: "Bob",
-					Age:  40,
-				}),
-			},
-			"3123": {
-				ID: "3123",
-				Data: schema.FromGo(exampleRecord{
-					Name: "Zarlie",
-					Age:  39,
-				}),
-			},
-		},
-	})
+	err := repo.UpdateRecords(exampleUpdateRecords)
 	assert.NoError(t, err)
 
 	result, err := repo.FindingRecords(FindingRecords[Record[schema.Schema]]{
@@ -97,4 +99,33 @@ func TestNewRepository2WithSchema(t *testing.T) {
 			//}
 		}
 	}
+}
+
+func TestRepositoryWithSchema_UpdateRecords_Deletion(t *testing.T) {
+	repo := NewRepository2WithSchema()
+	assert.NotNil(t, repo)
+
+	err := repo.UpdateRecords(exampleUpdateRecords)
+	assert.NoError(t, err)
+
+	result, err := repo.FindingRecords(FindingRecords[Record[schema.Schema]]{})
+	assert.NoError(t, err)
+	assert.Len(t, result.Items, 5, "should have 5 records")
+	assert.False(t, result.HasNext(), "should not have next page of results")
+
+	deleting := map[string]Record[schema.Schema]{}
+	for _, item := range result.Items {
+		deleting[item.ID] = item
+	}
+
+	err = repo.UpdateRecords(UpdateRecords[Record[schema.Schema]]{
+		Deleting: deleting,
+	})
+
+	result, err = repo.FindingRecords(FindingRecords[Record[schema.Schema]]{})
+	assert.NoError(t, err)
+	for _, item := range result.Items {
+		t.Log(item)
+	}
+	assert.Len(t, result.Items, 0, "should have 0 records")
 }

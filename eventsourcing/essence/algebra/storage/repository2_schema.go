@@ -58,6 +58,10 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 		s.store[id] = record
 	}
 
+	for _, id := range x.Deleting {
+		delete(s.store, id.ID)
+	}
+
 	return nil
 }
 
