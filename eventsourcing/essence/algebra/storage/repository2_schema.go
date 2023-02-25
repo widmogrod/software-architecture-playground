@@ -81,9 +81,59 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 		records = sortRecords(records, query.Sort)
 	}
 
+	if query.After != nil {
+		found := false
+		newRecords := make([]Record[schema.Schema], 0)
+		for _, record := range records {
+			if !found && record.ID == *query.After {
+				found = true
+				continue // we're interested in records after this one
+			}
+			if found {
+				newRecords = append(newRecords, record)
+			}
+		}
+		records = newRecords
+		//} else if query.Before != nil {
+		//	found := false
+		//	newRecords := make([]Record[schema.Schema], 0)
+		//	for _, record := range records {
+		//		if !found && record.ID == *query.Before {
+		//			found = true
+		//			break // we accumulated records before this one, and now we're done
+		//		}
+		//
+		//		if !found {
+		//			newRecords = append(newRecords, record)
+		//		}
+		//	}
+		//	records = newRecords
+	}
+
+	// Use limit to reduce number of records
+	var next *FindingRecords[Record[schema.Schema]]
+	if query.Limit > 0 {
+		if len(records) > int(query.Limit) {
+			//if query.Before != nil {
+			//	records = records[len(records)-int(query.Limit):]
+			//} else {
+			records = records[:query.Limit]
+			//}
+
+			next = &FindingRecords[Record[schema.Schema]]{
+				Where: query.Where,
+				Sort:  query.Sort,
+				Limit: query.Limit,
+				After: &records[len(records)-1].ID,
+				//Before: nil,
+			}
+
+		}
+	}
+
 	result := PageResult[Record[schema.Schema]]{
 		Items: records,
-		Next:  "",
+		Next:  next,
 	}
 
 	return result, nil

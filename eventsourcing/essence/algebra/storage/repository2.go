@@ -13,10 +13,11 @@ type Record[A any] struct {
 }
 
 type FindingRecords[T any] struct {
-	Where  *predicate.Where
-	Sort   []SortField
-	Limit  uint8
-	Cursor *Cursor
+	Where *predicate.Where
+	Sort  []SortField
+	Limit uint8
+	After *Cursor
+	//Before *Cursor
 }
 
 type SortField struct {

@@ -84,10 +84,10 @@ func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Rec
 	defer r.mux.Unlock()
 
 	found, err := r.storage.FindingRecords(FindingRecords[Record[schema.Schema]]{
-		Where:  query.Where,
-		Sort:   query.Sort,
-		Limit:  query.Limit,
-		Cursor: query.Cursor,
+		Where: query.Where,
+		Sort:  query.Sort,
+		Limit: query.Limit,
+		After: query.After,
 	})
 	if err != nil {
 		return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords storage error %w", err)
@@ -95,7 +95,16 @@ func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Rec
 
 	result := PageResult[Record[B]]{
 		Items: nil,
-		Next:  found.Next,
+		Next:  nil,
+	}
+
+	if found.HasNext() {
+		result.Next = &FindingRecords[Record[B]]{
+			Where: query.Where,
+			Sort:  query.Sort,
+			Limit: query.Limit,
+			After: found.Next.After,
+		}
 	}
 
 	for _, item := range found.Items {

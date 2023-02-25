@@ -109,16 +109,21 @@ type Cursor = string
 
 type PageResult[A any] struct {
 	Items []A
-	Next  Cursor
+	Next  *FindingRecords[A]
+	//Prev  *FindingRecords[A]
 }
 
 func (a PageResult[A]) HasNext() bool {
-	return a.Next != ""
+	return a.Next != nil
 }
+
+//func (a PageResult[A]) HasPrev() bool {
+//	return a.Prev != nil
+//}
 
 func (r *RepositoryInMemory[A]) FindAllKeyEqual(key string, value string) (PageResult[A], error) {
 	result := PageResult[A]{
-		Next: "",
+		Next: nil,
 	}
 
 	r.store.Range(func(k, v interface{}) bool {

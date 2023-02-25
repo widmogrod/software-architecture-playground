@@ -19,8 +19,8 @@ func RetriveID[T any](s Storage[T], id string) (T, error) {
 }
 
 type UpdateRecords[T any] struct {
-	Saving map[string]T
-	//Deleting map[string]T
+	Saving   map[string]T
+	Deleting map[string]T
 }
 
 func RecordAs[A any](record Record[schema.Schema]) (Record[A], error) {
