@@ -82,14 +82,14 @@ func TestNewRepositoryInMemory(t *testing.T) {
 
 	result, err := r.FindingRecords(FindingRecords[Record[User]]{
 		Where: predicate.MustWhere(
-			"Age > :age",
+			"Data.Age > :age",
 			predicate.ParamBinds{
 				":age": schema.MkInt(20),
 			},
 		),
 		Sort: []SortField{
 			{
-				Field:      "Name",
+				Field:      "Data.Name",
 				Descending: true,
 			},
 		},
@@ -105,7 +105,7 @@ func TestNewRepositoryInMemory(t *testing.T) {
 		RecordType: "byAge",
 		Sort: []SortField{
 			{
-				Field:      "Count",
+				Field:      "Data.Count",
 				Descending: true,
 			},
 		},

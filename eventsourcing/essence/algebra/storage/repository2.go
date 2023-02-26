@@ -10,7 +10,7 @@ type Record[A any] struct {
 	ID      string
 	Type    string
 	Data    A
-	Version uint64
+	Version uint16
 }
 
 type FindingRecords[T any] struct {

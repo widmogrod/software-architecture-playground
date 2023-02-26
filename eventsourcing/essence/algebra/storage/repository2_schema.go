@@ -5,20 +5,19 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"sort"
-	"strings"
 	"sync"
 )
 
 func NewRepository2WithSchema() *RepositoryWithSchema {
 	return &RepositoryWithSchema{
-		store: make(map[string]Record[schema.Schema]),
+		store: make(map[string]schema.Schema),
 	}
 }
 
 var _ Repository2[schema.Schema] = &RepositoryWithSchema{}
 
 type RepositoryWithSchema struct {
-	store map[string]Record[schema.Schema]
+	store map[string]schema.Schema
 	mux   sync.Mutex
 }
 
@@ -31,7 +30,7 @@ func (s *RepositoryWithSchema) Get(key string) (Record[schema.Schema], error) {
 		return Record[schema.Schema]{}, ErrNotFound
 	}
 
-	return v, nil
+	return s.toTyped(v)
 }
 
 func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
@@ -48,15 +47,24 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 			continue
 		}
 
-		if stored.Version != record.Version {
+		storedVersion := schema.As[uint16](schema.Get(stored, "Version"), 0)
+
+		if storedVersion != record.Version {
 			return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords id=%s %d != %d %w",
-				id, stored.Version, record.Version, ErrVersionConflict)
+				id, storedVersion, record.Version, ErrVersionConflict)
 		}
 	}
 
 	for id, record := range x.Saving {
 		record.Version += 1
-		s.store[id] = record
+
+		s.store[id] = schema.MkMap(
+			schema.MkField("ID", schema.MkString(record.ID)),
+			schema.MkField("Type", schema.MkString(record.Type)),
+			schema.MkField("Data", record.Data),
+			schema.MkField("Version", schema.MkInt(int(record.Version))),
+		)
+
 	}
 
 	for _, id := range x.Deleting {
@@ -67,15 +75,24 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 }
 
 func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
-	records := make([]Record[schema.Schema], 0)
+	records := make([]schema.Schema, 0)
 	for _, v := range s.store {
 		records = append(records, v)
 	}
 
 	if query.RecordType != "" {
-		newRecords := make([]Record[schema.Schema], 0)
+		newRecords := make([]schema.Schema, 0)
 		for _, record := range records {
-			if strings.HasPrefix(record.ID, query.RecordType) {
+			if predicate.Evaluate(
+				&predicate.Compare{
+					Location:  "Type",
+					Operation: "=",
+					BindValue: ":type",
+				},
+				record,
+				map[string]schema.Schema{
+					":type": schema.MkString(query.RecordType),
+				}) {
 				newRecords = append(newRecords, record)
 			}
 		}
@@ -83,9 +100,9 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 	}
 
 	if query.Where != nil {
-		newRecords := make([]Record[schema.Schema], 0)
+		newRecords := make([]schema.Schema, 0)
 		for _, record := range s.store {
-			if predicate.Evaluate(query.Where.Predicate, record.Data, query.Where.Params) {
+			if predicate.Evaluate(query.Where.Predicate, record, query.Where.Params) {
 				newRecords = append(newRecords, record)
 			}
 		}
@@ -98,9 +115,18 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 
 	if query.After != nil {
 		found := false
-		newRecords := make([]Record[schema.Schema], 0)
+		newRecords := make([]schema.Schema, 0)
 		for _, record := range records {
-			if !found && record.ID == *query.After {
+			if predicate.Evaluate(
+				&predicate.Compare{
+					Location:  "ID",
+					Operation: "=",
+					BindValue: ":id",
+				},
+				record,
+				map[string]schema.Schema{
+					":id": schema.MkString(*query.After),
+				}) {
 				found = true
 				continue // we're interested in records after this one
 			}
@@ -109,56 +135,60 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 			}
 		}
 		records = newRecords
-		//} else if query.Before != nil {
-		//	found := false
-		//	newRecords := make([]Record[schema.Schema], 0)
-		//	for _, record := range records {
-		//		if !found && record.ID == *query.Before {
-		//			found = true
-		//			break // we accumulated records before this one, and now we're done
-		//		}
-		//
-		//		if !found {
-		//			newRecords = append(newRecords, record)
-		//		}
-		//	}
-		//	records = newRecords
+	}
+
+	typedRecords := make([]Record[schema.Schema], 0)
+	for _, record := range records {
+		typed, err := s.toTyped(record)
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, err
+		}
+		typedRecords = append(typedRecords, typed)
 	}
 
 	// Use limit to reduce number of records
 	var next *FindingRecords[Record[schema.Schema]]
 	if query.Limit > 0 {
-		if len(records) > int(query.Limit) {
-			//if query.Before != nil {
-			//	records = records[len(records)-int(query.Limit):]
-			//} else {
-			records = records[:query.Limit]
-			//}
+		if len(typedRecords) > int(query.Limit) {
+			typedRecords = typedRecords[:query.Limit]
 
 			next = &FindingRecords[Record[schema.Schema]]{
 				Where: query.Where,
 				Sort:  query.Sort,
 				Limit: query.Limit,
-				After: &records[len(records)-1].ID,
-				//Before: nil,
+				After: &typedRecords[len(typedRecords)-1].ID,
 			}
-
 		}
 	}
 
 	result := PageResult[Record[schema.Schema]]{
-		Items: records,
+		Items: typedRecords,
 		Next:  next,
 	}
 
 	return result, nil
 }
 
-func sortRecords(records []Record[schema.Schema], sortFields []SortField) []Record[schema.Schema] {
+func (s *RepositoryWithSchema) toTyped(record schema.Schema) (Record[schema.Schema], error) {
+	typed := Record[schema.Schema]{
+		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
+		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
+		Data:    schema.Get(record, "Data"),
+		Version: schema.As[uint16](schema.Get(record, "Version"), 0),
+	}
+	if typed.Type == "record-id-corrupted" &&
+		typed.ID == "record-id-corrupted" &&
+		typed.Version == 0 {
+		return Record[schema.Schema]{}, fmt.Errorf("store.RepositoryWithSchema.FindingRecords corrupted record: %v", record)
+	}
+	return typed, nil
+}
+
+func sortRecords(records []schema.Schema, sortFields []SortField) []schema.Schema {
 	sort.Slice(records, func(i, j int) bool {
 		for _, sortField := range sortFields {
-			fieldA := schema.Get(records[i].Data, sortField.Field)
-			fieldB := schema.Get(records[j].Data, sortField.Field)
+			fieldA := schema.Get(records[i], sortField.Field)
+			fieldB := schema.Get(records[j], sortField.Field)
 			cmp := schema.Compare(fieldA, fieldB)
 			if !sortField.Descending {
 				cmp = -cmp
