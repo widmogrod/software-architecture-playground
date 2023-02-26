@@ -15,7 +15,7 @@ type Record[A any] struct {
 
 type FindingRecords[T any] struct {
 	RecordType string
-	Where      *predicate.Where
+	Where      *predicate.WherePredicates
 	Sort       []SortField
 	Limit      uint8
 	After      *Cursor
