@@ -22,15 +22,21 @@ type RepositoryWithSchema struct {
 }
 
 func (s *RepositoryWithSchema) Get(key string) (Record[schema.Schema], error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+	result, err := s.FindingRecords(FindingRecords[Record[schema.Schema]]{
+		Where: predicate.MustWhere("ID = :id", predicate.ParamBinds{
+			":id": schema.MkString(key),
+		}),
+		Limit: 1,
+	})
+	if err != nil {
+		return Record[schema.Schema]{}, err
+	}
 
-	v, ok := s.store[key]
-	if !ok {
+	if len(result.Items) == 0 {
 		return Record[schema.Schema]{}, ErrNotFound
 	}
 
-	return s.toTyped(v)
+	return result.Items[0], nil
 }
 
 func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
