@@ -60,6 +60,8 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 		}
 	}
 
+	// TODO: add deletion support in aggregate!
+
 	for index, versionedData := range aggregate.GetVersionedIndices() {
 		log.Printf("index %s %#v\n", index, versionedData)
 		schemas.Saving[versionedData.ID] = versionedData

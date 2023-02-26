@@ -15,35 +15,40 @@ type exampleRecord struct {
 // refactored exampleUpdateRecords that use Save
 var exampleUpdateRecords = Save(
 	Record[schema.Schema]{
-		ID: "123",
+		ID:   "123",
+		Type: "exampleRecord",
 		Data: schema.FromGo(exampleRecord{
 			Name: "John",
 			Age:  20,
 		}),
 	},
 	Record[schema.Schema]{
-		ID: "124",
+		ID:   "124",
+		Type: "exampleRecord",
 		Data: schema.FromGo(exampleRecord{
 			Name: "Jane",
 			Age:  30,
 		}),
 	},
 	Record[schema.Schema]{
-		ID: "313",
+		ID:   "313",
+		Type: "exampleRecord",
 		Data: schema.FromGo(exampleRecord{
 			Name: "Alice",
 			Age:  39,
 		}),
 	},
 	Record[schema.Schema]{
-		ID: "1234",
+		ID:   "1234",
+		Type: "exampleRecord",
 		Data: schema.FromGo(exampleRecord{
 			Name: "Bob",
 			Age:  40,
 		}),
 	},
 	Record[schema.Schema]{
-		ID: "3123",
+		ID:   "3123",
+		Type: "exampleRecord",
 		Data: schema.FromGo(exampleRecord{
 			Name: "Zarlie",
 			Age:  39,

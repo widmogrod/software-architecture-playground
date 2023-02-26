@@ -1,0 +1,276 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/widmogrod/mkunion/x/schema"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+	"strings"
+)
+
+func NewDynamoDBRepository2(client *dynamodb.Client, tableName string) *DynamoDBRepository2 {
+	return &DynamoDBRepository2{
+		client:    client,
+		tableName: tableName,
+	}
+}
+
+var _ Repository2[schema.Schema] = (*DynamoDBRepository2)(nil)
+
+type DynamoDBRepository2 struct {
+	client    *dynamodb.Client
+	tableName string
+}
+
+func (d *DynamoDBRepository2) Get(key string) (Record[schema.Schema], error) {
+	result, err := d.FindingRecords(FindingRecords[Record[schema.Schema]]{
+		Where: predicate.MustWhere("key = :id", predicate.ParamBinds{
+			":id": schema.MkString(key),
+		}),
+		Limit: 1,
+	})
+	if err != nil {
+		return Record[schema.Schema]{}, err
+	}
+
+	if len(result.Items) == 0 {
+		return Record[schema.Schema]{}, ErrNotFound
+	}
+
+	return result.Items[0], nil
+}
+
+func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
+	var transact []types.TransactWriteItem
+	for _, value := range command.Saving {
+		sch := d.fromTyped(value)
+		item := schema.ToDynamoDB(sch)
+		if _, ok := item.(*types.AttributeValueMemberM); !ok {
+			return fmt.Errorf("DynamoDBRepository.Set: unsupported type: %T", item)
+		}
+
+		// TODO define ID should be partition key, where Type should be sort key
+		final := item.(*types.AttributeValueMemberM)
+		final.Value["key"] = &types.AttributeValueMemberS{
+			Value: value.ID,
+		}
+		// Optimistic locking, increase version
+		// but use current one to check if it was not changed
+		final.Value["Version"] = &types.AttributeValueMemberN{
+			Value: fmt.Sprintf("%d", value.Version+1),
+		}
+
+		transact = append(transact, types.TransactWriteItem{
+			Put: &types.Put{
+				TableName:           aws.String(d.tableName),
+				Item:                final.Value,
+				ConditionExpression: aws.String("Version = :version OR attribute_not_exists(Version)"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":version": &types.AttributeValueMemberN{
+						Value: fmt.Sprintf("%d", value.Version),
+					},
+				},
+			},
+		})
+	}
+
+	for _, id := range command.Deleting {
+		transact = append(transact, types.TransactWriteItem{
+			Delete: &types.Delete{
+				TableName: aws.String(d.tableName),
+				Key: map[string]types.AttributeValue{
+					"key": &types.AttributeValueMemberS{
+						Value: id.ID,
+					},
+				},
+			},
+		})
+	}
+
+	_, err := d.client.TransactWriteItems(context.Background(), &dynamodb.TransactWriteItemsInput{
+		TransactItems: transact,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
+	filterExpression, paramsExpression, expressionNames, err := d.buildFilterExpression(query)
+	if err != nil {
+		return PageResult[Record[schema.Schema]]{}, err
+	}
+
+	scanInput := &dynamodb.ScanInput{
+		TableName:                 &d.tableName,
+		ExpressionAttributeNames:  expressionNames,
+		ExpressionAttributeValues: paramsExpression,
+		FilterExpression:          aws.String(filterExpression),
+		ConsistentRead:            aws.Bool(true),
+	}
+
+	if query.Limit > 0 {
+		scanInput.Limit = aws.Int32(int32(query.Limit))
+	}
+
+	//TODO add sorting!
+	items, err := d.client.Scan(context.Background(), scanInput)
+
+	if err != nil {
+		return PageResult[Record[schema.Schema]]{}, err
+	}
+
+	result := PageResult[Record[schema.Schema]]{
+		Items: nil,
+	}
+
+	for _, item := range items.Items {
+		delete(item, "key")
+		// normalize input for further processing
+		i := &types.AttributeValueMemberM{
+			Value: item,
+		}
+
+		schemed, err := schema.FromDynamoDB(i)
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, err
+		}
+
+		typed, err := d.toTyped(schemed)
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, err
+		}
+		result.Items = append(result.Items, typed)
+	}
+
+	return result, nil
+}
+
+func (d *DynamoDBRepository2) fromTyped(record Record[schema.Schema]) *schema.Map {
+	return schema.MkMap(
+		schema.MkField("ID", schema.MkString(record.ID)),
+		schema.MkField("Type", schema.MkString(record.Type)),
+		schema.MkField("Data", record.Data),
+		schema.MkField("Version", schema.MkInt(int(record.Version))),
+	)
+}
+
+func (d *DynamoDBRepository2) toTyped(record schema.Schema) (Record[schema.Schema], error) {
+	typed := Record[schema.Schema]{
+		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
+		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
+		Data:    schema.Get(record, "Data"),
+		Version: schema.As[uint16](schema.Get(record, "Version"), 0),
+	}
+	if typed.Type == "record-id-corrupted" &&
+		typed.ID == "record-id-corrupted" &&
+		typed.Version == 0 {
+		return Record[schema.Schema]{}, fmt.Errorf("store.DynamoDBRepository2.FindingRecords corrupted record: %v", record)
+	}
+	return typed, nil
+}
+
+func (d *DynamoDBRepository2) buildFilterExpression(query FindingRecords[Record[schema.Schema]]) (string, map[string]types.AttributeValue, map[string]string, error) {
+	var where predicate.Predicate
+	var binds predicate.ParamBinds = map[predicate.BindValue]schema.Schema{}
+	var names map[string]string = map[string]string{}
+
+	if query.RecordType != "" {
+		names["Type"] = "#Type"
+		where = &predicate.Compare{
+			Location:  "#rt",
+			Operation: "=",
+			BindValue: ":record-type",
+		}
+		binds[":record-type"] = schema.MkString(query.RecordType)
+	}
+
+	if query.Where != nil {
+		if where == nil {
+			where = query.Where.Predicate
+			binds = query.Where.Params
+		} else {
+			where = &predicate.And{
+				L: []predicate.Predicate{where, query.Where.Predicate},
+			}
+
+			for k, v := range query.Where.Params {
+				if _, ok := binds[k]; ok {
+					return "", nil, nil, fmt.Errorf("store.DynamoDBRepository2.FindingRecords: duplicated bind value: %s", k)
+				}
+
+				binds[k] = v
+			}
+		}
+	}
+
+	if where == nil {
+		return "", nil, nil, nil
+	}
+
+	expression := toExpression(where, names)
+
+	// reverse names
+	reverser := map[string]string{}
+	for k, v := range names {
+		reverser[v] = k
+	}
+
+	return expression, toAttributes(binds), reverser, nil
+}
+
+func toExpression(where predicate.Predicate, names map[string]string) string {
+	return predicate.MustMatchPredicate(
+		where,
+		func(x *predicate.And) string {
+			var result []string
+			for _, v := range x.L {
+				result = append(result, toExpression(v, names))
+			}
+
+			return strings.Join(result, " AND ")
+		},
+		func(x *predicate.Or) string {
+			var result []string
+			for _, v := range x.L {
+				result = append(result, toExpression(v, names))
+			}
+
+			return strings.Join(result, " OR ")
+
+		},
+		func(x *predicate.Not) string {
+			return "NOT " + toExpression(x.P, names)
+		},
+		func(x *predicate.Compare) string {
+			// Because of https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ExpressionAttributeNames.html
+			// we need to make sure that all names are not reserved keyword, so we add a counter to the end of the name in case of collision
+			var named []string
+			var parts []string = strings.Split(x.Location, ".")
+
+			for _, part := range parts {
+				if _, ok := names[part]; !ok {
+					names[part] = "#" + part
+				}
+				named = append(named, names[part])
+			}
+
+			return strings.Join(named, ".") + " " + x.Operation + " " + x.BindValue
+		},
+	)
+}
+
+func toAttributes(binds predicate.ParamBinds) map[string]types.AttributeValue {
+	result := map[string]types.AttributeValue{}
+	for k, v := range binds {
+		result[k] = schema.ToDynamoDB(v)
+	}
+
+	return result
+}
