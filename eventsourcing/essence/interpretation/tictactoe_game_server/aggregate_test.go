@@ -1,9 +1,10 @@
-package storage
+package tictactoe_game_server
 
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"testing"
@@ -91,95 +92,9 @@ var latestGames = []tictactoemanage.State{
 	},
 }
 
-func InitEmtpy(id tictactoemanage.SessionID) tictactoemanage.SessionStatsResult {
-	return tictactoemanage.SessionStatsResult{
-		ID:         id,
-		TotalGames: 0,
-		TotalDraws: 0,
-		PlayerWins: nil,
-	}
-}
-
-func GroupByKey(data tictactoemanage.State) (string, tictactoemanage.SessionStatsResult) {
-	return tictactoemanage.MustMatchStateR2(
-		data,
-		func(x *tictactoemanage.SessionWaitingForPlayers) (string, tictactoemanage.SessionStatsResult) {
-			return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
-		},
-		func(x *tictactoemanage.SessionReady) (string, tictactoemanage.SessionStatsResult) {
-			return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
-		},
-		func(x *tictactoemanage.SessionInGame) (string, tictactoemanage.SessionStatsResult) {
-			if x.GameState == nil {
-				return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
-			}
-
-			return tictacstatemachine.MustMatchStateR2(
-				x.GameState,
-				func(y *tictacstatemachine.GameWaitingForPlayer) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
-				},
-				func(y *tictacstatemachine.GameProgress) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
-				},
-				func(y *tictacstatemachine.GameEndWithWin) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, tictactoemanage.SessionStatsResult{
-						ID:         x.SessionID,
-						TotalGames: 1,
-						TotalDraws: 0,
-						PlayerWins: map[tictactoemanage.PlayerID]int{
-							y.Winner: 1,
-						},
-					}
-				},
-				func(y *tictacstatemachine.GameEndWithDraw) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, tictactoemanage.SessionStatsResult{
-						ID:         x.SessionID,
-						TotalGames: 1,
-						TotalDraws: 1,
-						PlayerWins: nil,
-					}
-				},
-			)
-		},
-	)
-}
-
-/*
-CombineByKey is commutative, associative, and distributive.
-
-	commutativity = a * b = b * a
-	associativity = (a * b) * c = a * (b * c)
-	distributivity = a * (b + c) = (a * b) + (a * c)
-*/
-func CombineByKey(a, b tictactoemanage.SessionStatsResult) (tictactoemanage.SessionStatsResult, error) {
-	winds := a.PlayerWins
-	if winds == nil {
-		winds = map[tictactoemanage.PlayerID]int{}
-	}
-
-	for k, v := range b.PlayerWins {
-		winds[k] += v
-	}
-
-	return tictactoemanage.SessionStatsResult{
-		ID:         a.ID,
-		TotalGames: a.TotalGames + b.TotalGames,
-		TotalDraws: a.TotalDraws + b.TotalDraws,
-		PlayerWins: winds,
-	}, nil
-}
-
 func TestIndexer(t *testing.T) {
-	storage := NewRepository2WithSchema()
-
-	indexer := NewKeyedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult](
-		"session-stats",
-		[]string{"game"},
-		GroupByKey,
-		CombineByKey,
-		storage,
-	)
+	store := storage.NewRepository2WithSchema()
+	indexer := NewTictactoeManageStateAggregate(store)
 
 	_ = `CREATE QUERY "session-stats" ON games as g WITH 
 		PRIMARY_KEY session-stats.sessionID
@@ -252,7 +167,7 @@ func TestIndexer(t *testing.T) {
 	//})
 
 	for _, game := range latestGames {
-		err := indexer.Append(Record[tictactoemanage.State]{
+		err := indexer.Append(storage.Record[tictactoemanage.State]{
 			Type: "game",
 			Data: game,
 		})
@@ -272,11 +187,11 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestIndexingWithRepository(t *testing.T) {
-	storage := NewRepository2WithSchema()
+	store := storage.NewRepository2WithSchema()
 
 	// Simulate, that we have a sessions stats already
-	err := storage.UpdateRecords(UpdateRecords[Record[schema.Schema]]{
-		Saving: map[string]Record[schema.Schema]{
+	err := store.UpdateRecords(storage.UpdateRecords[storage.Record[schema.Schema]]{
+		Saving: map[string]storage.Record[schema.Schema]{
 			"session-stats:session-2": {
 				ID: "session-stats:session-2",
 				Data: schema.FromGo(tictactoemanage.SessionStatsResult{
@@ -293,23 +208,19 @@ func TestIndexingWithRepository(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	_, err = storage.Get("session-stats:session-2")
+	_, err = store.Get("session-stats:session-2")
 	assert.NoError(t, err)
 
-	indexer := NewKeyedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult](
-		"session-stats",
-		[]string{"game"},
-		GroupByKey,
-		CombineByKey,
-		storage,
-	)
+	aggregate := func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+		return NewTictactoeManageStateAggregate(store)
+	}
 
-	repo := NewRepositoryWithIndexer[tictactoemanage.State, tictactoemanage.SessionStatsResult](
-		storage,
-		indexer,
+	repo := storage.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+		store,
+		aggregate,
 	)
-	update := UpdateRecords[Record[tictactoemanage.State]]{
-		Saving: map[string]Record[tictactoemanage.State]{},
+	update := storage.UpdateRecords[storage.Record[tictactoemanage.State]]{
+		Saving: map[string]storage.Record[tictactoemanage.State]{},
 	}
 
 	for _, game := range latestGames {
@@ -325,13 +236,13 @@ func TestIndexingWithRepository(t *testing.T) {
 				return x.SessionID + "-" + x.GameID
 			},
 		)
-		update.Saving["game:"+id] = Record[tictactoemanage.State]{
+		update.Saving["game:"+id] = storage.Record[tictactoemanage.State]{
 			ID:      "game:" + id,
 			Type:    "game",
 			Data:    game,
 			Version: 1,
 		}
-		update.Saving["session:"+id] = Record[tictactoemanage.State]{
+		update.Saving["session:"+id] = storage.Record[tictactoemanage.State]{
 			ID:      "session:" + id,
 			Type:    "session",
 			Data:    game,
@@ -341,16 +252,13 @@ func TestIndexingWithRepository(t *testing.T) {
 
 	err = repo.UpdateRecords(update)
 	assert.NoError(t, err)
-	fmt.Printf("storage: %+v \n", storage)
+	fmt.Printf("store: %+v \n", store)
 
-	indexedRepo := NewRepositoryWithIndexer[tictactoemanage.SessionStatsResult, any](
-		storage,
-		NewNoopAggregator[tictactoemanage.SessionStatsResult, any](),
-	)
+	indexedRepo := storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store)
 
 	result2, err := indexedRepo.Get("session-stats:session-1")
 	assert.NoError(t, err)
-	assert.Equal(t, Record[tictactoemanage.SessionStatsResult]{
+	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
 		ID:   "session-stats:session-1",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
@@ -366,7 +274,7 @@ func TestIndexingWithRepository(t *testing.T) {
 
 	result3, err := indexedRepo.Get("session-stats:session-2")
 	assert.NoError(t, err)
-	assert.Equal(t, Record[tictactoemanage.SessionStatsResult]{
+	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
 		ID:   "session-stats:session-2",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{

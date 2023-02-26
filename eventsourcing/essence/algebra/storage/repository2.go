@@ -5,7 +5,7 @@ import "github.com/widmogrod/software-architecture-playground/eventsourcing/esse
 // Record could have two types (to think about it more):
 // data records, which is current implementation
 // index records, which is future implementation
-//   - when two replicas have same aggregate rules, then during replication of logs, index can be reused
+//   - when two replicas have same aggregator rules, then during replication of logs, index can be reused
 type Record[A any] struct {
 	ID      string
 	Type    string

@@ -57,22 +57,24 @@ var exampleUserRecords = Save(
 
 func TestNewRepositoryInMemory(t *testing.T) {
 	storage := NewRepository2WithSchema()
-	aggregate := NewKeyedAggregate[User, UsersCountByAge](
-		"byAge",
-		[]string{"user"},
-		func(data User) (string, UsersCountByAge) {
-			return AgeRangeKey(data.Age), UsersCountByAge{
-				Count: 1,
-			}
-		},
-		func(a, b UsersCountByAge) (UsersCountByAge, error) {
-			return UsersCountByAge{
-				Count: a.Count + b.Count,
-			}, nil
-		},
-		storage,
-	)
-	r := NewRepositoryWithIndexer[User, UsersCountByAge](
+	aggregate := func() Aggregator[User, UsersCountByAge] {
+		return NewKeyedAggregate[User, UsersCountByAge](
+			"byAge",
+			[]string{"user"},
+			func(data User) (string, UsersCountByAge) {
+				return AgeRangeKey(data.Age), UsersCountByAge{
+					Count: 1,
+				}
+			},
+			func(a, b UsersCountByAge) (UsersCountByAge, error) {
+				return UsersCountByAge{
+					Count: a.Count + b.Count,
+				}, nil
+			},
+			storage,
+		)
+	}
+	r := NewRepositoryWithAggregator[User, UsersCountByAge](
 		storage,
 		aggregate,
 	)

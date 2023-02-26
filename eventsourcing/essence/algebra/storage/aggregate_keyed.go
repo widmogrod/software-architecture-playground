@@ -55,6 +55,7 @@ func (t *KayedAggregate[T, R]) Append(data Record[T]) error {
 
 			t.dataByKey[index] = Record[R]{
 				ID:      index,
+				Type:    t.aggregateRecordTypeName,
 				Data:    result,
 				Version: 0,
 			}

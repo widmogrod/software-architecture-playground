@@ -1,6 +1,7 @@
 package tictactoe_game_server
 
 import (
+	"errors"
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
@@ -82,7 +83,7 @@ type SessionWithGame struct {
 	CurrentGameID string
 }
 
-func NewGame(b websockproto.Broadcaster, r Repository[tictactoemanage.State], q *OpenSearchStorage) *Game {
+func NewGame(b websockproto.Broadcaster, r storage.Repository2[tictactoemanage.State], q *OpenSearchStorage) *Game {
 	return &Game{
 		broadcast:           b,
 		gameStateRepository: r,
@@ -90,10 +91,14 @@ func NewGame(b websockproto.Broadcaster, r Repository[tictactoemanage.State], q 
 	}
 }
 
+type Query interface {
+	Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error)
+}
+
 type Game struct {
 	broadcast           websockproto.Broadcaster
-	gameStateRepository Repository[tictactoemanage.State]
-	query               *OpenSearchStorage
+	gameStateRepository storage.Repository2[tictactoemanage.State]
+	query               Query
 }
 
 func (g *Game) OnMessage(connectionID string, data []byte) error {
@@ -103,13 +108,13 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			sessionID := ExtractSessionID(cmd)
 			g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
-			state, err := storage.RetriveID[tictactoemanage.State](g.gameStateRepository, "session:"+sessionID)
-			if err != nil && err != storage.ErrNotFound {
+			stateRecord, err := g.gameStateRepository.Get("session:" + sessionID)
+			if err != nil && !errors.Is(err, storage.ErrNotFound) {
 				log.Println("OnMessage: Get: err", err)
 				return err
 			}
 
-			machine := tictactoemanage.NewMachineWithState(state)
+			machine := tictactoemanage.NewMachineWithState(stateRecord.Data)
 			err = machine.Handle(cmd)
 			if err != nil {
 				log.Println("Handle error continued:", err)
@@ -118,16 +123,26 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 			newState := machine.State()
 			if newState != nil {
-				// session has also latest state
-				update := storage.UpdateRecords[any]{
-					Saving: map[string]any{
-						"session:" + sessionID: newState,
+				// session has also latest stateRecord
+				update := storage.UpdateRecords[storage.Record[tictactoemanage.State]]{
+					Saving: map[string]storage.Record[tictactoemanage.State]{
+						"session:" + sessionID: {
+							ID:      "session:" + sessionID,
+							Type:    "session",
+							Data:    newState,
+							Version: stateRecord.Version,
+						},
 					},
 				}
 
-				// but pass game state are also valuable, for example to calculate leaderboards and stats
+				// but pass game stateRecord are also valuable, for example to calculate leaderboards and stats
 				if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
-					update.Saving["game:"+inGame.GameID] = inGame
+					update.Saving["game:"+inGame.GameID] = storage.Record[tictactoemanage.State]{
+						ID:      "game:" + inGame.GameID,
+						Type:    "game",
+						Data:    newState,
+						Version: stateRecord.Version,
+					}
 				}
 
 				err = g.gameStateRepository.UpdateRecords(update)
@@ -142,7 +157,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 				log.Println("OnMessage: MarshalState: err", err)
 				return err
 			}
-			log.Println("state", string(msg))
+			log.Println("stateRecord", string(msg))
 
 			shouldBroadcast := true
 			if shouldBroadcast {

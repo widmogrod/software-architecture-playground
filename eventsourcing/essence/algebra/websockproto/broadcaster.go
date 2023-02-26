@@ -1,7 +1,9 @@
 package websockproto
 
 import (
+	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"log"
 )
 
@@ -26,7 +28,7 @@ type ConnectionToSession struct {
 	SessionID    string
 }
 
-func NewBroadcaster(publisher Publisher, repository storage.Repository[ConnectionToSession]) *InMemoryBroadcaster {
+func NewBroadcaster(publisher Publisher, repository storage.Repository2[ConnectionToSession]) *InMemoryBroadcaster {
 	return &InMemoryBroadcaster{
 		publisher:  publisher,
 		repository: repository,
@@ -35,43 +37,60 @@ func NewBroadcaster(publisher Publisher, repository storage.Repository[Connectio
 
 type InMemoryBroadcaster struct {
 	publisher  Publisher
-	repository storage.Repository[ConnectionToSession]
+	repository storage.Repository2[ConnectionToSession]
 }
 
 func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {
-	return i.repository.Set(connectionID, ConnectionToSession{
-		ConnectionID: connectionID,
-	})
+	return i.repository.UpdateRecords(storage.Save(storage.Record[ConnectionToSession]{
+		ID:   connectionID,
+		Type: "connectionToSession",
+		Data: ConnectionToSession{
+			ConnectionID: connectionID,
+		},
+	}))
 }
 
 func (i *InMemoryBroadcaster) UnregisterConnectionID(connectionID string) error {
-	err := i.repository.Delete(connectionID)
-	if err == storage.ErrNotFound {
-		return nil
-	}
-	return err
+	return i.repository.UpdateRecords(storage.Delete(storage.Record[ConnectionToSession]{
+		ID: connectionID,
+	}))
 }
 
 func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string, sessionID string) {
-	err := i.repository.Set(connectionID, ConnectionToSession{
-		ConnectionID: connectionID,
-		SessionID:    sessionID,
-	})
+	record, err := i.repository.Get(connectionID)
+	if err != nil {
+		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession i.repository.Get() err:", err)
+		return
+	}
+
+	record.Data.SessionID = sessionID
+
+	err = i.repository.UpdateRecords(storage.Save(record))
 	if err != nil {
 		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession error:", err)
 	}
 }
 
 func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
+	cursor := storage.FindingRecords[storage.Record[ConnectionToSession]]{
+		Where: predicate.MustWhere(
+			"Type = :type AND Data.SessionID = :sessionID",
+			predicate.ParamBinds{
+				":type":      schema.MkString("connectionToSession"),
+				":sessionID": schema.MkString(sessionID),
+			},
+		),
+	}
+
 	for {
-		result, err := i.repository.FindAllKeyEqual("SessionID", sessionID)
+		result, err := i.repository.FindingRecords(cursor)
 		if err != nil {
-			log.Println("InMemoryBroadcaster.BroadcastToSession FindAllKeyEqual error:", err)
+			log.Println("InMemoryBroadcaster.BroadcastToSession FindingRecords error:", err)
 		}
 
 		for _, item := range result.Items {
-			log.Println("BroadcastToSession connectionID:", item.ConnectionID)
-			err = i.publisher.Publish(item.ConnectionID, msg)
+			log.Println("BroadcastToSession connectionID:", item.Data.ConnectionID)
+			err = i.publisher.Publish(item.Data.ConnectionID, msg)
 			// TODO handle this differently
 			if err != nil {
 				log.Println("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
@@ -81,6 +100,8 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 		if !result.HasNext() {
 			break
 		}
+
+		cursor = *result.Next
 	}
 }
 
@@ -90,7 +111,7 @@ func (i *InMemoryBroadcaster) SendBackToSender(connectionID string, msg []byte) 
 		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 
-	err = i.publisher.Publish(item.ConnectionID, msg)
+	err = i.publisher.Publish(item.Data.ConnectionID, msg)
 	if err != nil {
 		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
 	}

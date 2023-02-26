@@ -92,7 +92,7 @@ func (s *InMemoryProtocol) PublishLoop() {
 	for {
 		select {
 		case pub := <-s.publish:
-			fmt.Printf("PublishLoop: %s %s \n", pub.ConnectionID, string(pub.Data))
+			log.Printf("PublishLoop: %s %s \n", pub.ConnectionID, string(pub.Data))
 			conn, err := s.connByID(pub.ConnectionID)
 			if err != nil {
 				log.Println("PublishLoop: connByID error", err)
