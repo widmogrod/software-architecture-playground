@@ -63,14 +63,7 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 
 	for id, record := range x.Saving {
 		record.Version += 1
-
-		s.store[id] = schema.MkMap(
-			schema.MkField("ID", schema.MkString(record.ID)),
-			schema.MkField("Type", schema.MkString(record.Type)),
-			schema.MkField("Data", record.Data),
-			schema.MkField("Version", schema.MkInt(int(record.Version))),
-		)
-
+		s.store[id] = s.fromTyped(record)
 	}
 
 	for _, id := range x.Deleting {
@@ -155,6 +148,15 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 	}
 
 	return result, nil
+}
+
+func (s *RepositoryWithSchema) fromTyped(record Record[schema.Schema]) *schema.Map {
+	return schema.MkMap(
+		schema.MkField("ID", schema.MkString(record.ID)),
+		schema.MkField("Type", schema.MkString(record.Type)),
+		schema.MkField("Data", record.Data),
+		schema.MkField("Version", schema.MkInt(int(record.Version))),
+	)
 }
 
 func (s *RepositoryWithSchema) toTyped(record schema.Schema) (Record[schema.Schema], error) {
