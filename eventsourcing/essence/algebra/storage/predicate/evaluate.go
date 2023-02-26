@@ -53,3 +53,17 @@ func Evaluate(predicate Predicate, data schema.Schema, bind ParamBinds) bool {
 		},
 	)
 }
+
+func EvaluateEqual(record schema.Schema, location string, value any) bool {
+	return Evaluate(
+		&Compare{
+			Location:  location,
+			Operation: "=",
+			BindValue: ":value",
+		},
+		record,
+		map[string]schema.Schema{
+			":value": schema.FromGo(value),
+		},
+	)
+}

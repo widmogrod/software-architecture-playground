@@ -89,16 +89,7 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 	if query.RecordType != "" {
 		newRecords := make([]schema.Schema, 0)
 		for _, record := range records {
-			if predicate.Evaluate(
-				&predicate.Compare{
-					Location:  "Type",
-					Operation: "=",
-					BindValue: ":type",
-				},
-				record,
-				map[string]schema.Schema{
-					":type": schema.MkString(query.RecordType),
-				}) {
+			if predicate.EvaluateEqual(record, "Type", query.RecordType) {
 				newRecords = append(newRecords, record)
 			}
 		}
@@ -123,16 +114,7 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 		found := false
 		newRecords := make([]schema.Schema, 0)
 		for _, record := range records {
-			if predicate.Evaluate(
-				&predicate.Compare{
-					Location:  "ID",
-					Operation: "=",
-					BindValue: ":id",
-				},
-				record,
-				map[string]schema.Schema{
-					":id": schema.MkString(*query.After),
-				}) {
+			if predicate.EvaluateEqual(record, "ID", *query.After) {
 				found = true
 				continue // we're interested in records after this one
 			}
