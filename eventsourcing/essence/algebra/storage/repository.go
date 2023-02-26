@@ -8,8 +8,9 @@ import (
 
 var (
 	ErrNotFound        = fmt.Errorf("not found")
+	ErrEmptyCommand    = fmt.Errorf("empty command")
 	ErrInvalidType     = fmt.Errorf("invalid type")
-	ErrVersionConflict = fmt.Errorf("Version conflict")
+	ErrVersionConflict = fmt.Errorf("version conflict")
 	ErrInternalError   = fmt.Errorf("internal error")
 )
 

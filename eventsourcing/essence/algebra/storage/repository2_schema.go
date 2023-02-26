@@ -21,10 +21,11 @@ type RepositoryWithSchema struct {
 	mux   sync.Mutex
 }
 
-func (s *RepositoryWithSchema) Get(key string) (Record[schema.Schema], error) {
+func (s *RepositoryWithSchema) Get(recordID, recordType string) (Record[schema.Schema], error) {
 	result, err := s.FindingRecords(FindingRecords[Record[schema.Schema]]{
+		RecordType: recordType,
 		Where: predicate.MustWhere("ID = :id", predicate.ParamBinds{
-			":id": schema.MkString(key),
+			":id": schema.MkString(recordID),
 		}),
 		Limit: 1,
 	})
@@ -40,11 +41,15 @@ func (s *RepositoryWithSchema) Get(key string) (Record[schema.Schema], error) {
 }
 
 func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
+	if x.IsEmpty() {
+		return fmt.Errorf("storage.RepositoryWithSchema.UpdateRecords: empty command %w", ErrEmptyCommand)
+	}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	for id, record := range x.Saving {
-		stored, ok := s.store[id]
+	for _, record := range x.Saving {
+		stored, ok := s.store[record.ID+record.Type]
 		if !ok {
 			// new record, should have version 1
 			// and since few lines below we increment version
@@ -56,18 +61,18 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 		storedVersion := schema.As[uint16](schema.Get(stored, "Version"), 0)
 
 		if storedVersion != record.Version {
-			return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords id=%s %d != %d %w",
-				id, storedVersion, record.Version, ErrVersionConflict)
+			return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords ID=%s Type=%s %d != %d %w",
+				record.ID, record.Type, storedVersion, record.Version, ErrVersionConflict)
 		}
 	}
 
-	for id, record := range x.Saving {
+	for _, record := range x.Saving {
 		record.Version += 1
-		s.store[id] = s.fromTyped(record)
+		s.store[record.ID+record.Type] = s.fromTyped(record)
 	}
 
 	for _, id := range x.Deleting {
-		delete(s.store, id.ID)
+		delete(s.store, id.ID+id.Type)
 	}
 
 	return nil

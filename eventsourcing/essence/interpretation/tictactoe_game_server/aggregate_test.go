@@ -174,7 +174,7 @@ func TestIndexer(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	result := indexer.GetIndexByKey("session-stats:session-1")
+	result := indexer.GetIndexByKey("session-1")
 
 	assert.Equal(t, tictactoemanage.SessionStatsResult{
 		ID:         "session-1",
@@ -192,8 +192,9 @@ func TestIndexingWithRepository(t *testing.T) {
 	// Simulate, that we have a sessions stats already
 	err := store.UpdateRecords(storage.UpdateRecords[storage.Record[schema.Schema]]{
 		Saving: map[string]storage.Record[schema.Schema]{
-			"session-stats:session-2": {
-				ID: "session-stats:session-2",
+			"session-2": {
+				ID:   "session-2",
+				Type: "session-stats",
 				Data: schema.FromGo(tictactoemanage.SessionStatsResult{
 					ID:         "session-2",
 					TotalGames: 665,
@@ -208,7 +209,7 @@ func TestIndexingWithRepository(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	_, err = store.Get("session-stats:session-2")
+	_, err = store.Get("session-2", "session-stats")
 	assert.NoError(t, err)
 
 	aggregate := func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
@@ -237,13 +238,13 @@ func TestIndexingWithRepository(t *testing.T) {
 			},
 		)
 		update.Saving["game:"+id] = storage.Record[tictactoemanage.State]{
-			ID:      "game:" + id,
+			ID:      id,
 			Type:    "game",
 			Data:    game,
 			Version: 1,
 		}
 		update.Saving["session:"+id] = storage.Record[tictactoemanage.State]{
-			ID:      "session:" + id,
+			ID:      id,
 			Type:    "session",
 			Data:    game,
 			Version: 1,
@@ -256,10 +257,10 @@ func TestIndexingWithRepository(t *testing.T) {
 
 	indexedRepo := storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store)
 
-	result2, err := indexedRepo.Get("session-stats:session-1")
+	result2, err := indexedRepo.Get("session-1", "session-stats")
 	assert.NoError(t, err)
 	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
-		ID:   "session-stats:session-1",
+		ID:   "session-1",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
 			ID:         "session-1",
@@ -272,10 +273,10 @@ func TestIndexingWithRepository(t *testing.T) {
 		Version: 1,
 	}, result2)
 
-	result3, err := indexedRepo.Get("session-stats:session-2")
+	result3, err := indexedRepo.Get("session-2", "session-stats")
 	assert.NoError(t, err)
 	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
-		ID:   "session-stats:session-2",
+		ID:   "session-2",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
 			ID:         "session-2",

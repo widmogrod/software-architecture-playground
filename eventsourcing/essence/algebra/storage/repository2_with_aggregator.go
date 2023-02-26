@@ -23,15 +23,15 @@ type RepositoryWithAggregator[B any, C any] struct {
 	aggregator func() Aggregator[B, C]
 }
 
-func (r *RepositoryWithAggregator[B, C]) Get(key string) (Record[B], error) {
-	v, err := r.storage.Get(key)
+func (r *RepositoryWithAggregator[B, C]) Get(recordID, recordType string) (Record[B], error) {
+	v, err := r.storage.Get(recordID, recordType)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get storage error id=%s %w", key, err)
+		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get storage error ID=%s Type=%s. %w", recordID, recordType, err)
 	}
 
 	typed, err := RecordAs[B](v)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get type assertion error id=%s %w", key, err)
+		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get type assertion error ID=%s Type=%s. %w", recordID, recordType, err)
 	}
 
 	return typed, nil
@@ -39,7 +39,8 @@ func (r *RepositoryWithAggregator[B, C]) Get(key string) (Record[B], error) {
 
 func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) error {
 	schemas := UpdateRecords[Record[schema.Schema]]{
-		Saving: make(map[string]Record[schema.Schema]),
+		Saving:   make(map[string]Record[schema.Schema]),
+		Deleting: make(map[string]Record[schema.Schema]),
 	}
 
 	// This is fix to in memory aggregator
@@ -61,10 +62,18 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 	}
 
 	// TODO: add deletion support in aggregate!
+	for id, record := range s.Deleting {
+		schemas.Deleting[id] = Record[schema.Schema]{
+			ID:      record.ID,
+			Type:    record.Type,
+			Data:    schema.FromGo(record.Data),
+			Version: record.Version,
+		}
+	}
 
 	for index, versionedData := range aggregate.GetVersionedIndices() {
 		log.Printf("index %s %#v\n", index, versionedData)
-		schemas.Saving[versionedData.ID] = versionedData
+		schemas.Saving["indices:"+versionedData.ID+":"+versionedData.Type] = versionedData
 	}
 
 	err := r.storage.UpdateRecords(schemas)

@@ -23,10 +23,14 @@ type UpdateRecords[T any] struct {
 	Deleting map[string]T
 }
 
+func (s UpdateRecords[T]) IsEmpty() bool {
+	return len(s.Saving) == 0 && len(s.Deleting) == 0
+}
+
 func Save[T any](xs ...Record[T]) UpdateRecords[Record[T]] {
 	m := make(map[string]Record[T])
 	for _, x := range xs {
-		m[x.ID] = x
+		m[x.ID+":"+x.Type] = x
 	}
 
 	return UpdateRecords[Record[T]]{
@@ -37,7 +41,7 @@ func Save[T any](xs ...Record[T]) UpdateRecords[Record[T]] {
 func Delete[T any](xs ...Record[T]) UpdateRecords[Record[T]] {
 	m := make(map[string]Record[T])
 	for _, x := range xs {
-		m[x.ID] = x
+		m[x.ID+":"+x.Type] = x
 	}
 
 	return UpdateRecords[Record[T]]{

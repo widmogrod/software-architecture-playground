@@ -108,7 +108,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			sessionID := ExtractSessionID(cmd)
 			g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
-			stateRecord, err := g.gameStateRepository.Get("session:" + sessionID)
+			stateRecord, err := g.gameStateRepository.Get(sessionID, "session")
 			if err != nil && !errors.Is(err, storage.ErrNotFound) {
 				log.Println("OnMessage: Get: err", err)
 				return err
@@ -126,8 +126,8 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 				// session has also latest stateRecord
 				update := storage.UpdateRecords[storage.Record[tictactoemanage.State]]{
 					Saving: map[string]storage.Record[tictactoemanage.State]{
-						"session:" + sessionID: {
-							ID:      "session:" + sessionID,
+						sessionID: {
+							ID:      sessionID,
 							Type:    "session",
 							Data:    newState,
 							Version: stateRecord.Version,
@@ -137,8 +137,8 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 				// but pass game stateRecord are also valuable, for example to calculate leaderboards and stats
 				if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
-					update.Saving["game:"+inGame.GameID] = storage.Record[tictactoemanage.State]{
-						ID:      "game:" + inGame.GameID,
+					update.Saving[inGame.GameID] = storage.Record[tictactoemanage.State]{
+						ID:      inGame.GameID,
 						Type:    "game",
 						Data:    newState,
 						Version: stateRecord.Version,

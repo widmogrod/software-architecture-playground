@@ -20,26 +20,26 @@ func GroupByKey(data tictactoemanage.State) (string, tictactoemanage.SessionStat
 	return tictactoemanage.MustMatchStateR2(
 		data,
 		func(x *tictactoemanage.SessionWaitingForPlayers) (string, tictactoemanage.SessionStatsResult) {
-			return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
+			return x.SessionID, InitEmtpy(x.SessionID)
 		},
 		func(x *tictactoemanage.SessionReady) (string, tictactoemanage.SessionStatsResult) {
-			return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
+			return x.SessionID, InitEmtpy(x.SessionID)
 		},
 		func(x *tictactoemanage.SessionInGame) (string, tictactoemanage.SessionStatsResult) {
 			if x.GameState == nil {
-				return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
+				return x.SessionID, InitEmtpy(x.SessionID)
 			}
 
 			return tictacstatemachine.MustMatchStateR2(
 				x.GameState,
 				func(y *tictacstatemachine.GameWaitingForPlayer) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
+					return x.SessionID, InitEmtpy(x.SessionID)
 				},
 				func(y *tictacstatemachine.GameProgress) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, InitEmtpy(x.SessionID)
+					return x.SessionID, InitEmtpy(x.SessionID)
 				},
 				func(y *tictacstatemachine.GameEndWithWin) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, tictactoemanage.SessionStatsResult{
+					return x.SessionID, tictactoemanage.SessionStatsResult{
 						ID:         x.SessionID,
 						TotalGames: 1,
 						TotalDraws: 0,
@@ -49,7 +49,7 @@ func GroupByKey(data tictactoemanage.State) (string, tictactoemanage.SessionStat
 					}
 				},
 				func(y *tictacstatemachine.GameEndWithDraw) (string, tictactoemanage.SessionStatsResult) {
-					return "session-stats:" + x.SessionID, tictactoemanage.SessionStatsResult{
+					return x.SessionID, tictactoemanage.SessionStatsResult{
 						ID:         x.SessionID,
 						TotalGames: 1,
 						TotalDraws: 1,

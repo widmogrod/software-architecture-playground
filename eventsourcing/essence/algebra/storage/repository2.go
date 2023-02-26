@@ -28,7 +28,7 @@ type SortField struct {
 }
 
 type Repository2[T any] interface {
-	Get(key string) (Record[T], error)
+	Get(recordID, recordType string) (Record[T], error)
 	UpdateRecords(command UpdateRecords[Record[T]]) error
 	FindingRecords(query FindingRecords[Record[T]]) (PageResult[Record[T]], error)
 }

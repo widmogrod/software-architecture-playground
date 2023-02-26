@@ -16,7 +16,7 @@ type QueryStorage struct {
 }
 
 func (q *QueryStorage) Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error) {
-	result, err := q.store.Get("session-stats:" + query.SessionID)
+	result, err := q.store.Get(query.SessionID, "session-stats")
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,8 @@ package tictactoe_game_server
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
@@ -10,12 +12,14 @@ import (
 
 func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	var err error
-	//cfg, err := config.LoadDefaultConfig(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	store := storage.NewRepository2WithSchema()
+	//store := storage.NewRepository2WithSchema()
+	store := storage.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), "test-repo-record")
+
 	connRepo := storage.NewRepository2Typed[websockproto.ConnectionToSession](store)
 	//connRepo := storage.NewDynamoDBRepository(
 	//	dynamodb.NewFromConfig(cfg),

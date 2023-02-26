@@ -52,12 +52,13 @@ func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {
 
 func (i *InMemoryBroadcaster) UnregisterConnectionID(connectionID string) error {
 	return i.repository.UpdateRecords(storage.Delete(storage.Record[ConnectionToSession]{
-		ID: connectionID,
+		ID:   connectionID,
+		Type: "connectionToSession",
 	}))
 }
 
 func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string, sessionID string) {
-	record, err := i.repository.Get(connectionID)
+	record, err := i.repository.Get(connectionID, "connectionToSession")
 	if err != nil {
 		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession i.repository.Get() err:", err)
 		return
@@ -106,7 +107,7 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 }
 
 func (i *InMemoryBroadcaster) SendBackToSender(connectionID string, msg []byte) {
-	item, err := i.repository.Get(connectionID)
+	item, err := i.repository.Get(connectionID, "connectionToSession")
 	if err != nil {
 		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
 	}

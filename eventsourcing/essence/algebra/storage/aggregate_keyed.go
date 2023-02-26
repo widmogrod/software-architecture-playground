@@ -101,7 +101,7 @@ func (t *KayedAggregate[T, R]) loadIndex(index string) (Record[R], error) {
 	// load index state from storage
 	// if index is found, then concat with unversionedData
 	// otherwise just use unversionedData.
-	initial, err := t.storage.Get(index)
+	initial, err := t.storage.Get(index, t.aggregateRecordTypeName)
 	if err != nil {
 		return r, fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords index(1)=%s %w", index, err)
 	}

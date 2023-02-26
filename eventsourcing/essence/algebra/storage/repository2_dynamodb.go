@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/widmogrod/mkunion/x/schema"
@@ -25,42 +27,62 @@ type DynamoDBRepository2 struct {
 	tableName string
 }
 
-func (d *DynamoDBRepository2) Get(key string) (Record[schema.Schema], error) {
-	result, err := d.FindingRecords(FindingRecords[Record[schema.Schema]]{
-		Where: predicate.MustWhere("key = :id", predicate.ParamBinds{
-			":id": schema.MkString(key),
-		}),
-		Limit: 1,
+func (d *DynamoDBRepository2) Get(key, recordType string) (Record[schema.Schema], error) {
+	item, err := d.client.GetItem(context.Background(), &dynamodb.GetItemInput{
+		Key: map[string]types.AttributeValue{
+			"ID": &types.AttributeValueMemberS{
+				Value: key,
+			},
+			"Type": &types.AttributeValueMemberS{
+				Value: recordType,
+			},
+		},
+		TableName:      &d.tableName,
+		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
-		return Record[schema.Schema]{}, err
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get error=%s. %w", err, ErrInternalError)
 	}
 
-	if len(result.Items) == 0 {
-		return Record[schema.Schema]{}, ErrNotFound
+	if len(item.Item) == 0 {
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get not found. %w", ErrNotFound)
 	}
 
-	return result.Items[0], nil
+	i := &types.AttributeValueMemberM{
+		Value: item.Item,
+	}
+
+	schemed, err := schema.FromDynamoDB(i)
+	if err != nil {
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get schema conversion error=%s. %w", err, ErrInternalError)
+	}
+
+	typed, err := d.toTyped(schemed)
+	if err != nil {
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get type conversion error=%s. %w", err, ErrInvalidType)
+	}
+
+	return typed, nil
 }
 
 func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
+	if command.IsEmpty() {
+		return fmt.Errorf("DynamoDBRepository2.UpdateRecords: empty command %w", ErrEmptyCommand)
+	}
+
 	var transact []types.TransactWriteItem
 	for _, value := range command.Saving {
+		originalVersion := value.Version
+		value.Version++
 		sch := d.fromTyped(value)
 		item := schema.ToDynamoDB(sch)
 		if _, ok := item.(*types.AttributeValueMemberM); !ok {
-			return fmt.Errorf("DynamoDBRepository.Set: unsupported type: %T", item)
+			return fmt.Errorf("DynamoDBRepository2.UpdateRecords: unsupported type: %T", item)
 		}
 
-		// TODO define ID should be partition key, where Type should be sort key
-		final := item.(*types.AttributeValueMemberM)
-		final.Value["key"] = &types.AttributeValueMemberS{
-			Value: value.ID,
-		}
-		// Optimistic locking, increase version
-		// but use current one to check if it was not changed
-		final.Value["Version"] = &types.AttributeValueMemberN{
-			Value: fmt.Sprintf("%d", value.Version+1),
+		final, ok := item.(*types.AttributeValueMemberM)
+		if !ok {
+			return fmt.Errorf("DynamoDBRepository2.UpdateRecords: expected map as item. %w", ErrInternalError)
 		}
 
 		transact = append(transact, types.TransactWriteItem{
@@ -70,7 +92,7 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 				ConditionExpression: aws.String("Version = :version OR attribute_not_exists(Version)"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
 					":version": &types.AttributeValueMemberN{
-						Value: fmt.Sprintf("%d", value.Version),
+						Value: fmt.Sprintf("%d", originalVersion),
 					},
 				},
 			},
@@ -82,8 +104,11 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 			Delete: &types.Delete{
 				TableName: aws.String(d.tableName),
 				Key: map[string]types.AttributeValue{
-					"key": &types.AttributeValueMemberS{
+					"ID": &types.AttributeValueMemberS{
 						Value: id.ID,
+					},
+					"Type": &types.AttributeValueMemberS{
+						Value: id.Type,
 					},
 				},
 			},
@@ -95,6 +120,17 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 	})
 
 	if err != nil {
+		respErr := &http.ResponseError{}
+		if errors.As(err, &respErr) {
+			conditional := &types.TransactionCanceledException{}
+			if errors.As(respErr.ResponseError.Err, &conditional) {
+				for _, reason := range conditional.CancellationReasons {
+					if *reason.Code == "ConditionalCheckFailed" {
+						return fmt.Errorf("storage.DynamoDBRepository.UpdateRecords: %w", ErrVersionConflict)
+					}
+				}
+			}
+		}
 		return err
 	}
 
@@ -112,16 +148,31 @@ func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.
 		ExpressionAttributeNames:  expressionNames,
 		ExpressionAttributeValues: paramsExpression,
 		FilterExpression:          aws.String(filterExpression),
-		ConsistentRead:            aws.Bool(true),
+		//ConsistentRead:            aws.Bool(true),
 	}
 
+	if query.After != nil {
+		schemed, err := schema.FromJSON([]byte(*query.After))
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, err
+		}
+
+		scanInput.ExclusiveStartKey = map[string]types.AttributeValue{
+			"ID": &types.AttributeValueMemberS{
+				Value: schema.As[string](schema.Get(schemed, "ID"), ""),
+			},
+			"Type": &types.AttributeValueMemberS{
+				Value: schema.As[string](schema.Get(schemed, "Type"), ""),
+			},
+		}
+	}
+
+	// Be aware that DynamoDB limit is scan limit, not page limit!
 	if query.Limit > 0 {
 		scanInput.Limit = aws.Int32(int32(query.Limit))
 	}
 
-	//TODO add sorting!
 	items, err := d.client.Scan(context.Background(), scanInput)
-
 	if err != nil {
 		return PageResult[Record[schema.Schema]]{}, err
 	}
@@ -131,7 +182,6 @@ func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.
 	}
 
 	for _, item := range items.Items {
-		delete(item, "key")
 		// normalize input for further processing
 		i := &types.AttributeValueMemberM{
 			Value: item,
@@ -147,6 +197,27 @@ func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.
 			return PageResult[Record[schema.Schema]]{}, err
 		}
 		result.Items = append(result.Items, typed)
+	}
+
+	if items.LastEvaluatedKey != nil {
+		after := &types.AttributeValueMemberM{
+			Value: items.LastEvaluatedKey,
+		}
+		schemed, err := schema.FromDynamoDB(after)
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository2.FindingRecords: error calculating after cursor %s. %w", err, ErrInternalError)
+		}
+		json, err := schema.ToJSON(schemed)
+		if err != nil {
+			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository2.FindingRecords: error serializing after cursor %s. %w", err, ErrInternalError)
+		}
+		cursor := string(json)
+		result.Next = &FindingRecords[Record[schema.Schema]]{
+			Where: query.Where,
+			Sort:  query.Sort,
+			Limit: query.Limit,
+			After: &cursor,
+		}
 	}
 
 	return result, nil
@@ -184,11 +255,11 @@ func (d *DynamoDBRepository2) buildFilterExpression(query FindingRecords[Record[
 	if query.RecordType != "" {
 		names["Type"] = "#Type"
 		where = &predicate.Compare{
-			Location:  "#rt",
+			Location:  "Type",
 			Operation: "=",
-			BindValue: ":record-type",
+			BindValue: ":Type",
 		}
-		binds[":record-type"] = schema.MkString(query.RecordType)
+		binds[":Type"] = schema.MkString(query.RecordType)
 	}
 
 	if query.Where != nil {
