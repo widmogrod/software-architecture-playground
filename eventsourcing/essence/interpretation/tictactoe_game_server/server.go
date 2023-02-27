@@ -83,7 +83,7 @@ type SessionWithGame struct {
 	CurrentGameID string
 }
 
-func NewGame(b websockproto.Broadcaster, r storage.Repository2[tictactoemanage.State], q *OpenSearchStorage) *Game {
+func NewGame(b websockproto.Broadcaster, r storage.Repository2[tictactoemanage.State], q Query) *Game {
 	return &Game{
 		broadcast:           b,
 		gameStateRepository: r,
@@ -105,6 +105,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 	return UnmarshalQueryOrCommand(
 		data,
 		func(cmd tictactoemanage.Command) error {
+			log.Printf("OnMessage: command %#v \n", cmd)
 			sessionID := ExtractSessionID(cmd)
 			g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
@@ -170,7 +171,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			return nil
 		},
 		func(q tictactoemanage.Query) error {
-			log.Println("OnMessage: query", q)
+			log.Printf("OnMessage: query %#v \n", q)
 			return tictactoemanage.MustMatchQuery(
 				q,
 				func(x *tictactoemanage.SessionStatsQuery) error {

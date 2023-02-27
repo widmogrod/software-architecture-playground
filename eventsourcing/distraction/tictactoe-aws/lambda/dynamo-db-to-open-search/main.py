@@ -19,7 +19,7 @@ def handler(event, context):
     count = 0
     for record in event['Records']:
         # Get the primary key for use as the OpenSearch ID
-        id = record['dynamodb']['Keys']['key']['S']
+        id = record['dynamodb']['Keys']['ID']['S'] + ":" + record['dynamodb']['Keys']['Type']['S']
 
         if record['eventName'] == 'REMOVE':
             r = requests.delete(url + id, auth=awsauth)

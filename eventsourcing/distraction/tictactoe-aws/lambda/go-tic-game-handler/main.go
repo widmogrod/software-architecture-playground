@@ -30,27 +30,37 @@ func main() {
 	}
 
 	tableName := os.Getenv("TABLE_NAME")
-
-	connRepo := storage.NewDynamoDBRepository(
-		dynamodb.NewFromConfig(cfg),
-		tableName,
-		func() websockproto.ConnectionToSession {
-			panic("not supported creation of ConnectionToSession")
-		})
-
-	stateRepo := storage.NewDynamoDBRepository(
-		dynamodb.NewFromConfig(cfg),
-		tableName,
-		func() tictactoemanage.State {
-			return nil
-		})
-
-	openSearchHost := os.Getenv("OPENSEARCH_HOST")
-
-	query, err := tictactoe_game_server.NewQuery(
-		openSearchHost,
-		"lambda-index",
+	store := storage.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), tableName)
+	connRepo := storage.NewRepository2Typed[websockproto.ConnectionToSession](store)
+	stateRepo := storage.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+		store,
+		func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+			return tictactoe_game_server.NewTictactoeManageStateAggregate(store)
+		},
 	)
+
+	//connRepo := storage.NewDynamoDBRepository(
+	//	dynamodb.NewFromConfig(cfg),
+	//	tableName,
+	//	func() websockproto.ConnectionToSession {
+	//		panic("not supported creation of ConnectionToSession")
+	//	})
+
+	//stateRepo := storage.NewDynamoDBRepository(
+	//	dynamodb.NewFromConfig(cfg),
+	//	tableName,
+	//	func() tictactoemanage.State {
+	//		return nil
+	//	})
+
+	query := tictactoe_game_server.NewQueryUsingStorage(
+		storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store),
+	)
+	//openSearchHost := os.Getenv("OPENSEARCH_HOST")
+	//query, err := tictactoe_game_server.NewQuery(
+	//	openSearchHost,
+	//	"lambda-index",
+	//)
 	if err != nil {
 		fmt.Printf("ERR: tictactoe_game_server.NewQuery: %s \n", err)
 		panic(err)

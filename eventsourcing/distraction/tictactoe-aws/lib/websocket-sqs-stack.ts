@@ -25,7 +25,11 @@ export class WebsocketSqSStack extends cdk.Stack {
 
         const table = new dynamodb.Table(this, 'WebsocketSQSConnections', {
             partitionKey: {
-                name: 'key',
+                name: 'ID',
+                type: dynamodb.AttributeType.STRING
+            },
+            sortKey: {
+                name: 'Type',
                 type: dynamodb.AttributeType.STRING
             },
             removalPolicy: cdk.RemovalPolicy.DESTROY, // not recommended for production code!

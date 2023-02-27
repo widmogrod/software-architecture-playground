@@ -14,7 +14,11 @@ export const handler = async (event: APIGatewayProxyEvent) => {
     const putParams = {
         TableName: tableName,
         Item: {
-            key: event.requestContext.connectionId,
+            ID: event.requestContext.connectionId,
+            Type: 'connectionToSession',
+            Data: {
+                ConnectionID: event.requestContext.connectionId,
+            }
         },
     };
 

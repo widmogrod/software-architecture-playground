@@ -41,21 +41,21 @@ type OpenSearchStorage struct {
 	indexName string
 }
 
-const queryTemplate = `{
+const queryTemplate = `{{
   "size": 0,
   "query": {
     "bool": {
       "must": [
         {
           "term": {
-            "SessionInGame.M.SessionID.S.keyword": {
+            "Data.M.SessionInGame.M.SessionID.S.keyword": {
               "value": "%s"
             }
           }
         },
-		{
+        {
           "prefix": {
-            "key.S.keyword":  "game:"
+           "Type.S.keyword": "game"
           }
         }
       ]
@@ -64,12 +64,12 @@ const queryTemplate = `{
   "aggs": {
     "wins": {
       "terms": {
-        "field": "SessionInGame.M.GameState.M.GameEndWithWin.M.Winner.S.keyword"
+        "field": "Data.M.SessionInGame.M.GameState.M.GameEndWithWin.M.Winner.S.keyword"
       }
     },
     "draws": {
       "terms": {
-        "field": "SessionInGame.M.GameState.M.GameEndWithDraw.M.TicTacToeBaseState.M.BoardCols.N.keyword"
+        "field": "Data.M.SessionInGame.M.GameState.M.GameEndWithDraw.M.TicTacToeBaseState.M.BoardCols.N.keyword"
       }
     }
   }
