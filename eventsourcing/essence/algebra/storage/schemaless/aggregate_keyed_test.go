@@ -92,7 +92,7 @@ package schemaless
 //}
 //
 //func TestIndexer(t *testing.T) {
-//	storage := NewRepository2WithSchema()
+//	storage := NewInMemoryRepository()
 //	indexer := tictactoe_game_server.NewTictactoeManageStateAggregate(storage)
 //
 //	_ = `CREATE QUERY "session-stats" ON games as g WITH

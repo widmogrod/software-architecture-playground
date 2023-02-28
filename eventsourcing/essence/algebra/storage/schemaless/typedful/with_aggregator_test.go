@@ -1,9 +1,10 @@
-package schemaless
+package typedful
 
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+	. "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"testing"
 )
 
@@ -56,7 +57,7 @@ var exampleUserRecords = Save(
 )
 
 func TestNewRepositoryInMemory(t *testing.T) {
-	storage := NewRepository2WithSchema()
+	storage := NewInMemoryRepository()
 	aggregate := func() Aggregator[User, UsersCountByAge] {
 		return NewKeyedAggregate[User, UsersCountByAge](
 			"byAge",
@@ -74,7 +75,7 @@ func TestNewRepositoryInMemory(t *testing.T) {
 			storage,
 		)
 	}
-	r := NewRepositoryWithAggregator[User, UsersCountByAge](
+	r := NewTypedRepoWithAggregator[User, UsersCountByAge](
 		storage,
 		aggregate,
 	)

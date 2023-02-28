@@ -17,7 +17,7 @@ func TestNewDynamoDBRepository2(t *testing.T) {
 
 	d := dynamodb.NewFromConfig(cfg)
 
-	repo := NewDynamoDBRepository2(d, "test-repo-record")
+	repo := NewDynamoDBRepository(d, "test-repo-record")
 
 	// clean database
 	err = repo.UpdateRecords(UpdateRecords[Record[schema.Schema]]{

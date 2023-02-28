@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"testing"
@@ -93,7 +94,7 @@ var latestGames = []tictactoemanage.State{
 }
 
 func TestIndexer(t *testing.T) {
-	store := schemaless.NewRepository2WithSchema()
+	store := schemaless.NewInMemoryRepository()
 	indexer := NewTictactoeManageStateAggregate(store)
 
 	_ = `CREATE QUERY "session-stats" ON games as g WITH 
@@ -187,7 +188,7 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestIndexingWithRepository(t *testing.T) {
-	store := schemaless.NewRepository2WithSchema()
+	store := schemaless.NewInMemoryRepository()
 
 	// Simulate, that we have a sessions stats already
 	err := store.UpdateRecords(schemaless.UpdateRecords[schemaless.Record[schema.Schema]]{
@@ -216,7 +217,7 @@ func TestIndexingWithRepository(t *testing.T) {
 		return NewTictactoeManageStateAggregate(store)
 	}
 
-	repo := schemaless.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+	repo := typedful.NewTypedRepoWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		store,
 		aggregate,
 	)
@@ -255,7 +256,7 @@ func TestIndexingWithRepository(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("store: %+v \n", store)
 
-	indexedRepo := schemaless.NewRepository2Typed[tictactoemanage.SessionStatsResult](store)
+	indexedRepo := typedful.NewTypedRepository[tictactoemanage.SessionStatsResult](store)
 
 	result2, err := indexedRepo.Get("session-1", "session-stats")
 	assert.NoError(t, err)

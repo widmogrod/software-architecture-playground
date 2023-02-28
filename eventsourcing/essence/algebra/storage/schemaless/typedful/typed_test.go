@@ -1,15 +1,16 @@
-package schemaless
+package typedful
 
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+	. "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"testing"
 )
 
 func TestNewRepository2Typed(t *testing.T) {
-	storage := NewRepository2WithSchema()
-	r := NewRepository2Typed[User](storage)
+	storage := NewInMemoryRepository()
+	r := NewTypedRepository[User](storage)
 
 	err := r.UpdateRecords(exampleUserRecords)
 	assert.NoError(t, err)

@@ -11,7 +11,7 @@ func NewKeyedAggregate[T, R any](
 	supportedRecordTypes []string,
 	groupByFunc func(data T) (string, R),
 	combineByFunc func(a, b R) (R, error),
-	storage Repository2[schema.Schema],
+	storage Repository[schema.Schema],
 ) *KayedAggregate[T, R] {
 	return &KayedAggregate[T, R]{
 		aggregateRecordTypeName: recordTypeName,
@@ -35,7 +35,7 @@ type KayedAggregate[T, R any] struct {
 
 	dataByKey map[string]Record[R]
 
-	storage Repository2[schema.Schema]
+	storage Repository[schema.Schema]
 }
 
 func (t *KayedAggregate[T, R]) Append(data Record[T]) error {

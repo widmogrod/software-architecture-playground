@@ -28,7 +28,7 @@ type ConnectionToSession struct {
 	SessionID    string
 }
 
-func NewBroadcaster(publisher Publisher, repository schemaless.Repository2[ConnectionToSession]) *InMemoryBroadcaster {
+func NewBroadcaster(publisher Publisher, repository schemaless.Repository[ConnectionToSession]) *InMemoryBroadcaster {
 	return &InMemoryBroadcaster{
 		publisher:  publisher,
 		repository: repository,
@@ -37,7 +37,7 @@ func NewBroadcaster(publisher Publisher, repository schemaless.Repository2[Conne
 
 type InMemoryBroadcaster struct {
 	publisher  Publisher
-	repository schemaless.Repository2[ConnectionToSession]
+	repository schemaless.Repository[ConnectionToSession]
 }
 
 func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {

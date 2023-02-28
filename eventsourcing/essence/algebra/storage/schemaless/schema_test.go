@@ -57,7 +57,7 @@ var exampleUpdateRecords = Save(
 )
 
 func TestNewRepository2WithSchema(t *testing.T) {
-	repo := NewRepository2WithSchema()
+	repo := NewInMemoryRepository()
 	assert.NotNil(t, repo)
 
 	err := repo.UpdateRecords(exampleUpdateRecords)
@@ -106,7 +106,7 @@ func TestNewRepository2WithSchema(t *testing.T) {
 }
 
 func TestRepositoryWithSchema_UpdateRecords_Deletion(t *testing.T) {
-	repo := NewRepository2WithSchema()
+	repo := NewInMemoryRepository()
 	assert.NotNil(t, repo)
 
 	err := repo.UpdateRecords(exampleUpdateRecords)

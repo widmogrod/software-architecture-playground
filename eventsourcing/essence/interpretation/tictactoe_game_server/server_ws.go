@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 )
@@ -17,10 +18,10 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 		return nil, err
 	}
 
-	//store := schemaless.NewRepository2WithSchema()
-	store := schemaless.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), "test-repo-record")
+	//store := schemaless.NewInMemoryRepository()
+	store := schemaless.NewDynamoDBRepository(dynamodb.NewFromConfig(cfg), "test-repo-record")
 
-	connRepo := schemaless.NewRepository2Typed[websockproto.ConnectionToSession](store)
+	connRepo := typedful.NewTypedRepository[websockproto.ConnectionToSession](store)
 	//connRepo := schemaless.NewDynamoDBRepository(
 	//	dynamodb.NewFromConfig(cfg),
 	//	"test-repo",
@@ -28,7 +29,7 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	//		panic("not supported creation of ConnectionToSession")
 	//	})
 
-	stateRepo := schemaless.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+	stateRepo := typedful.NewTypedRepoWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		store,
 		func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
 			return NewTictactoeManageStateAggregate(store)
@@ -42,7 +43,7 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	//	})
 
 	query := NewQueryUsingStorage(
-		schemaless.NewRepository2Typed[tictactoemanage.SessionStatsResult](store),
+		typedful.NewTypedRepository[tictactoemanage.SessionStatsResult](store),
 	)
 	//query, err := NewQuery(
 	//	"https://search-dynamodb-projection-vggyq7lvwooliwe65oddc5gyse.eu-west-1.es.amazonaws.com/",

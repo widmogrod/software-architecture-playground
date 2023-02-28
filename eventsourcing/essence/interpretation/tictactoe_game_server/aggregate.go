@@ -86,7 +86,7 @@ func CombineByKey(a, b tictactoemanage.SessionStatsResult) (tictactoemanage.Sess
 	}, nil
 }
 
-func NewTictactoeManageStateAggregate(repo schemaless.Repository2[schema.Schema]) *schemaless.KayedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+func NewTictactoeManageStateAggregate(repo schemaless.Repository[schema.Schema]) *schemaless.KayedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
 	return schemaless.NewKeyedAggregate[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		"session-stats",
 		[]string{"game"},

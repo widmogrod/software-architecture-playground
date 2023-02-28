@@ -13,21 +13,21 @@ import (
 	"strings"
 )
 
-func NewDynamoDBRepository2(client *dynamodb.Client, tableName string) *DynamoDBRepository2 {
-	return &DynamoDBRepository2{
+func NewDynamoDBRepository(client *dynamodb.Client, tableName string) *DynamoDBRepository {
+	return &DynamoDBRepository{
 		client:    client,
 		tableName: tableName,
 	}
 }
 
-var _ Repository2[schema.Schema] = (*DynamoDBRepository2)(nil)
+var _ Repository[schema.Schema] = (*DynamoDBRepository)(nil)
 
-type DynamoDBRepository2 struct {
+type DynamoDBRepository struct {
 	client    *dynamodb.Client
 	tableName string
 }
 
-func (d *DynamoDBRepository2) Get(key, recordType string) (Record[schema.Schema], error) {
+func (d *DynamoDBRepository) Get(key, recordType string) (Record[schema.Schema], error) {
 	item, err := d.client.GetItem(context.Background(), &dynamodb.GetItemInput{
 		Key: map[string]types.AttributeValue{
 			"ID": &types.AttributeValueMemberS{
@@ -41,11 +41,11 @@ func (d *DynamoDBRepository2) Get(key, recordType string) (Record[schema.Schema]
 		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
-		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get error=%s. %w", err, ErrInternalError)
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get error=%s. %w", err, ErrInternalError)
 	}
 
 	if len(item.Item) == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get not found. %w", ErrNotFound)
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get not found. %w", ErrNotFound)
 	}
 
 	i := &types.AttributeValueMemberM{
@@ -54,20 +54,20 @@ func (d *DynamoDBRepository2) Get(key, recordType string) (Record[schema.Schema]
 
 	schemed, err := schema.FromDynamoDB(i)
 	if err != nil {
-		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get schema conversion error=%s. %w", err, ErrInternalError)
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get schema conversion error=%s. %w", err, ErrInternalError)
 	}
 
 	typed, err := d.toTyped(schemed)
 	if err != nil {
-		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository2.Get type conversion error=%s. %w", err, ErrInvalidType)
+		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get type conversion error=%s. %w", err, ErrInvalidType)
 	}
 
 	return typed, nil
 }
 
-func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
+func (d *DynamoDBRepository) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
 	if command.IsEmpty() {
-		return fmt.Errorf("DynamoDBRepository2.UpdateRecords: empty command %w", ErrEmptyCommand)
+		return fmt.Errorf("DynamoDBRepository.UpdateRecords: empty command %w", ErrEmptyCommand)
 	}
 
 	var transact []types.TransactWriteItem
@@ -77,12 +77,12 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 		sch := d.fromTyped(value)
 		item := schema.ToDynamoDB(sch)
 		if _, ok := item.(*types.AttributeValueMemberM); !ok {
-			return fmt.Errorf("DynamoDBRepository2.UpdateRecords: unsupported type: %T", item)
+			return fmt.Errorf("DynamoDBRepository.UpdateRecords: unsupported type: %T", item)
 		}
 
 		final, ok := item.(*types.AttributeValueMemberM)
 		if !ok {
-			return fmt.Errorf("DynamoDBRepository2.UpdateRecords: expected map as item. %w", ErrInternalError)
+			return fmt.Errorf("DynamoDBRepository.UpdateRecords: expected map as item. %w", ErrInternalError)
 		}
 
 		transact = append(transact, types.TransactWriteItem{
@@ -137,7 +137,7 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 	return nil
 }
 
-func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
+func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
 	filterExpression, paramsExpression, expressionNames, err := d.buildFilterExpression(query)
 	if err != nil {
 		return PageResult[Record[schema.Schema]]{}, err
@@ -205,11 +205,11 @@ func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.
 		}
 		schemed, err := schema.FromDynamoDB(after)
 		if err != nil {
-			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository2.FindingRecords: error calculating after cursor %s. %w", err, ErrInternalError)
+			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository.FindingRecords: error calculating after cursor %s. %w", err, ErrInternalError)
 		}
 		json, err := schema.ToJSON(schemed)
 		if err != nil {
-			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository2.FindingRecords: error serializing after cursor %s. %w", err, ErrInternalError)
+			return PageResult[Record[schema.Schema]]{}, fmt.Errorf("DynamoDBRepository.FindingRecords: error serializing after cursor %s. %w", err, ErrInternalError)
 		}
 		cursor := string(json)
 		result.Next = &FindingRecords[Record[schema.Schema]]{
@@ -223,7 +223,7 @@ func (d *DynamoDBRepository2) FindingRecords(query FindingRecords[Record[schema.
 	return result, nil
 }
 
-func (d *DynamoDBRepository2) fromTyped(record Record[schema.Schema]) *schema.Map {
+func (d *DynamoDBRepository) fromTyped(record Record[schema.Schema]) *schema.Map {
 	return schema.MkMap(
 		schema.MkField("ID", schema.MkString(record.ID)),
 		schema.MkField("Type", schema.MkString(record.Type)),
@@ -232,7 +232,7 @@ func (d *DynamoDBRepository2) fromTyped(record Record[schema.Schema]) *schema.Ma
 	)
 }
 
-func (d *DynamoDBRepository2) toTyped(record schema.Schema) (Record[schema.Schema], error) {
+func (d *DynamoDBRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
 	typed := Record[schema.Schema]{
 		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
 		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
@@ -242,12 +242,12 @@ func (d *DynamoDBRepository2) toTyped(record schema.Schema) (Record[schema.Schem
 	if typed.Type == "record-id-corrupted" &&
 		typed.ID == "record-id-corrupted" &&
 		typed.Version == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("store.DynamoDBRepository2.FindingRecords corrupted record: %v", record)
+		return Record[schema.Schema]{}, fmt.Errorf("store.DynamoDBRepository.FindingRecords corrupted record: %v", record)
 	}
 	return typed, nil
 }
 
-func (d *DynamoDBRepository2) buildFilterExpression(query FindingRecords[Record[schema.Schema]]) (string, map[string]types.AttributeValue, map[string]string, error) {
+func (d *DynamoDBRepository) buildFilterExpression(query FindingRecords[Record[schema.Schema]]) (string, map[string]types.AttributeValue, map[string]string, error) {
 	var where predicate.Predicate
 	var binds predicate.ParamBinds = map[predicate.BindValue]schema.Schema{}
 	var names map[string]string = map[string]string{}
@@ -273,7 +273,7 @@ func (d *DynamoDBRepository2) buildFilterExpression(query FindingRecords[Record[
 
 			for k, v := range query.Where.Params {
 				if _, ok := binds[k]; ok {
-					return "", nil, nil, fmt.Errorf("store.DynamoDBRepository2.FindingRecords: duplicated bind value: %s", k)
+					return "", nil, nil, fmt.Errorf("store.DynamoDBRepository.FindingRecords: duplicated bind value: %s", k)
 				}
 
 				binds[k] = v

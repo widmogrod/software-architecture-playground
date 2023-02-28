@@ -8,20 +8,20 @@ import (
 	"sync"
 )
 
-func NewRepository2WithSchema() *RepositoryWithSchema {
-	return &RepositoryWithSchema{
+func NewInMemoryRepository() *InMemoryRepository {
+	return &InMemoryRepository{
 		store: make(map[string]schema.Schema),
 	}
 }
 
-var _ Repository2[schema.Schema] = &RepositoryWithSchema{}
+var _ Repository[schema.Schema] = &InMemoryRepository{}
 
-type RepositoryWithSchema struct {
+type InMemoryRepository struct {
 	store map[string]schema.Schema
 	mux   sync.Mutex
 }
 
-func (s *RepositoryWithSchema) Get(recordID, recordType string) (Record[schema.Schema], error) {
+func (s *InMemoryRepository) Get(recordID, recordType string) (Record[schema.Schema], error) {
 	result, err := s.FindingRecords(FindingRecords[Record[schema.Schema]]{
 		RecordType: recordType,
 		Where: predicate.MustWhere("ID = :id", predicate.ParamBinds{
@@ -40,9 +40,9 @@ func (s *RepositoryWithSchema) Get(recordID, recordType string) (Record[schema.S
 	return result.Items[0], nil
 }
 
-func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
+func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
 	if x.IsEmpty() {
-		return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords: empty command %w", ErrEmptyCommand)
+		return fmt.Errorf("store.InMemoryRepository.UpdateRecords: empty command %w", ErrEmptyCommand)
 	}
 
 	s.mux.Lock()
@@ -61,7 +61,7 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 		storedVersion := schema.As[uint16](schema.Get(stored, "Version"), 0)
 
 		if storedVersion != record.Version {
-			return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords ID=%s Type=%s %d != %d %w",
+			return fmt.Errorf("store.InMemoryRepository.UpdateRecords ID=%s Type=%s %d != %d %w",
 				record.ID, record.Type, storedVersion, record.Version, ErrVersionConflict)
 		}
 	}
@@ -78,7 +78,7 @@ func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schem
 	return nil
 }
 
-func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
+func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
 	records := make([]schema.Schema, 0)
 	for _, v := range s.store {
 		records = append(records, v)
@@ -155,7 +155,7 @@ func (s *RepositoryWithSchema) FindingRecords(query FindingRecords[Record[schema
 	return result, nil
 }
 
-func (s *RepositoryWithSchema) fromTyped(record Record[schema.Schema]) *schema.Map {
+func (s *InMemoryRepository) fromTyped(record Record[schema.Schema]) *schema.Map {
 	return schema.MkMap(
 		schema.MkField("ID", schema.MkString(record.ID)),
 		schema.MkField("Type", schema.MkString(record.Type)),
@@ -164,7 +164,7 @@ func (s *RepositoryWithSchema) fromTyped(record Record[schema.Schema]) *schema.M
 	)
 }
 
-func (s *RepositoryWithSchema) toTyped(record schema.Schema) (Record[schema.Schema], error) {
+func (s *InMemoryRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
 	typed := Record[schema.Schema]{
 		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
 		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
@@ -174,7 +174,7 @@ func (s *RepositoryWithSchema) toTyped(record schema.Schema) (Record[schema.Sche
 	if typed.Type == "record-id-corrupted" &&
 		typed.ID == "record-id-corrupted" &&
 		typed.Version == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("store.RepositoryWithSchema.FindingRecords corrupted record: %v", record)
+		return Record[schema.Schema]{}, fmt.Errorf("store.InMemoryRepository.FindingRecords corrupted record: %v", record)
 	}
 	return typed, nil
 }

@@ -1,43 +1,44 @@
-package schemaless
+package typedful
 
 import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
+	. "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"log"
 )
 
-func NewRepositoryWithAggregator[B, C any](
-	store Repository2[schema.Schema],
-	aggregator func() Aggregator[B, C],
-) *RepositoryWithAggregator[B, C] {
-	return &RepositoryWithAggregator[B, C]{
+func NewTypedRepoWithAggregator[T, C any](
+	store Repository[schema.Schema],
+	aggregator func() Aggregator[T, C],
+) *TypedRepoWithAggregator[T, C] {
+	return &TypedRepoWithAggregator[T, C]{
 		store:      store,
 		aggregator: aggregator,
 	}
 }
 
-var _ Repository2[any] = &RepositoryWithAggregator[any, any]{}
+var _ Repository[any] = &TypedRepoWithAggregator[any, any]{}
 
-type RepositoryWithAggregator[B any, C any] struct {
-	store      Repository2[schema.Schema]
-	aggregator func() Aggregator[B, C]
+type TypedRepoWithAggregator[T any, C any] struct {
+	store      Repository[schema.Schema]
+	aggregator func() Aggregator[T, C]
 }
 
-func (r *RepositoryWithAggregator[B, C]) Get(recordID, recordType string) (Record[B], error) {
+func (r *TypedRepoWithAggregator[T, C]) Get(recordID string, recordType RecordType) (Record[T], error) {
 	v, err := r.store.Get(recordID, recordType)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get store error ID=%s Type=%s. %w", recordID, recordType, err)
+		return Record[T]{}, fmt.Errorf("store.TypedRepoWithAggregator.Get store error ID=%s Type=%s. %w", recordID, recordType, err)
 	}
 
-	typed, err := RecordAs[B](v)
+	typed, err := RecordAs[T](v)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get type assertion error ID=%s Type=%s. %w", recordID, recordType, err)
+		return Record[T]{}, fmt.Errorf("store.TypedRepoWithAggregator.Get type assertion error ID=%s Type=%s. %w", recordID, recordType, err)
 	}
 
 	return typed, nil
 }
 
-func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]]) error {
+func (r *TypedRepoWithAggregator[T, C]) UpdateRecords(s UpdateRecords[Record[T]]) error {
 	schemas := UpdateRecords[Record[schema.Schema]]{
 		Saving:   make(map[string]Record[schema.Schema]),
 		Deleting: make(map[string]Record[schema.Schema]),
@@ -49,7 +50,7 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 	for id, record := range s.Saving {
 		err := aggregate.Append(record)
 		if err != nil {
-			return fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords aggregator.Append %w", err)
+			return fmt.Errorf("store.TypedRepoWithAggregator.UpdateRecords aggregator.Append %w", err)
 		}
 
 		schemed := schema.FromGo(record.Data)
@@ -78,13 +79,13 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 
 	err := r.store.UpdateRecords(schemas)
 	if err != nil {
-		return fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords schemas store err %w", err)
+		return fmt.Errorf("store.TypedRepoWithAggregator.UpdateRecords schemas store err %w", err)
 	}
 
 	return nil
 }
 
-func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Record[B]]) (PageResult[Record[B]], error) {
+func (r *TypedRepoWithAggregator[T, C]) FindingRecords(query FindingRecords[Record[T]]) (PageResult[Record[T]], error) {
 	found, err := r.store.FindingRecords(FindingRecords[Record[schema.Schema]]{
 		Where: query.Where,
 		Sort:  query.Sort,
@@ -92,16 +93,16 @@ func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Rec
 		After: query.After,
 	})
 	if err != nil {
-		return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords store error %w", err)
+		return PageResult[Record[T]]{}, fmt.Errorf("store.TypedRepoWithAggregator.FindingRecords store error %w", err)
 	}
 
-	result := PageResult[Record[B]]{
+	result := PageResult[Record[T]]{
 		Items: nil,
 		Next:  nil,
 	}
 
 	if found.HasNext() {
-		result.Next = &FindingRecords[Record[B]]{
+		result.Next = &FindingRecords[Record[T]]{
 			Where: query.Where,
 			Sort:  query.Sort,
 			Limit: query.Limit,
@@ -110,9 +111,9 @@ func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Rec
 	}
 
 	for _, item := range found.Items {
-		typed, err := RecordAs[B](item)
+		typed, err := RecordAs[T](item)
 		if err != nil {
-			return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords RecordAs error id=%s %w", item.ID, err)
+			return PageResult[Record[T]]{}, fmt.Errorf("store.TypedRepoWithAggregator.FindingRecords RecordAs error id=%s %w", item.ID, err)
 		}
 
 		result.Items = append(result.Items, typed)
@@ -141,6 +142,6 @@ func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Rec
 //     But, because synchronous index is from point of time, it needs to trigger reindex.
 //     Which imply that aggregator myst know when index was created, so it can know when to stop rebuilding process.
 //     This implies control plane. Versions of records should follow monotonically increasing order, that way it will be easier to detect when index is up to date.
-func (r *RepositoryWithAggregator[B, C]) ReindexAll() {
+func (r *TypedRepoWithAggregator[T, C]) ReindexAll() {
 	panic("not implemented")
 }

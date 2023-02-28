@@ -5,14 +5,14 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 )
 
-func NewQueryUsingStorage(store schemaless.Repository2[tictactoemanage.SessionStatsResult]) *QueryStorage {
+func NewQueryUsingStorage(store schemaless.Repository[tictactoemanage.SessionStatsResult]) *QueryStorage {
 	return &QueryStorage{
 		store: store,
 	}
 }
 
 type QueryStorage struct {
-	store schemaless.Repository2[tictactoemanage.SessionStatsResult]
+	store schemaless.Repository[tictactoemanage.SessionStatsResult]
 }
 
 func (q *QueryStorage) Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error) {

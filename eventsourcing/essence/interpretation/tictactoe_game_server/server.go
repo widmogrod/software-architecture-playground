@@ -83,7 +83,7 @@ type SessionWithGame struct {
 	CurrentGameID string
 }
 
-func NewGame(b websockproto.Broadcaster, r schemaless.Repository2[tictactoemanage.State], q Query) *Game {
+func NewGame(b websockproto.Broadcaster, r schemaless.Repository[tictactoemanage.State], q Query) *Game {
 	return &Game{
 		broadcast:           b,
 		gameStateRepository: r,
@@ -97,7 +97,7 @@ type Query interface {
 
 type Game struct {
 	broadcast           websockproto.Broadcaster
-	gameStateRepository schemaless.Repository2[tictactoemanage.State]
+	gameStateRepository schemaless.Repository[tictactoemanage.State]
 	query               Query
 }
 
