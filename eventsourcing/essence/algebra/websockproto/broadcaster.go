@@ -2,8 +2,8 @@ package websockproto
 
 import (
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"log"
 )
 
@@ -28,7 +28,7 @@ type ConnectionToSession struct {
 	SessionID    string
 }
 
-func NewBroadcaster(publisher Publisher, repository storage.Repository2[ConnectionToSession]) *InMemoryBroadcaster {
+func NewBroadcaster(publisher Publisher, repository schemaless.Repository2[ConnectionToSession]) *InMemoryBroadcaster {
 	return &InMemoryBroadcaster{
 		publisher:  publisher,
 		repository: repository,
@@ -37,11 +37,11 @@ func NewBroadcaster(publisher Publisher, repository storage.Repository2[Connecti
 
 type InMemoryBroadcaster struct {
 	publisher  Publisher
-	repository storage.Repository2[ConnectionToSession]
+	repository schemaless.Repository2[ConnectionToSession]
 }
 
 func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {
-	return i.repository.UpdateRecords(storage.Save(storage.Record[ConnectionToSession]{
+	return i.repository.UpdateRecords(schemaless.Save(schemaless.Record[ConnectionToSession]{
 		ID:   connectionID,
 		Type: "connectionToSession",
 		Data: ConnectionToSession{
@@ -51,7 +51,7 @@ func (i *InMemoryBroadcaster) RegisterConnectionID(connectionID string) error {
 }
 
 func (i *InMemoryBroadcaster) UnregisterConnectionID(connectionID string) error {
-	return i.repository.UpdateRecords(storage.Delete(storage.Record[ConnectionToSession]{
+	return i.repository.UpdateRecords(schemaless.Delete(schemaless.Record[ConnectionToSession]{
 		ID:   connectionID,
 		Type: "connectionToSession",
 	}))
@@ -66,14 +66,14 @@ func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string
 
 	record.Data.SessionID = sessionID
 
-	err = i.repository.UpdateRecords(storage.Save(record))
+	err = i.repository.UpdateRecords(schemaless.Save(record))
 	if err != nil {
 		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession error:", err)
 	}
 }
 
 func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
-	cursor := storage.FindingRecords[storage.Record[ConnectionToSession]]{
+	cursor := schemaless.FindingRecords[schemaless.Record[ConnectionToSession]]{
 		Where: predicate.MustWhere(
 			"Type = :type AND Data.SessionID = :sessionID",
 			predicate.ParamBinds{

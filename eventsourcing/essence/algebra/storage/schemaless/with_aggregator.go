@@ -1,4 +1,4 @@
-package storage
+package schemaless
 
 import (
 	"fmt"
@@ -7,11 +7,11 @@ import (
 )
 
 func NewRepositoryWithAggregator[B, C any](
-	storage Repository2[schema.Schema],
+	store Repository2[schema.Schema],
 	aggregator func() Aggregator[B, C],
 ) *RepositoryWithAggregator[B, C] {
 	return &RepositoryWithAggregator[B, C]{
-		storage:    storage,
+		store:      store,
 		aggregator: aggregator,
 	}
 }
@@ -19,14 +19,14 @@ func NewRepositoryWithAggregator[B, C any](
 var _ Repository2[any] = &RepositoryWithAggregator[any, any]{}
 
 type RepositoryWithAggregator[B any, C any] struct {
-	storage    Repository2[schema.Schema]
+	store      Repository2[schema.Schema]
 	aggregator func() Aggregator[B, C]
 }
 
 func (r *RepositoryWithAggregator[B, C]) Get(recordID, recordType string) (Record[B], error) {
-	v, err := r.storage.Get(recordID, recordType)
+	v, err := r.store.Get(recordID, recordType)
 	if err != nil {
-		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get storage error ID=%s Type=%s. %w", recordID, recordType, err)
+		return Record[B]{}, fmt.Errorf("store.RepositoryWithAggregator.Get store error ID=%s Type=%s. %w", recordID, recordType, err)
 	}
 
 	typed, err := RecordAs[B](v)
@@ -76,7 +76,7 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 		schemas.Saving["indices:"+versionedData.ID+":"+versionedData.Type] = versionedData
 	}
 
-	err := r.storage.UpdateRecords(schemas)
+	err := r.store.UpdateRecords(schemas)
 	if err != nil {
 		return fmt.Errorf("store.RepositoryWithAggregator.UpdateRecords schemas store err %w", err)
 	}
@@ -85,14 +85,14 @@ func (r *RepositoryWithAggregator[B, C]) UpdateRecords(s UpdateRecords[Record[B]
 }
 
 func (r *RepositoryWithAggregator[B, C]) FindingRecords(query FindingRecords[Record[B]]) (PageResult[Record[B]], error) {
-	found, err := r.storage.FindingRecords(FindingRecords[Record[schema.Schema]]{
+	found, err := r.store.FindingRecords(FindingRecords[Record[schema.Schema]]{
 		Where: query.Where,
 		Sort:  query.Sort,
 		Limit: query.Limit,
 		After: query.After,
 	})
 	if err != nil {
-		return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords storage error %w", err)
+		return PageResult[Record[B]]{}, fmt.Errorf("store.RepositoryWithAggregator.FindingRecords store error %w", err)
 	}
 
 	result := PageResult[Record[B]]{

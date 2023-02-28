@@ -1,4 +1,4 @@
-package storage
+package schemaless
 
 import "github.com/widmogrod/mkunion/x/schema"
 

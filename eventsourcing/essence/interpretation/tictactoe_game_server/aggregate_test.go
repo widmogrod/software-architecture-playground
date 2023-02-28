@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"testing"
@@ -93,7 +93,7 @@ var latestGames = []tictactoemanage.State{
 }
 
 func TestIndexer(t *testing.T) {
-	store := storage.NewRepository2WithSchema()
+	store := schemaless.NewRepository2WithSchema()
 	indexer := NewTictactoeManageStateAggregate(store)
 
 	_ = `CREATE QUERY "session-stats" ON games as g WITH 
@@ -167,7 +167,7 @@ func TestIndexer(t *testing.T) {
 	//})
 
 	for _, game := range latestGames {
-		err := indexer.Append(storage.Record[tictactoemanage.State]{
+		err := indexer.Append(schemaless.Record[tictactoemanage.State]{
 			Type: "game",
 			Data: game,
 		})
@@ -187,11 +187,11 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestIndexingWithRepository(t *testing.T) {
-	store := storage.NewRepository2WithSchema()
+	store := schemaless.NewRepository2WithSchema()
 
 	// Simulate, that we have a sessions stats already
-	err := store.UpdateRecords(storage.UpdateRecords[storage.Record[schema.Schema]]{
-		Saving: map[string]storage.Record[schema.Schema]{
+	err := store.UpdateRecords(schemaless.UpdateRecords[schemaless.Record[schema.Schema]]{
+		Saving: map[string]schemaless.Record[schema.Schema]{
 			"session-2": {
 				ID:   "session-2",
 				Type: "session-stats",
@@ -212,16 +212,16 @@ func TestIndexingWithRepository(t *testing.T) {
 	_, err = store.Get("session-2", "session-stats")
 	assert.NoError(t, err)
 
-	aggregate := func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+	aggregate := func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
 		return NewTictactoeManageStateAggregate(store)
 	}
 
-	repo := storage.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+	repo := schemaless.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		store,
 		aggregate,
 	)
-	update := storage.UpdateRecords[storage.Record[tictactoemanage.State]]{
-		Saving: map[string]storage.Record[tictactoemanage.State]{},
+	update := schemaless.UpdateRecords[schemaless.Record[tictactoemanage.State]]{
+		Saving: map[string]schemaless.Record[tictactoemanage.State]{},
 	}
 
 	for _, game := range latestGames {
@@ -237,13 +237,13 @@ func TestIndexingWithRepository(t *testing.T) {
 				return x.SessionID + "-" + x.GameID
 			},
 		)
-		update.Saving["game:"+id] = storage.Record[tictactoemanage.State]{
+		update.Saving["game:"+id] = schemaless.Record[tictactoemanage.State]{
 			ID:      id,
 			Type:    "game",
 			Data:    game,
 			Version: 1,
 		}
-		update.Saving["session:"+id] = storage.Record[tictactoemanage.State]{
+		update.Saving["session:"+id] = schemaless.Record[tictactoemanage.State]{
 			ID:      id,
 			Type:    "session",
 			Data:    game,
@@ -255,11 +255,11 @@ func TestIndexingWithRepository(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("store: %+v \n", store)
 
-	indexedRepo := storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store)
+	indexedRepo := schemaless.NewRepository2Typed[tictactoemanage.SessionStatsResult](store)
 
 	result2, err := indexedRepo.Get("session-1", "session-stats")
 	assert.NoError(t, err)
-	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
+	assert.Equal(t, schemaless.Record[tictactoemanage.SessionStatsResult]{
 		ID:   "session-1",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{
@@ -275,7 +275,7 @@ func TestIndexingWithRepository(t *testing.T) {
 
 	result3, err := indexedRepo.Get("session-2", "session-stats")
 	assert.NoError(t, err)
-	assert.Equal(t, storage.Record[tictactoemanage.SessionStatsResult]{
+	assert.Equal(t, schemaless.Record[tictactoemanage.SessionStatsResult]{
 		ID:   "session-2",
 		Type: "session-stats",
 		Data: tictactoemanage.SessionStatsResult{

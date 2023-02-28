@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"log"
@@ -75,7 +75,7 @@ func ExtractSessionID(cmd tictactoemanage.Command) string {
 
 type Repository[A any] interface {
 	GetAs(key string, x *A) error
-	UpdateRecords(s storage.UpdateRecords[any]) error
+	UpdateRecords(s schemaless.UpdateRecords[any]) error
 }
 
 type SessionWithGame struct {
@@ -83,7 +83,7 @@ type SessionWithGame struct {
 	CurrentGameID string
 }
 
-func NewGame(b websockproto.Broadcaster, r storage.Repository2[tictactoemanage.State], q Query) *Game {
+func NewGame(b websockproto.Broadcaster, r schemaless.Repository2[tictactoemanage.State], q Query) *Game {
 	return &Game{
 		broadcast:           b,
 		gameStateRepository: r,
@@ -97,7 +97,7 @@ type Query interface {
 
 type Game struct {
 	broadcast           websockproto.Broadcaster
-	gameStateRepository storage.Repository2[tictactoemanage.State]
+	gameStateRepository schemaless.Repository2[tictactoemanage.State]
 	query               Query
 }
 
@@ -110,7 +110,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			g.broadcast.AssociateConnectionWithSession(connectionID, sessionID)
 
 			stateRecord, err := g.gameStateRepository.Get(sessionID, "session")
-			if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			if err != nil && !errors.Is(err, schemaless.ErrNotFound) {
 				log.Println("OnMessage: Get: err", err)
 				return err
 			}
@@ -125,8 +125,8 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			newState := machine.State()
 			if newState != nil {
 				// session has also latest stateRecord
-				update := storage.UpdateRecords[storage.Record[tictactoemanage.State]]{
-					Saving: map[string]storage.Record[tictactoemanage.State]{
+				update := schemaless.UpdateRecords[schemaless.Record[tictactoemanage.State]]{
+					Saving: map[string]schemaless.Record[tictactoemanage.State]{
 						sessionID: {
 							ID:      sessionID,
 							Type:    "session",
@@ -138,7 +138,7 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 				// but pass game stateRecord are also valuable, for example to calculate leaderboards and stats
 				if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
-					update.Saving[inGame.GameID] = storage.Record[tictactoemanage.State]{
+					update.Saving[inGame.GameID] = schemaless.Record[tictactoemanage.State]{
 						ID:      inGame.GameID,
 						Type:    "game",
 						Data:    newState,

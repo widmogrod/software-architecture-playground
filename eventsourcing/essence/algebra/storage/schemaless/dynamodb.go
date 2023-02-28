@@ -1,4 +1,4 @@
-package storage
+package schemaless
 
 import (
 	"context"
@@ -126,7 +126,7 @@ func (d *DynamoDBRepository2) UpdateRecords(command UpdateRecords[Record[schema.
 			if errors.As(respErr.ResponseError.Err, &conditional) {
 				for _, reason := range conditional.CancellationReasons {
 					if *reason.Code == "ConditionalCheckFailed" {
-						return fmt.Errorf("storage.DynamoDBRepository.UpdateRecords: %w", ErrVersionConflict)
+						return fmt.Errorf("store.DynamoDBRepository.UpdateRecords: %w", ErrVersionConflict)
 					}
 				}
 			}

@@ -1,4 +1,4 @@
-package storage
+package schemaless
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ func (s *RepositoryWithSchema) Get(recordID, recordType string) (Record[schema.S
 
 func (s *RepositoryWithSchema) UpdateRecords(x UpdateRecords[Record[schema.Schema]]) error {
 	if x.IsEmpty() {
-		return fmt.Errorf("storage.RepositoryWithSchema.UpdateRecords: empty command %w", ErrEmptyCommand)
+		return fmt.Errorf("store.RepositoryWithSchema.UpdateRecords: empty command %w", ErrEmptyCommand)
 	}
 
 	s.mux.Lock()

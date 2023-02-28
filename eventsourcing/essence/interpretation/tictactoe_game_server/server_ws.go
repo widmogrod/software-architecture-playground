@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 )
@@ -17,24 +17,24 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 		return nil, err
 	}
 
-	//store := storage.NewRepository2WithSchema()
-	store := storage.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), "test-repo-record")
+	//store := schemaless.NewRepository2WithSchema()
+	store := schemaless.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), "test-repo-record")
 
-	connRepo := storage.NewRepository2Typed[websockproto.ConnectionToSession](store)
-	//connRepo := storage.NewDynamoDBRepository(
+	connRepo := schemaless.NewRepository2Typed[websockproto.ConnectionToSession](store)
+	//connRepo := schemaless.NewDynamoDBRepository(
 	//	dynamodb.NewFromConfig(cfg),
 	//	"test-repo",
 	//	func() websockproto.ConnectionToSession {
 	//		panic("not supported creation of ConnectionToSession")
 	//	})
 
-	stateRepo := storage.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+	stateRepo := schemaless.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		store,
-		func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+		func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
 			return NewTictactoeManageStateAggregate(store)
 		},
 	)
-	//stateRepo := storage.NewDynamoDBRepository(
+	//stateRepo := schemaless.NewDynamoDBRepository(
 	//	dynamodb.NewFromConfig(cfg),
 	//	"test-repo",
 	//	func() tictactoemanage.State {
@@ -42,7 +42,7 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	//	})
 
 	query := NewQueryUsingStorage(
-		storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store),
+		schemaless.NewRepository2Typed[tictactoemanage.SessionStatsResult](store),
 	)
 	//query, err := NewQuery(
 	//	"https://search-dynamodb-projection-vggyq7lvwooliwe65oddc5gyse.eu-west-1.es.amazonaws.com/",
