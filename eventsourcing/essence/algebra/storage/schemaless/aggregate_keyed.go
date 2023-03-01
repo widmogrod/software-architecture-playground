@@ -30,8 +30,9 @@ type KayedAggregate[T, R any] struct {
 	supportedRecordTypes    []string
 	aggregateRecordTypeName string
 
-	groupByKey   func(data T) (string, R)
-	combineByKey func(a, b R) (R, error)
+	groupByKey     func(data T) (string, R)
+	combineByKey   func(a, b R) (R, error)
+	unCombineByKey func(from, b R) (R, error)
 
 	dataByKey map[string]Record[R]
 
@@ -39,8 +40,6 @@ type KayedAggregate[T, R any] struct {
 }
 
 func (t *KayedAggregate[T, R]) Append(data Record[T]) error {
-	var err error
-
 	if !t.supportedType(data.Type) {
 		return nil
 	}
@@ -65,7 +64,45 @@ func (t *KayedAggregate[T, R]) Append(data Record[T]) error {
 		t.dataByKey[index] = initial
 	}
 
-	result, err = t.combineByKey(t.dataByKey[index].Data, result)
+	result, err := t.combineByKey(t.dataByKey[index].Data, result)
+	if err != nil {
+		return err
+	}
+
+	existing := t.dataByKey[index]
+	existing.Data = result
+	t.dataByKey[index] = existing
+
+	return nil
+}
+
+func (t *KayedAggregate[T, R]) Delete(data Record[T]) error {
+	// is supported type?
+	if !t.supportedType(data.Type) {
+		return nil
+	}
+
+	index, result := t.groupByKey(data.Data)
+	if _, ok := t.dataByKey[index]; !ok {
+		initial, err := t.loadIndex(index)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return err
+			}
+
+			t.dataByKey[index] = Record[R]{
+				ID:      index,
+				Type:    t.aggregateRecordTypeName,
+				Data:    result,
+				Version: 0,
+			}
+			return nil
+		}
+
+		t.dataByKey[index] = initial
+	}
+
+	result, err := t.unCombineByKey(t.dataByKey[index].Data, result)
 	if err != nil {
 		return err
 	}

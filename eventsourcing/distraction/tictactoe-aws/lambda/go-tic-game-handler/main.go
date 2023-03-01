@@ -8,7 +8,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/interpretation/tictactoe_game_server"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
@@ -30,11 +31,11 @@ func main() {
 	}
 
 	tableName := os.Getenv("TABLE_NAME")
-	store := storage.NewDynamoDBRepository2(dynamodb.NewFromConfig(cfg), tableName)
-	connRepo := storage.NewRepository2Typed[websockproto.ConnectionToSession](store)
-	stateRepo := storage.NewRepositoryWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
+	store := schemaless.NewDynamoDBRepository(dynamodb.NewFromConfig(cfg), tableName)
+	connRepo := typedful.NewTypedRepository[websockproto.ConnectionToSession](store)
+	stateRepo := typedful.NewTypedRepoWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
 		store,
-		func() storage.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
+		func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
 			return tictactoe_game_server.NewTictactoeManageStateAggregate(store)
 		},
 	)
@@ -54,7 +55,7 @@ func main() {
 	//	})
 
 	query := tictactoe_game_server.NewQueryUsingStorage(
-		storage.NewRepository2Typed[tictactoemanage.SessionStatsResult](store),
+		typedful.NewTypedRepository[tictactoemanage.SessionStatsResult](store),
 	)
 	//openSearchHost := os.Getenv("OPENSEARCH_HOST")
 	//query, err := tictactoe_game_server.NewQuery(

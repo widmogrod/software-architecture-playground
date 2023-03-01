@@ -14,6 +14,10 @@ func (n *NoopAggregator[T, R]) Append(data Record[T]) error {
 	return nil
 }
 
+func (n *NoopAggregator[T, R]) Delete(data Record[T]) error {
+	return nil
+}
+
 func (n *NoopAggregator[T, R]) GetVersionedIndices() map[string]Record[schema.Schema] {
 	return nil
 }
