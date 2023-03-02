@@ -1,11 +1,14 @@
 package schemaless
 
-import "sync"
+import (
+	"sync"
+)
 
 func NewInMemoryInterpreter() *InMemoryInterpreter {
 	return &InMemoryInterpreter{
 		channels: make(map[DAG]chan Message),
 		errors:   make(map[DAG]error),
+		handlers: make(map[DAG]map[string]Handler),
 	}
 }
 
@@ -13,6 +16,7 @@ type InMemoryInterpreter struct {
 	lock     sync.Mutex
 	channels map[DAG]chan Message
 	errors   map[DAG]error
+	handlers map[DAG]map[string]Handler
 }
 
 func (i *InMemoryInterpreter) Run(dag DAG) error {
@@ -47,7 +51,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 					select {
 					case msg := <-i.channelForNode(x.Input[0]):
 						//fmt.Printf("Merge: recieved %T msg=%v\n", x, msg)
-						if err := x.OnMerge.Process(msg, i.returning(x)); err != nil {
+						if err := i.handerByTypeAndKey(x, msg).Process(msg, i.returning(x)); err != nil {
 							i.recordError(x, err)
 							return
 						}
@@ -72,10 +76,9 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 	)
 }
 
-func (i *InMemoryInterpreter) returning(x DAG) func(Message) error {
-	return func(msg Message) error {
+func (i *InMemoryInterpreter) returning(x DAG) func(Message) {
+	return func(msg Message) {
 		i.channelForNode(x) <- msg
-		return nil
 	}
 }
 
@@ -93,4 +96,47 @@ func (i *InMemoryInterpreter) recordError(x DAG, err error) {
 	defer i.lock.Unlock()
 	//fmt.Printf("element %v error %s", x, err)
 	i.errors[x] = err
+}
+
+func (i *InMemoryInterpreter) handerByTypeAndKey(x DAG, msg Message) Handler {
+	key := i.keyFromMessage(msg)
+	if _, ok := i.handlers[x]; !ok {
+		i.handlers[x] = make(map[string]Handler)
+	}
+	if _, ok := i.handlers[x][key]; !ok {
+		i.handlers[x][key] = MustMatchDAG(
+			x,
+			func(x *Map) Handler {
+				h := x.OnMap
+				return h
+			},
+			func(x *Merge) Handler {
+				// TODO: to figure out how to make merge handler don't inhetit previous state
+				// ????? This is bug for failing test
+
+				return x.OnMerge()
+			},
+			func(x *Load) Handler {
+				h := x.OnLoad
+				return h
+			},
+		)
+	}
+
+	return i.handlers[x][key]
+}
+
+func (i *InMemoryInterpreter) keyFromMessage(msg Message) string {
+	return MustMatchMessage(
+		msg,
+		func(x *Combine) string {
+			return x.Key
+		},
+		func(x *Retract) string {
+			return x.Key
+		},
+		func(x *Both) string {
+			return x.Key
+		},
+	)
 }

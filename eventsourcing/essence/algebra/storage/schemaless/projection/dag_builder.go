@@ -19,7 +19,7 @@ func (b *DagBuilder) Map(handler Handler) Builder {
 	}
 }
 
-func (b *DagBuilder) Merge(handler Handler) Builder {
+func (b *DagBuilder) Merge(handler func() Handler) Builder {
 	return &DagBuilder{
 		dag: &Merge{
 			OnMerge: handler,

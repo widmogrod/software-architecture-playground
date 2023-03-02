@@ -7,40 +7,34 @@ import (
 )
 
 func TestMapHandler(t *testing.T) {
-	m := func(x Game) (SessionsStats, error) {
-		if x.IsDraw {
-			return SessionsStats{
-				Draws: 1,
-			}, nil
-		}
-
-		if x.Winner == "" {
-			return SessionsStats{}, nil
-		}
-
-		return SessionsStats{
-			Wins: 1,
-		}, nil
-	}
-	h := &MapHandler[Game, SessionsStats]{
-		onCombine: m,
-		onRetract: m,
-	}
-
+	h := MapGameToStats()
 	l := &ListAssert{
 		t: t,
 	}
 
 	err := h.Process(&Combine{
+		Key: "game:1",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			Winner:  "a",
 		}),
 	}, l.Returning)
 	assert.NoError(t, err)
+	l.AssertLen(2)
 	l.AssertAt(0, &Combine{
+		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
-			Wins: 1,
+			Wins:  1,
+			Loose: 0,
+			Draws: 0,
+		}),
+	})
+	l.AssertAt(1, &Combine{
+		Key: "session-stats-by-player:b",
+		Data: schema.FromGo(SessionsStats{
+			Wins:  0,
+			Loose: 1,
+			Draws: 0,
 		}),
 	})
 }

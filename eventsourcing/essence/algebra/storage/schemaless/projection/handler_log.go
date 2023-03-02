@@ -5,13 +5,17 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 )
 
-type LogHandler struct{}
-
-func Log() Handler {
-	return &LogHandler{}
+type LogHandler struct {
+	prefix string
 }
 
-func (l *LogHandler) Process(msg Message, returning func(Message) error) error {
+func Log(prefix string) Handler {
+	return &LogHandler{
+		prefix: prefix,
+	}
+}
+
+func (l *LogHandler) Process(msg Message, returning func(Message)) error {
 	return MustMatchMessage(
 		msg,
 		func(x *Combine) error {
@@ -19,26 +23,28 @@ func (l *LogHandler) Process(msg Message, returning func(Message) error) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Log: Combine(%s, %s) \n", x.Key, res)
-			return returning(msg)
+			fmt.Printf("%s: Combine(%s, %s) \n", l.prefix, x.Key, res)
+			returning(msg)
+			return nil
 		},
 		func(x *Retract) error {
 			res, err := schema.ToJSON(x.Data)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Log: Retract(%s, %s) \n", x.Key, res)
-			return returning(msg)
-
+			fmt.Printf("%s: Retract(%s, %s) \n", l.prefix, x.Key, res)
+			returning(msg)
+			return nil
 		},
 		func(x *Both) error {
-			fmt.Printf("Log: Both(%s:\n", x.Key)
+			fmt.Printf("%s: Both(%s:\n", l.prefix, x.Key)
 			fmt.Printf("\t")
 			_ = l.Process(&x.Retract, returning)
 			fmt.Printf("\t")
 			_ = l.Process(&x.Combine, returning)
-			fmt.Printf(") Both end\n")
-			return returning(msg)
+			fmt.Printf(")\n")
+			returning(msg)
+			return nil
 		},
 	)
 }

@@ -8,7 +8,7 @@ type MergeHandler[A any] struct {
 	onRetract func(base A, x A) (A, error)
 }
 
-func (h *MergeHandler[A]) Process(msg Message, returning func(Message) error) error {
+func (h *MergeHandler[A]) Process(msg Message, returning func(Message)) error {
 	return MustMatchMessage(
 		msg,
 		func(x *Combine) error {
@@ -19,13 +19,14 @@ func (h *MergeHandler[A]) Process(msg Message, returning func(Message) error) er
 
 			oldState := h.state
 
-			newState, err := h.onCombine(h.state, data)
+			newState, err := h.onCombine(oldState, data)
 			if err != nil {
 				return err
 			}
 			h.state = newState
 
-			return h.returns(newState, oldState, returning)
+			h.returns(newState, oldState, x.Key, returning)
+			return nil
 		},
 		func(x *Retract) error {
 			data, err := ConvertAs[A](x.Data)
@@ -41,7 +42,8 @@ func (h *MergeHandler[A]) Process(msg Message, returning func(Message) error) er
 			}
 			h.state = newState
 
-			return h.returns(newState, oldState, returning)
+			h.returns(newState, oldState, x.Key, returning)
+			return nil
 		},
 		func(x *Both) error {
 			combineData, err := ConvertAs[A](x.Combine.Data)
@@ -55,35 +57,39 @@ func (h *MergeHandler[A]) Process(msg Message, returning func(Message) error) er
 			}
 
 			oldState := h.state
+			newState, err := h.onRetract(oldState, retractData)
+			if err != nil {
+				return err
+			}
+			newState, err = h.onCombine(newState, combineData)
+			if err != nil {
+				return err
+			}
 
-			newState, err := h.onCombine(h.state, combineData)
-			if err != nil {
-				return err
-			}
-			newState, err = h.onRetract(newState, retractData)
-			if err != nil {
-				return err
-			}
 			h.state = newState
-
-			return h.returns(newState, oldState, returning)
+			h.returns(newState, oldState, x.Key, returning)
+			return nil
 		},
 	)
 }
 
-func (h *MergeHandler[A]) returns(newState, oldState A, returning func(Message) error) error {
-	if any(newState) == nil {
-		return returning(&Retract{
+func (h *MergeHandler[A]) returns(newState, oldState A, key string, returning func(Message)) {
+	//if any(oldState) == nil {
+	//	returning(&Retract{
+	//		Key:  key,
+	//		Data: schema.FromGo(newState),
+	//	})
+	//} else {
+	returning(&Both{
+		Key: key,
+		Retract: Retract{
+			Key:  key,
 			Data: schema.FromGo(oldState),
-		})
-	} else {
-		return returning(&Both{
-			Retract: Retract{
-				Data: schema.FromGo(oldState),
-			},
-			Combine: Combine{
-				Data: schema.FromGo(newState),
-			},
-		})
-	}
+		},
+		Combine: Combine{
+			Key:  key,
+			Data: schema.FromGo(newState),
+		},
+	})
+	//}
 }

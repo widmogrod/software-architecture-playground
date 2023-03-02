@@ -29,10 +29,9 @@ func TestGenerateHandler(t *testing.T) {
 	}
 
 	h := &GenerateHandler{
-		load: func(returning func(message Message) error) error {
-			for idx, msg := range generate {
-				err := returning(msg)
-				assert.NoError(t, err, "failed to returning message at index=%d", idx)
+		load: func(returning func(message Message)) error {
+			for _, msg := range generate {
+				returning(msg)
 			}
 			return nil
 		},

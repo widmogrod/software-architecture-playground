@@ -3,10 +3,10 @@ package schemaless
 import "fmt"
 
 type GenerateHandler struct {
-	load func(push func(message Message) error) error
+	load func(push func(message Message)) error
 }
 
-func (h *GenerateHandler) Process(msg Message, returning func(Message) error) error {
+func (h *GenerateHandler) Process(msg Message, returning func(Message)) error {
 	return MustMatchMessage(
 		msg,
 		func(x *Combine) error {

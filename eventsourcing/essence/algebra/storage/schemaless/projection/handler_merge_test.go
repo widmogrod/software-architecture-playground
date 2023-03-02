@@ -7,24 +7,11 @@ import (
 )
 
 func TestMergeHandler(t *testing.T) {
-	h := &MergeHandler[SessionsStats]{
-		state: SessionsStats{},
-		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
-			return SessionsStats{
-				Wins:  base.Wins + x.Wins,
-				Draws: base.Draws + x.Draws,
-			}, nil
-		},
-		onRetract: func(base, x SessionsStats) (SessionsStats, error) {
-			return SessionsStats{
-				Wins:  base.Wins - x.Wins,
-				Draws: base.Draws - x.Draws,
-			}, nil
-		},
-	}
+	h := MergeSessionStats()
 
 	l := &ListAssert{t: t}
 	err := h.Process(&Combine{
+		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  1,
 			Draws: 2,
@@ -32,10 +19,13 @@ func TestMergeHandler(t *testing.T) {
 	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(0, &Both{
+		Key: "session-stats-by-player:a",
 		Retract: Retract{
+			Key:  "session-stats-by-player:a",
 			Data: schema.FromGo(SessionsStats{}),
 		},
 		Combine: Combine{
+			Key: "session-stats-by-player:a",
 			Data: schema.FromGo(SessionsStats{
 				Wins:  1,
 				Draws: 2,

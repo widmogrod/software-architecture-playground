@@ -7,7 +7,7 @@ type AvgHandler struct {
 	count int
 }
 
-func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
+func (h *AvgHandler) Process(msg Message, returning func(Message)) error {
 	return MustMatchMessage(
 		msg,
 		func(x *Combine) error {
@@ -19,7 +19,7 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 
 			newValue := schema.Number(h.avg)
 
-			return returning(&Both{
+			returning(&Both{
 				Retract: Retract{
 					Data: &oldValue,
 				},
@@ -27,6 +27,8 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 					Data: &newValue,
 				},
 			})
+
+			return nil
 		},
 		func(x *Retract) error {
 			oldValue := schema.Number(h.avg)
@@ -37,7 +39,7 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 
 			newValue := schema.Number(h.avg)
 
-			return returning(&Both{
+			returning(&Both{
 				Retract: Retract{
 					Data: &oldValue,
 				},
@@ -45,6 +47,7 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 					Data: &newValue,
 				},
 			})
+			return nil
 		},
 		func(x *Both) error {
 			oldValue := schema.Number(h.avg)
@@ -59,7 +62,7 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 
 			newValue := schema.Number(h.avg)
 
-			return returning(&Both{
+			returning(&Both{
 				Retract: Retract{
 					Data: &oldValue,
 				},
@@ -67,6 +70,8 @@ func (h *AvgHandler) Process(msg Message, returning func(Message) error) error {
 					Data: &newValue,
 				},
 			})
+
+			return nil
 		},
 	)
 }

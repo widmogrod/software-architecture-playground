@@ -10,17 +10,6 @@ import (
 	"time"
 )
 
-type Game struct {
-	Players []string
-	Winner  string
-	IsDraw  bool
-}
-
-type SessionsStats struct {
-	Wins  int
-	Draws int
-}
-
 var generateData = []Message{
 	&Combine{
 		Key: "game:1",
@@ -47,11 +36,9 @@ var generateData = []Message{
 
 func GenerateData() Handler {
 	return &GenerateHandler{
-		load: func(returning func(message Message) error) error {
+		load: func(returning func(message Message)) error {
 			for _, msg := range generateData {
-				if err := returning(msg); err != nil {
-					return err
-				}
+				returning(msg)
 			}
 			return nil
 		},
@@ -59,29 +46,34 @@ func GenerateData() Handler {
 }
 
 func MapGameToStats() Handler {
-	m := func(x Game) (SessionsStats, error) {
-		if x.IsDraw {
-			return SessionsStats{
-				Draws: 1,
-			}, nil
-		}
-
-		if x.Winner == "" {
-			return SessionsStats{}, nil
-		}
-
-		return SessionsStats{
-			Wins: 1,
-		}, nil
-	}
-
 	return &MapHandler[Game, SessionsStats]{
-		onCombine: m,
-		onRetract: m,
+		F: func(x Game, returning func(key string, value SessionsStats)) error {
+			for _, player := range x.Players {
+				wins := 0
+				draws := 0
+				loose := 0
+
+				if x.IsDraw {
+					draws = 1
+				} else if x.Winner == player {
+					wins = 1
+				} else {
+					loose = 1
+				}
+
+				returning("session-stats-by-player:"+player, SessionsStats{
+					Wins:  wins,
+					Draws: draws,
+					Loose: loose,
+				})
+			}
+
+			return nil
+		},
 	}
 }
 
-func MergeSessionStats() Handler {
+func MergeSessionStats() *MergeHandler[SessionsStats] {
 	return &MergeHandler[SessionsStats]{
 		state: SessionsStats{},
 		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
@@ -105,8 +97,10 @@ func TestProjection(t *testing.T) {
 
 	dag := NewBuilder()
 	games := dag.Load(GenerateData())
-	gameStats := games.Map(MapGameToStats())
-	gameStatsBySession := gameStats.Merge(MergeSessionStats())
+	gameStats := games.Map(MapGameToStats()).Map(Log("after-map"))
+	gameStatsBySession := gameStats.Merge(func() Handler {
+		return MergeSessionStats()
+	}).Map(Log("after-merge"))
 
 	end := gameStatsBySession.Map(NewRepositorySink("session", store))
 	// .Map(Log())
@@ -137,9 +131,27 @@ func TestProjection(t *testing.T) {
 
 	result, err := typed.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{})
 	assert.NoError(t, err)
-	assert.Len(t, result.Items, 1)
+	assert.Len(t, result.Items, 2)
+
+	stats, err := typed.Get("session-stats-by-player:a", "session-stats-by-player")
+	assert.NoError(t, err)
+	assert.Equal(t, SessionsStats{
+		Wins:  1,
+		Loose: 1,
+		Draws: 1,
+	}, stats.Data)
+
+	stats, err = typed.Get("session-stats-by-player:b", "session-stats-by-player")
+	assert.NoError(t, err)
+	assert.Equal(t, SessionsStats{
+		Wins:  1,
+		Loose: 1,
+		Draws: 1,
+	}, stats.Data)
 
 	for _, x := range result.Items {
-		fmt.Printf("item: %#v\n", x)
+		v, err := schema.ToJSON(schema.FromGo(x.Data))
+		assert.NoError(t, err)
+		fmt.Printf("item: id=%s type-%s %s\n", x.ID, x.Type, string(v))
 	}
 }

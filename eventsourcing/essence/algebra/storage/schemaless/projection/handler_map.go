@@ -1,13 +1,27 @@
 package schemaless
 
-import "github.com/widmogrod/mkunion/x/schema"
+import (
+	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
+)
 
 type MapHandler[A any, B any] struct {
-	onCombine func(x A) (B, error)
-	onRetract func(x A) (B, error)
+	F func(x A, returning func(key string, value B)) error
 }
 
-func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) error {
+func (h *MapHandler[A, B]) Process(msg Message, returning func(Message)) error {
+	mapCombineReturning := func(key string, value B) {
+		returning(&Combine{
+			Key:  key,
+			Data: schema.FromGo(value),
+		})
+	}
+	mapRetractReturning := func(key string, value B) {
+		returning(&Retract{
+			Key:  key,
+			Data: schema.FromGo(value),
+		})
+	}
 	return MustMatchMessage(
 		msg,
 		func(x *Combine) error {
@@ -16,15 +30,7 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 				return err
 			}
 
-			newState, err := h.onCombine(data)
-			if err != nil {
-				return err
-			}
-
-			return returning(&Combine{
-				Key:  x.Key,
-				Data: schema.FromGo(newState),
-			})
+			return h.F(data, mapCombineReturning)
 		},
 		func(x *Retract) error {
 			data, err := ConvertAs[A](x.Data)
@@ -32,15 +38,7 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 				return err
 			}
 
-			newState, err := h.onRetract(data)
-			if err != nil {
-				return err
-			}
-
-			return returning(&Combine{
-				Key:  x.Key,
-				Data: schema.FromGo(newState),
-			})
+			return h.F(data, mapRetractReturning)
 		},
 		func(x *Both) error {
 			data, err := ConvertAs[A](x.Combine.Data)
@@ -48,7 +46,15 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 				return err
 			}
 
-			newState, err := h.onCombine(data)
+			result := []*Both{}
+			err = h.F(data, func(s string, b B) {
+				result = append(result, &Both{
+					Combine: Combine{
+						Key:  s,
+						Data: schema.FromGo(b),
+					},
+				})
+			})
 			if err != nil {
 				return err
 			}
@@ -58,22 +64,27 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 				return err
 			}
 
-			newState, err = h.onRetract(data)
+			idx := 0
+			err = h.F(data, func(s string, b B) {
+				result[idx].Retract = Retract{
+					Key:  s,
+					Data: schema.FromGo(b),
+				}
+				idx++
+			})
 			if err != nil {
 				return err
 			}
 
-			return returning(&Both{
-				Key: x.Key,
-				Combine: Combine{
-					Key:  x.Combine.Key,
-					Data: schema.FromGo(newState),
-				},
-				Retract: Retract{
-					Key:  x.Retract.Key,
-					Data: schema.FromGo(newState),
-				},
-			})
+			for _, r := range result {
+				if r.Combine.Key != r.Retract.Key {
+					return fmt.Errorf("MapHandler: key mismatch: %s != %s", r.Combine.Key, r.Retract.Key)
+				}
+
+				returning(r)
+			}
+
+			return nil
 		},
 	)
 }

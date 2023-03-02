@@ -35,13 +35,12 @@ type ListAssert struct {
 	Err   error
 }
 
-func (l *ListAssert) Returning(msg Message) error {
+func (l *ListAssert) Returning(msg Message) {
 	if l.Err != nil {
-		return l.Err
+		panic(l.Err)
 	}
 
 	l.Items = append(l.Items, msg)
-	return nil
 }
 
 func (l *ListAssert) AssertLen(expected int) bool {

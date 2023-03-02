@@ -8,7 +8,7 @@ import (
 
 func NewRepositorySink(recordType string, store schemaless.Repository[schema.Schema]) *RepositorySink {
 	sink := &RepositorySink{
-		flushWhenBatchSize: 10,
+		flushWhenBatchSize: 100,
 		flushWhenDuration:  1 * time.Second,
 
 		store:      store,
@@ -43,7 +43,7 @@ func (s *RepositorySink) FlushOnTime() {
 	}()
 }
 
-func (s *RepositorySink) Process(msg Message, returning func(Message) error) error {
+func (s *RepositorySink) Process(msg Message, returning func(Message)) error {
 	err := MustMatchMessage(
 		msg,
 		func(x *Combine) error {
