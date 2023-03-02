@@ -23,18 +23,21 @@ type SessionsStats struct {
 
 var generateData = []Message{
 	&Combine{
+		Key: "game:1",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			Winner:  "a",
 		}),
 	},
 	&Combine{
+		Key: "game:2",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			Winner:  "b",
 		}),
 	},
 	&Combine{
+		Key: "game:3",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			IsDraw:  true,
@@ -78,7 +81,7 @@ func MapGameToStats() Handler {
 	}
 }
 
-func MapGameStatsToSession() Handler {
+func MergeSessionStats() Handler {
 	return &MergeHandler[SessionsStats]{
 		state: SessionsStats{},
 		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
@@ -103,16 +106,15 @@ func TestProjection(t *testing.T) {
 	dag := NewBuilder()
 	games := dag.Load(GenerateData())
 	gameStats := games.Map(MapGameToStats())
-	gameStatsBySession := gameStats.Merge(MapGameStatsToSession())
+	gameStatsBySession := gameStats.Merge(MergeSessionStats())
 
 	end := gameStatsBySession.Map(NewRepositorySink("session", store))
-
-	//end := gameStatsBySession.Map(Log())
+	// .Map(Log())
 
 	//expected := &Map{
 	//	OnMap: Log(),
 	//	Input: &Merge{
-	//		OnMerge: MapGameStatsToSession(),
+	//		OnMerge: MergeSessionStats(),
 	//		Input: []DAG{
 	//			&Map{
 	//				OnMap: MapGameToStats(),

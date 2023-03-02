@@ -22,6 +22,7 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 			}
 
 			return returning(&Combine{
+				Key:  x.Key,
 				Data: schema.FromGo(newState),
 			})
 		},
@@ -37,6 +38,7 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 			}
 
 			return returning(&Combine{
+				Key:  x.Key,
 				Data: schema.FromGo(newState),
 			})
 		},
@@ -62,10 +64,13 @@ func (h *MapHandler[A, B]) Process(msg Message, returning func(Message) error) e
 			}
 
 			return returning(&Both{
+				Key: x.Key,
 				Combine: Combine{
+					Key:  x.Combine.Key,
 					Data: schema.FromGo(newState),
 				},
 				Retract: Retract{
+					Key:  x.Retract.Key,
 					Data: schema.FromGo(newState),
 				},
 			})
