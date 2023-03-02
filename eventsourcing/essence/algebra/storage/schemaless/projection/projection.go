@@ -12,12 +12,15 @@ type (
 		OnMerge Handler
 		Input   []DAG
 	}
+	Load struct {
+		OnLoad Handler
+	}
 )
 
 //go:generate mkunion -name=Message
 type (
 	Combine struct {
-		// Key string
+		Key  string
 		Data schema.Schema
 	}
 	Retract struct {
@@ -25,6 +28,7 @@ type (
 		Data schema.Schema
 	}
 	Both struct {
+		Key     string
 		Retract Retract
 		Combine Combine
 	}
@@ -34,12 +38,13 @@ type TypeDef struct {
 }
 
 type Handler interface {
-	InputType() TypeDef
-	OutputType() TypeDef
+	//InputType() TypeDef
+	//OutputType() TypeDef
 	Process(msg Message, returning func(Message) error) error
 }
 
 type Builder interface {
+	Load(f Handler) Builder
 	Map(f Handler) Builder
 	Merge(f Handler) Builder
 	Build() DAG

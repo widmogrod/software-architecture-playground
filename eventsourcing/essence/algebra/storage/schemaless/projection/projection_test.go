@@ -4,71 +4,297 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"testing"
+	"time"
 )
 
-func NewBuilder() Builder {
-	return nil
-}
-
-type handler struct{}
-
-func (h *handler) Process(msg Message, next func(Message) error) error {
-	return fmt.Errorf("not implemented yet")
-}
-
-func (h *handler) InputType() TypeDef {
-	return TypeDef{}
-}
-
-func (h *handler) OutputType() TypeDef {
-	return TypeDef{}
-}
-
-func Log() Handler {
-	return &handler{}
+var generateData = []Message{
+	&Combine{
+		Data: schema.FromGo(Game{
+			Players: []string{"a", "b"},
+			Winner:  "a",
+		}),
+	},
+	&Combine{
+		Data: schema.FromGo(Game{
+			Players: []string{"a", "b"},
+			Winner:  "b",
+		}),
+	},
+	&Combine{
+		Data: schema.FromGo(Game{
+			Players: []string{"a", "b"},
+			IsDraw:  true,
+		}),
+	},
 }
 
 func GenerateData() Handler {
-	return &handler{}
+	return &GenerateHandler{
+		load: func(returning func(message Message) error) error {
+			for _, msg := range generateData {
+				if err := returning(msg); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
 }
 
 func MapGameToStats() Handler {
-	return &handler{}
+	m := func(x Game) (SessionsStats, error) {
+		if x.IsDraw {
+			return SessionsStats{
+				Draws: 1,
+			}, nil
+		}
+
+		if x.Winner == "" {
+			return SessionsStats{}, nil
+		}
+
+		return SessionsStats{
+			Wins: 1,
+		}, nil
+	}
+
+	return &MapHandler[Game, SessionsStats]{
+		onCombine: m,
+		onRetract: m,
+	}
 }
 
 func MapGameStatsToSession() Handler {
-	return &handler{}
+	return &MergeHandler[SessionsStats]{
+		state: SessionsStats{},
+		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
+			return SessionsStats{
+				Wins:  base.Wins + x.Wins,
+				Draws: base.Draws + x.Draws,
+			}, nil
+		},
+		onRetract: func(base, x SessionsStats) (SessionsStats, error) {
+			return SessionsStats{
+				Wins:  base.Wins - x.Wins,
+				Draws: base.Draws - x.Draws,
+			}, nil
+		},
+	}
 }
 
 func TestProjection(t *testing.T) {
-	t.Skip("not implemented yet")
-	// Given
-	// When
-	// Then
+	store := schemaless.NewInMemoryRepository()
+	typed := typedful.NewTypedRepository[SessionsStats](store)
 
 	dag := NewBuilder()
-	games := dag.Map(GenerateData())
+	games := dag.Load(GenerateData())
 	gameStats := games.Map(MapGameToStats())
 	gameStatsBySession := gameStats.Merge(MapGameStatsToSession())
-	gameStatsBySession.Map(Log())
+	end := gameStatsBySession.Map(NewRepositorySink("session", store))
 
-	expected := &Map{
-		OnMap: Log(),
-		Input: &Merge{
-			OnMerge: MapGameStatsToSession(),
-			Input: []DAG{
-				&Map{
-					OnMap: MapGameToStats(),
-					Input: &Map{
-						OnMap: GenerateData(),
-						Input: nil,
-					},
-				},
-			},
+	//end := gameStatsBySession.Map(Log())
+
+	//expected := &Map{
+	//	OnMap: Log(),
+	//	Input: &Merge{
+	//		OnMerge: MapGameStatsToSession(),
+	//		Input: []DAG{
+	//			&Map{
+	//				OnMap: MapGameToStats(),
+	//				Input: &Map{
+	//					OnMap: GenerateData(),
+	//					Input: nil,
+	//				},
+	//			},
+	//		},
+	//	},
+	//}
+	//assert.Equal(t, expected, end.Build())
+
+	NewInMemoryInterpreter().Run(end.Build())
+
+	time.Sleep(5 * time.Second)
+	//l.Contains(SessionsStats{
+	//	Wins:  2,
+	//	Draws: 1,
+	//})
+
+	result, err := typed.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
+		RecordType: "session",
+		Limit:      10,
+	})
+	assert.NoError(t, err)
+
+	for _, x := range result.Items {
+		fmt.Printf("item: %#v\n", x)
+	}
+}
+
+type InMemoryInterpreter struct {
+	channels map[DAG]chan Message
+	errors   map[DAG]error
+}
+
+func (i *InMemoryInterpreter) Run(dag DAG) error {
+	if dag == nil {
+		return nil
+	}
+
+	return MustMatchDAG(
+		dag,
+		func(x *Map) error {
+			go func() {
+				fmt.Printf("Map: gorutine starting %T\n", x)
+				for {
+					select {
+					case msg := <-i.channelForNode(x.Input):
+						fmt.Printf("Map: recieved %T msg=%v\n", x, msg)
+						if err := x.OnMap.Process(msg, i.returning(x)); err != nil {
+							i.recordError(x, err)
+							return
+						}
+					case <-time.After(1 * time.Second):
+						fmt.Printf("Map: timeout for %T\n", x)
+					}
+				}
+			}()
+			return i.Run(x.Input)
+		},
+		func(x *Merge) error {
+			go func() {
+				fmt.Printf("Merge: gorutine starting %T\n", x)
+				for {
+					select {
+					case msg := <-i.channelForNode(x.Input[0]):
+						fmt.Printf("Merge: recieved %T msg=%v\n", x, msg)
+						if err := x.OnMerge.Process(msg, i.returning(x)); err != nil {
+							i.recordError(x, err)
+							return
+						}
+					case <-time.After(1 * time.Second):
+						fmt.Printf("Merge: timeout for %T\n", x)
+					}
+				}
+			}()
+			return i.Run(x.Input[0])
+		},
+		func(x *Load) error {
+			go func() {
+				fmt.Printf("Load: gorutine starting %T\n", x)
+				if err := x.OnLoad.Process(&Combine{}, i.returning(x)); err != nil {
+					i.recordError(x, err)
+					return
+				}
+			}()
+
+			return nil
+		},
+	)
+}
+
+func (i *InMemoryInterpreter) returning(x DAG) func(Message) error {
+	return func(msg Message) error {
+		i.channelForNode(x) <- msg
+		return nil
+	}
+}
+
+func (i *InMemoryInterpreter) channelForNode(x DAG) chan Message {
+	if _, ok := i.channels[x]; !ok {
+		i.channels[x] = make(chan Message)
+	}
+	return i.channels[x]
+}
+
+func (i *InMemoryInterpreter) recordError(x DAG, err error) {
+	fmt.Printf("element %v error %s", x, err)
+	i.errors[x] = err
+}
+
+func NewInMemoryInterpreter() *InMemoryInterpreter {
+	return &InMemoryInterpreter{
+		channels: make(map[DAG]chan Message),
+		errors:   make(map[DAG]error),
+	}
+}
+
+func NewBuilder() *DagBuilder {
+	return &DagBuilder{}
+}
+
+type DagBuilder struct {
+	dag DAG
+}
+
+func (b *DagBuilder) Map(handler Handler) *DagBuilder {
+	return &DagBuilder{
+		dag: &Map{
+			OnMap: handler,
+			Input: b.dag,
 		},
 	}
-	assert.Equal(t, expected, dag.Build())
+}
+
+func (b *DagBuilder) Merge(handler Handler) *DagBuilder {
+	return &DagBuilder{
+		dag: &Merge{
+			OnMerge: handler,
+			Input:   []DAG{b.dag},
+		},
+	}
+}
+
+func (b *DagBuilder) Build() DAG {
+	return b.dag
+}
+
+func (b *DagBuilder) Load(data Handler) *DagBuilder {
+	return &DagBuilder{
+		dag: &Load{
+			OnLoad: data,
+		},
+	}
+}
+
+type LogHandler struct{}
+
+func (l *LogHandler) Process(msg Message, returning func(Message) error) error {
+	return MustMatchMessage(
+		msg,
+		func(x *Combine) error {
+			res, err := schema.ToJSON(x.Data)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Log: Combine(%s) \n", res)
+			return nil
+		},
+		func(x *Retract) error {
+			res, err := schema.ToJSON(x.Data)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Log: Retract(%s) \n", res)
+			return nil
+
+		},
+		func(x *Both) error {
+			fmt.Printf("Log: Both(\n")
+			fmt.Printf("\t")
+			_ = l.Process(&x.Retract, returning)
+			fmt.Printf("\t")
+			_ = l.Process(&x.Combine, returning)
+			fmt.Printf(") Both end\n")
+			return nil
+		},
+	)
+}
+
+func Log() Handler {
+	return &LogHandler{}
 }
 
 type CountHandler struct {
@@ -126,7 +352,7 @@ func TestCountHandler(t *testing.T) {
 	l := &ListAssert{t: t}
 	err := h.Process(&Combine{
 		Data: schema.MkInt(1),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(0, &Both{
 		Retract: Retract{
@@ -140,7 +366,7 @@ func TestCountHandler(t *testing.T) {
 
 	err = h.Process(&Combine{
 		Data: schema.MkInt(2),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(1, &Both{
 		Retract: Retract{
@@ -154,7 +380,7 @@ func TestCountHandler(t *testing.T) {
 
 	err = h.Process(&Retract{
 		Data: schema.MkInt(1),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(2, &Both{
 		Retract: Retract{
@@ -173,7 +399,7 @@ func TestCountHandler(t *testing.T) {
 		Combine: Combine{
 			Data: schema.MkInt(1),
 		},
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(3, &Both{
 		Retract: Retract{
@@ -263,7 +489,7 @@ func TestAvgHandler(t *testing.T) {
 
 	err := h.Process(&Combine{
 		Data: schema.MkInt(1),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(0, &Both{
 		Retract: Retract{
@@ -278,7 +504,7 @@ func TestAvgHandler(t *testing.T) {
 
 	err = h.Process(&Combine{
 		Data: schema.MkInt(11),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(1, &Both{
 		Retract: Retract{
@@ -293,7 +519,7 @@ func TestAvgHandler(t *testing.T) {
 
 	err = h.Process(&Combine{
 		Data: schema.MkInt(3),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(2, &Both{
 		Retract: Retract{
@@ -308,7 +534,7 @@ func TestAvgHandler(t *testing.T) {
 
 	err = h.Process(&Retract{
 		Data: schema.MkInt(1),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(3, &Both{
 		Retract: Retract{
@@ -328,7 +554,7 @@ func TestAvgHandler(t *testing.T) {
 		Combine: Combine{
 			Data: schema.MkInt(10),
 		},
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(4, &Both{
 		Retract: Retract{
@@ -478,7 +704,7 @@ func TestGenericHandler(t *testing.T) {
 			Wins:  1,
 			Draws: 2,
 		}),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(0, &Both{
 		Retract: Retract{
@@ -604,7 +830,7 @@ func TestMapHandler(t *testing.T) {
 			Players: []string{"a", "b"},
 			Winner:  "a",
 		}),
-	}, l.Append)
+	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertAt(0, &Combine{
 		Data: schema.FromGo(SessionsStats{
@@ -667,7 +893,7 @@ func TestGenerateHandler(t *testing.T) {
 	l := &ListAssert{
 		t: t,
 	}
-	err := h.Process(&Combine{}, l.Append)
+	err := h.Process(&Combine{}, l.Returning)
 	assert.NoError(t, err)
 
 	l.AssertLen(3)
@@ -683,7 +909,7 @@ type ListAssert struct {
 	Err   error
 }
 
-func (l *ListAssert) Append(msg Message) error {
+func (l *ListAssert) Returning(msg Message) error {
 	if l.Err != nil {
 		return l.Err
 	}
@@ -709,4 +935,87 @@ func (l *ListAssert) Contains(expected Message) bool {
 
 	l.t.Errorf("expected to find %v in result set but failed", expected)
 	return false
+}
+
+func NewRepositorySink(recordType string, store schemaless.Repository[schema.Schema]) *RepositorySink {
+	return &RepositorySink{
+		flushWhenBatchSize: 0,
+		flushWhenDuration:  5 * time.Second,
+
+		store:      store,
+		recordType: recordType,
+
+		bufferSaving:   map[string]schemaless.Record[schema.Schema]{},
+		bufferDeleting: map[string]schemaless.Record[schema.Schema]{},
+	}
+}
+
+type RepositorySink struct {
+	flushWhenBatchSize int
+	flushWhenDuration  time.Duration
+
+	bufferSaving   map[string]schemaless.Record[schema.Schema]
+	bufferDeleting map[string]schemaless.Record[schema.Schema]
+
+	store      schemaless.Repository[schema.Schema]
+	recordType string
+}
+
+func (s *RepositorySink) Process(msg Message, returning func(Message) error) error {
+	err := MustMatchMessage(
+		msg,
+		func(x *Combine) error {
+			s.bufferSaving[x.Key] = schemaless.Record[schema.Schema]{
+				ID:      x.Key,
+				Type:    s.recordType,
+				Data:    x.Data,
+				Version: 0,
+			}
+			return nil
+		},
+		func(x *Retract) error {
+			s.bufferDeleting[x.Key] = schemaless.Record[schema.Schema]{
+				ID:      x.Key,
+				Type:    s.recordType,
+				Data:    x.Data,
+				Version: 0,
+			}
+			return nil
+		},
+		func(x *Both) error {
+			s.bufferDeleting[x.Key] = schemaless.Record[schema.Schema]{
+				ID:      x.Key,
+				Type:    s.recordType,
+				Data:    x.Combine.Data,
+				Version: 0,
+			}
+			return nil
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if len(s.bufferSaving)+len(s.bufferDeleting) >= s.flushWhenBatchSize {
+		return s.flush()
+	}
+
+	return nil
+
+}
+
+func (s *RepositorySink) flush() error {
+	err := s.store.UpdateRecords(schemaless.UpdateRecords[schemaless.Record[schema.Schema]]{
+		Saving:   s.bufferSaving,
+		Deleting: s.bufferDeleting,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.bufferSaving = map[string]schemaless.Record[schema.Schema]{}
+	s.bufferDeleting = map[string]schemaless.Record[schema.Schema]{}
+	return nil
+
 }
