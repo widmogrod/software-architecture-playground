@@ -36,7 +36,7 @@ type TypeDef struct {
 type Handler interface {
 	InputType() TypeDef
 	OutputType() TypeDef
-	Process(msg Message) (Message, error)
+	Process(msg Message, returning func(Message) error) error
 }
 
 type Builder interface {
