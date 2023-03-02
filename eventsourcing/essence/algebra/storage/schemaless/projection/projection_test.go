@@ -6,6 +6,7 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
+	"sync"
 	"testing"
 	"time"
 )
@@ -93,6 +94,7 @@ func TestProjection(t *testing.T) {
 	games := dag.Load(GenerateData())
 	gameStats := games.Map(MapGameToStats())
 	gameStatsBySession := gameStats.Merge(MapGameStatsToSession())
+
 	end := gameStatsBySession.Map(NewRepositorySink("session", store))
 
 	//end := gameStatsBySession.Map(Log())
@@ -114,19 +116,16 @@ func TestProjection(t *testing.T) {
 	//}
 	//assert.Equal(t, expected, end.Build())
 
-	NewInMemoryInterpreter().Run(end.Build())
-
-	time.Sleep(5 * time.Second)
-	//l.Contains(SessionsStats{
-	//	Wins:  2,
-	//	Draws: 1,
-	//})
-
-	result, err := typed.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
-		RecordType: "session",
-		Limit:      10,
-	})
+	interpretation := NewInMemoryInterpreter()
+	err := interpretation.Run(end.Build())
 	assert.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+	assert.Equal(t, 0, len(interpretation.errors), "interpretation should be without errors")
+
+	result, err := typed.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{})
+	assert.NoError(t, err)
+	assert.Len(t, result.Items, 1)
 
 	for _, x := range result.Items {
 		fmt.Printf("item: %#v\n", x)
@@ -134,6 +133,7 @@ func TestProjection(t *testing.T) {
 }
 
 type InMemoryInterpreter struct {
+	lock     sync.Mutex
 	channels map[DAG]chan Message
 	errors   map[DAG]error
 }
@@ -147,17 +147,17 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		dag,
 		func(x *Map) error {
 			go func() {
-				fmt.Printf("Map: gorutine starting %T\n", x)
+				//fmt.Printf("Map: gorutine starting %T\n", x)
 				for {
 					select {
 					case msg := <-i.channelForNode(x.Input):
-						fmt.Printf("Map: recieved %T msg=%v\n", x, msg)
+						//fmt.Printf("Map: recieved %T msg=%v\n", x, msg)
 						if err := x.OnMap.Process(msg, i.returning(x)); err != nil {
 							i.recordError(x, err)
 							return
 						}
-					case <-time.After(1 * time.Second):
-						fmt.Printf("Map: timeout for %T\n", x)
+						//case <-time.After(1 * time.Second):
+						//	fmt.Printf("Map: timeout for %T\n", x)
 					}
 				}
 			}()
@@ -165,17 +165,17 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		},
 		func(x *Merge) error {
 			go func() {
-				fmt.Printf("Merge: gorutine starting %T\n", x)
+				//fmt.Printf("Merge: gorutine starting %T\n", x)
 				for {
 					select {
 					case msg := <-i.channelForNode(x.Input[0]):
-						fmt.Printf("Merge: recieved %T msg=%v\n", x, msg)
+						//fmt.Printf("Merge: recieved %T msg=%v\n", x, msg)
 						if err := x.OnMerge.Process(msg, i.returning(x)); err != nil {
 							i.recordError(x, err)
 							return
 						}
-					case <-time.After(1 * time.Second):
-						fmt.Printf("Merge: timeout for %T\n", x)
+						//case <-time.After(1 * time.Second):
+						//	fmt.Printf("Merge: timeout for %T\n", x)
 					}
 				}
 			}()
@@ -183,7 +183,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		},
 		func(x *Load) error {
 			go func() {
-				fmt.Printf("Load: gorutine starting %T\n", x)
+				//fmt.Printf("Load: gorutine starting %T\n", x)
 				if err := x.OnLoad.Process(&Combine{}, i.returning(x)); err != nil {
 					i.recordError(x, err)
 					return
@@ -203,6 +203,8 @@ func (i *InMemoryInterpreter) returning(x DAG) func(Message) error {
 }
 
 func (i *InMemoryInterpreter) channelForNode(x DAG) chan Message {
+	i.lock.Lock()
+	defer i.lock.Unlock()
 	if _, ok := i.channels[x]; !ok {
 		i.channels[x] = make(chan Message)
 	}
@@ -210,7 +212,9 @@ func (i *InMemoryInterpreter) channelForNode(x DAG) chan Message {
 }
 
 func (i *InMemoryInterpreter) recordError(x DAG, err error) {
-	fmt.Printf("element %v error %s", x, err)
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	//fmt.Printf("element %v error %s", x, err)
 	i.errors[x] = err
 }
 
@@ -938,9 +942,9 @@ func (l *ListAssert) Contains(expected Message) bool {
 }
 
 func NewRepositorySink(recordType string, store schemaless.Repository[schema.Schema]) *RepositorySink {
-	return &RepositorySink{
-		flushWhenBatchSize: 0,
-		flushWhenDuration:  5 * time.Second,
+	sink := &RepositorySink{
+		flushWhenBatchSize: 10,
+		flushWhenDuration:  1 * time.Second,
 
 		store:      store,
 		recordType: recordType,
@@ -948,6 +952,10 @@ func NewRepositorySink(recordType string, store schemaless.Repository[schema.Sch
 		bufferSaving:   map[string]schemaless.Record[schema.Schema]{},
 		bufferDeleting: map[string]schemaless.Record[schema.Schema]{},
 	}
+
+	sink.FlushOnTime()
+
+	return sink
 }
 
 type RepositorySink struct {
@@ -959,6 +967,15 @@ type RepositorySink struct {
 
 	store      schemaless.Repository[schema.Schema]
 	recordType string
+}
+
+func (s *RepositorySink) FlushOnTime() {
+	go func() {
+		ticker := time.NewTicker(s.flushWhenDuration)
+		for range ticker.C {
+			s.flush()
+		}
+	}()
 }
 
 func (s *RepositorySink) Process(msg Message, returning func(Message) error) error {
@@ -983,7 +1000,7 @@ func (s *RepositorySink) Process(msg Message, returning func(Message) error) err
 			return nil
 		},
 		func(x *Both) error {
-			s.bufferDeleting[x.Key] = schemaless.Record[schema.Schema]{
+			s.bufferSaving[x.Key] = schemaless.Record[schema.Schema]{
 				ID:      x.Key,
 				Type:    s.recordType,
 				Data:    x.Combine.Data,
@@ -1006,6 +1023,10 @@ func (s *RepositorySink) Process(msg Message, returning func(Message) error) err
 }
 
 func (s *RepositorySink) flush() error {
+	if len(s.bufferSaving)+len(s.bufferDeleting) == 0 {
+		return nil
+	}
+
 	err := s.store.UpdateRecords(schemaless.UpdateRecords[schemaless.Record[schema.Schema]]{
 		Saving:   s.bufferSaving,
 		Deleting: s.bufferDeleting,
