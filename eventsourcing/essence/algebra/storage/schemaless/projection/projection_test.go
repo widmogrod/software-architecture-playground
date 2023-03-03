@@ -34,7 +34,7 @@ var generateData = []Item{
 	},
 }
 
-func GenerateData() Handler {
+func GenerateData() *GenerateHandler {
 	return &GenerateHandler{
 		load: func(returning func(message Item)) error {
 			for _, msg := range generateData {
@@ -45,7 +45,7 @@ func GenerateData() Handler {
 	}
 }
 
-func MapGameToStats() Handler {
+func MapGameToStats() *MapHandler[Game, SessionsStats] {
 	return &MapHandler[Game, SessionsStats]{
 		F: func(x Game, returning func(key string, value SessionsStats)) error {
 			for _, player := range x.Players {

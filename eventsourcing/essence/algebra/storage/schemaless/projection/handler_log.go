@@ -24,3 +24,8 @@ func (l *LogHandler) Process(x Item, returning func(Item)) error {
 	returning(x)
 	return nil
 }
+
+func (l *LogHandler) Retract(x Item, returning func(Item)) error {
+	//TODO implement me
+	panic("implement me")
+}

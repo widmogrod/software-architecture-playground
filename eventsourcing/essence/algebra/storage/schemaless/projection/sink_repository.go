@@ -55,9 +55,12 @@ func (s *RepositorySink) Process(x Item, returning func(Item)) error {
 	}
 
 	return nil
-
 }
 
+func (s *RepositorySink) Retract(x Item, returning func(Item)) error {
+	//TODO implement me
+	panic("implement me")
+}
 func (s *RepositorySink) flush() error {
 	if len(s.bufferSaving)+len(s.bufferDeleting) == 0 {
 		return nil

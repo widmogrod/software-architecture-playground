@@ -32,6 +32,7 @@ type Handler interface {
 	//InputType() TypeDef
 	//OutputType() TypeDef
 	Process(x Item, returning func(Item)) error
+	Retract(x Item, returning func(Item)) error
 }
 
 type Builder interface {

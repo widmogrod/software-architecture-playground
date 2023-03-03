@@ -29,6 +29,41 @@ func ConvertAs[A any](x schema.Schema) (A, error) {
 	return result, nil
 }
 
+func Each(x schema.Schema, f func(value schema.Schema)) {
+	_ = schema.MustMatchSchema(
+		x,
+		func(x *schema.None) any {
+			return nil
+		},
+		func(x *schema.Bool) any {
+			f(x)
+			return nil
+		},
+		func(x *schema.Number) any {
+			f(x)
+			return nil
+		},
+		func(x *schema.String) any {
+			f(x)
+			return nil
+		},
+		func(x *schema.Binary) any {
+			f(x)
+			return nil
+		},
+		func(x *schema.List) any {
+			for _, v := range x.Items {
+				f(v)
+			}
+			return nil
+		},
+		func(x *schema.Map) any {
+			f(x)
+			return nil
+		},
+	)
+}
+
 type ListAssert struct {
 	t     *testing.T
 	Items []Item

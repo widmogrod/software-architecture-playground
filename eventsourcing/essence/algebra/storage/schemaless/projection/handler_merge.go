@@ -4,44 +4,11 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 )
 
+var _ Handler = &MergeHandler[any]{}
+
 type MergeHandler[A any] struct {
 	onCombine func(base A, x A) (A, error)
 	//onRetract func(base A, x A) (A, error)
-}
-
-func Each(x schema.Schema, f func(value schema.Schema)) {
-	_ = schema.MustMatchSchema(
-		x,
-		func(x *schema.None) any {
-			return nil
-		},
-		func(x *schema.Bool) any {
-			f(x)
-			return nil
-		},
-		func(x *schema.Number) any {
-			f(x)
-			return nil
-		},
-		func(x *schema.String) any {
-			f(x)
-			return nil
-		},
-		func(x *schema.Binary) any {
-			f(x)
-			return nil
-		},
-		func(x *schema.List) any {
-			for _, v := range x.Items {
-				f(v)
-			}
-			return nil
-		},
-		func(x *schema.Map) any {
-			f(x)
-			return nil
-		},
-	)
 }
 
 func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
@@ -77,4 +44,9 @@ func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
 	})
 
 	return nil
+}
+
+func (h *MergeHandler[A]) Retract(x Item, returning func(Item)) error {
+	//TODO implement me
+	panic("implement me")
 }
