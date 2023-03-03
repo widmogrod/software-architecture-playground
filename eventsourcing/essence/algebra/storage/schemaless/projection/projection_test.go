@@ -75,7 +75,7 @@ func MapGameToStats() *MapHandler[Game, SessionsStats] {
 
 func MergeSessionStats() *MergeHandler[SessionsStats] {
 	return &MergeHandler[SessionsStats]{
-		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
+		Combine: func(base, x SessionsStats) (SessionsStats, error) {
 			return SessionsStats{
 				Wins:  base.Wins + x.Wins,
 				Draws: base.Draws + x.Draws,
@@ -91,6 +91,21 @@ func MergeSessionStats() *MergeHandler[SessionsStats] {
 	}
 }
 
+func CountTotalSessionsStats(b Builder) Builder {
+	return b.
+		Map(&MapHandler[SessionsStats, int]{
+			F: func(x SessionsStats, returning func(key string, value int)) error {
+				returning("total", 1)
+				return nil
+			},
+		}).
+		Merge(&MergeHandler[int]{
+			Combine: func(base, x int) (int, error) {
+				return base + x, nil
+			},
+		})
+}
+
 func TestProjection(t *testing.T) {
 	store := schemaless.NewInMemoryRepository()
 	typed := typedful.NewTypedRepository[SessionsStats](store)
@@ -99,6 +114,8 @@ func TestProjection(t *testing.T) {
 	games := dag.Load(GenerateData())
 	gameStats := games.Map(MapGameToStats()).Map(Log("after-map"))
 	gameStatsBySession := gameStats.Merge(MergeSessionStats()).Map(Log("after-merge"))
+
+	_ = CountTotalSessionsStats(gameStatsBySession)
 
 	end := gameStatsBySession.Map(NewRepositorySink("session", store))
 	// .Map(Log())

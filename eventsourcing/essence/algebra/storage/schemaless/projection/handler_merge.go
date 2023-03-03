@@ -7,7 +7,7 @@ import (
 var _ Handler = &MergeHandler[any]{}
 
 type MergeHandler[A any] struct {
-	onCombine func(base A, x A) (A, error)
+	Combine func(base A, x A) (A, error)
 	//onRetract func(base A, x A) (A, error)
 }
 
@@ -32,7 +32,7 @@ func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
 			return
 		}
 
-		result, err = h.onCombine(result, elem)
+		result, err = h.Combine(result, elem)
 		if err != nil {
 			return
 		}
