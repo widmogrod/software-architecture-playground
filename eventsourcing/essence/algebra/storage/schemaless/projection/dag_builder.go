@@ -28,14 +28,14 @@ func (b *DagBuilder) Merge(handler Handler) Builder {
 	}
 }
 
-func (b *DagBuilder) Build() DAG {
-	return b.dag
-}
-
 func (b *DagBuilder) Load(data Handler) Builder {
 	return &DagBuilder{
 		dag: &Load{
 			OnLoad: data,
 		},
 	}
+}
+
+func (b *DagBuilder) Build() DAG {
+	return b.dag
 }

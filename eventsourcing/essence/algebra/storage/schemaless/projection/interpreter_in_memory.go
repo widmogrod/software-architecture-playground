@@ -37,7 +37,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 					select {
 					case msg := <-i.channelForNode(x.Input):
 						//fmt.Printf("Map: recieved %T msg=%v\n", x, msg)
-						if err := x.OnMap.Process(msg, i.returning(x)); err != nil {
+						if err := i.callProcess(x.OnMap, msg, i.returning(x)); err != nil {
 							i.recordError(x, err)
 							return
 						}
@@ -63,7 +63,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 								Data: schema.MkList(prev.Data, msg.Data),
 							}
 							//fmt.Printf("Merge: recieved prev=%s msg=%s \n", i.keyFromMessage(prev), i.keyFromMessage(msg))
-							if err := x.OnMerge.Process(merge, i.returning(x)); err != nil {
+							if err := i.callProcess(x.OnMerge, merge, i.returning(x)); err != nil {
 								i.recordError(x, err)
 								return
 							}
@@ -78,7 +78,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		func(x *Load) error {
 			go func() {
 				//fmt.Printf("Load: gorutine starting %T\n", x)
-				if err := x.OnLoad.Process(Item{}, i.returning(x)); err != nil {
+				if err := i.callProcess(x.OnLoad, Item{}, i.returning(x)); err != nil {
 					i.recordError(x, err)
 					return
 				}
@@ -87,6 +87,10 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 			return nil
 		},
 	)
+}
+
+func (i *InMemoryInterpreter) callProcess(handler Handler, x Item, returning func(Item)) error {
+	return handler.Process(x, returning)
 }
 
 func (i *InMemoryInterpreter) returning(x DAG) func(Item) {

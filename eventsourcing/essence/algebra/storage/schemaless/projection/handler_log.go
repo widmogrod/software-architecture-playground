@@ -5,14 +5,14 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 )
 
-type LogHandler struct {
-	prefix string
-}
-
 func Log(prefix string) Handler {
 	return &LogHandler{
 		prefix: prefix,
 	}
+}
+
+type LogHandler struct {
+	prefix string
 }
 
 func (l *LogHandler) Process(x Item, returning func(Item)) error {
