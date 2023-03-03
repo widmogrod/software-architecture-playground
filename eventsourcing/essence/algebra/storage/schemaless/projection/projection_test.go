@@ -10,22 +10,22 @@ import (
 	"time"
 )
 
-var generateData = []Message{
-	&Combine{
+var generateData = []Item{
+	Item{
 		Key: "game:1",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			Winner:  "a",
 		}),
 	},
-	&Combine{
+	Item{
 		Key: "game:2",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
 			Winner:  "b",
 		}),
 	},
-	&Combine{
+	Item{
 		Key: "game:3",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
@@ -36,7 +36,7 @@ var generateData = []Message{
 
 func GenerateData() Handler {
 	return &GenerateHandler{
-		load: func(returning func(message Message)) error {
+		load: func(returning func(message Item)) error {
 			for _, msg := range generateData {
 				returning(msg)
 			}

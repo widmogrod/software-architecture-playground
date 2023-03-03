@@ -43,42 +43,13 @@ func (s *RepositorySink) FlushOnTime() {
 	}()
 }
 
-func (s *RepositorySink) Process(msg Message, returning func(Message)) error {
-	err := MustMatchMessage(
-		msg,
-		func(x *Combine) error {
-			s.bufferSaving[x.Key] = schemaless.Record[schema.Schema]{
-				ID:      x.Key,
-				Type:    s.recordType,
-				Data:    x.Data,
-				Version: 0,
-			}
-			return nil
-		},
-		func(x *Retract) error {
-			s.bufferDeleting[x.Key] = schemaless.Record[schema.Schema]{
-				ID:      x.Key,
-				Type:    s.recordType,
-				Data:    x.Data,
-				Version: 0,
-			}
-			return nil
-		},
-		func(x *Both) error {
-			s.bufferSaving[x.Key] = schemaless.Record[schema.Schema]{
-				ID:      x.Key,
-				Type:    s.recordType,
-				Data:    x.Combine.Data,
-				Version: 0,
-			}
-			return nil
-		},
-	)
-
-	if err != nil {
-		return err
+func (s *RepositorySink) Process(x Item, returning func(Item)) error {
+	s.bufferSaving[x.Key] = schemaless.Record[schema.Schema]{
+		ID:      x.Key,
+		Type:    s.recordType,
+		Data:    x.Data,
+		Version: 0,
 	}
-
 	if len(s.bufferSaving)+len(s.bufferDeleting) >= s.flushWhenBatchSize {
 		return s.flush()
 	}

@@ -10,13 +10,13 @@ func TestMergeHandler(t *testing.T) {
 	h := MergeSessionStats()
 
 	l := &ListAssert{t: t}
-	err := h.Process2(&Combine{
+	err := h.Process2(Item{
 		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  1,
 			Draws: 2,
 		}),
-	}, &Combine{
+	}, Item{
 		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  3,
@@ -24,7 +24,7 @@ func TestMergeHandler(t *testing.T) {
 		}),
 	}, l.Returning)
 	assert.NoError(t, err)
-	l.AssertAt(0, &Combine{
+	l.AssertAt(0, Item{
 		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  4,

@@ -17,36 +17,23 @@ type (
 	}
 )
 
-//go:generate mkunion -name=Message
-type (
-	Combine struct {
-		Key  string
-		Data schema.Schema
-	}
-	Retract struct {
-		Key  string
-		Data schema.Schema
-	}
-	Both struct {
-		Key     string
-		Retract Retract
-		Combine Combine
-	}
-)
-
-type TypeDef struct {
+type Item struct {
+	Key  string
+	Data schema.Schema
 }
+
+//type TypeDef struct {}
 
 type Handler interface {
 	//InputType() TypeDef
 	//OutputType() TypeDef
-	Process(msg Message, returning func(Message)) error
+	Process(x Item, returning func(Item)) error
 }
 
 type Handler2 interface {
 	//InputType() TypeDef
 	//OutputType() TypeDef
-	Process2(a, b Message, returning func(Message)) error
+	Process2(a, b Item, returning func(Item)) error
 }
 
 type Builder interface {

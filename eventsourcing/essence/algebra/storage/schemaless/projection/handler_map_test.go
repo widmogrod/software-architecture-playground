@@ -12,7 +12,7 @@ func TestMapHandler(t *testing.T) {
 		t: t,
 	}
 
-	err := h.Process(&Combine{
+	err := h.Process(Item{
 		Key: "game:1",
 		Data: schema.FromGo(Game{
 			Players: []string{"a", "b"},
@@ -21,7 +21,7 @@ func TestMapHandler(t *testing.T) {
 	}, l.Returning)
 	assert.NoError(t, err)
 	l.AssertLen(2)
-	l.AssertAt(0, &Combine{
+	l.AssertAt(0, Item{
 		Key: "session-stats-by-player:a",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  1,
@@ -29,7 +29,7 @@ func TestMapHandler(t *testing.T) {
 			Draws: 0,
 		}),
 	})
-	l.AssertAt(1, &Combine{
+	l.AssertAt(1, Item{
 		Key: "session-stats-by-player:b",
 		Data: schema.FromGo(SessionsStats{
 			Wins:  0,

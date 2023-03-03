@@ -7,19 +7,19 @@ import (
 
 func NewInMemoryInterpreter() *InMemoryInterpreter {
 	return &InMemoryInterpreter{
-		channels: make(map[DAG]chan Message),
+		channels: make(map[DAG]chan Item),
 		errors:   make(map[DAG]error),
 		handlers: make(map[DAG]map[string]Handler),
-		byKeys:   make(map[DAG]map[string]Message),
+		byKeys:   make(map[DAG]map[string]Item),
 	}
 }
 
 type InMemoryInterpreter struct {
 	lock     sync.Mutex
-	channels map[DAG]chan Message
+	channels map[DAG]chan Item
 	errors   map[DAG]error
 	handlers map[DAG]map[string]Handler
-	byKeys   map[DAG]map[string]Message
+	byKeys   map[DAG]map[string]Item
 }
 
 func (i *InMemoryInterpreter) Run(dag DAG) error {
@@ -73,7 +73,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		func(x *Load) error {
 			go func() {
 				//fmt.Printf("Load: gorutine starting %T\n", x)
-				if err := x.OnLoad.Process(&Combine{}, i.returning(x)); err != nil {
+				if err := x.OnLoad.Process(Item{}, i.returning(x)); err != nil {
 					i.recordError(x, err)
 					return
 				}
@@ -84,28 +84,21 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 	)
 }
 
-func (i *InMemoryInterpreter) returning(x DAG) func(Message) {
-	return func(msg Message) {
+func (i *InMemoryInterpreter) returning(x DAG) func(Item) {
+	return func(msg Item) {
 		switch x.(type) {
 		case *Merge:
-			//switch z := msg.(type) {
-			//case *Combine:
-			//	b, _ := schema.ToJSON(z.Data)
-			//	fmt.Printf("Merge: returning %s %s \n", i.keyFromMessage(msg), string(b))
-			//
-			//}
-			//delete(i.byKeys[y], i.keyFromMessage(msg))
 			i.byKeys[x][i.keyFromMessage(msg)] = msg
 		}
 		i.channelForNode(x) <- msg
 	}
 }
 
-func (i *InMemoryInterpreter) channelForNode(x DAG) chan Message {
+func (i *InMemoryInterpreter) channelForNode(x DAG) chan Item {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	if _, ok := i.channels[x]; !ok {
-		i.channels[x] = make(chan Message)
+		i.channels[x] = make(chan Item)
 	}
 	return i.channels[x]
 }
@@ -117,29 +110,18 @@ func (i *InMemoryInterpreter) recordError(x DAG, err error) {
 	i.errors[x] = err
 }
 
-func (i *InMemoryInterpreter) keyFromMessage(msg Message) string {
-	return MustMatchMessage(
-		msg,
-		func(x *Combine) string {
-			return x.Key
-		},
-		func(x *Retract) string {
-			return x.Key
-		},
-		func(x *Both) string {
-			return x.Key
-		},
-	)
+func (i *InMemoryInterpreter) keyFromMessage(msg Item) string {
+	return msg.Key
 }
 
-func (i *InMemoryInterpreter) byKey(x *Merge, key string) (Message, bool) {
+func (i *InMemoryInterpreter) byKey(x *Merge, key string) (Item, bool) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 	if _, ok := i.byKeys[x]; !ok {
-		i.byKeys[x] = make(map[string]Message)
+		i.byKeys[x] = make(map[string]Item)
 	}
 	if _, ok := i.byKeys[x][key]; !ok {
-		return nil, false
+		return Item{}, false
 	}
 	return i.byKeys[x][key], true
 }

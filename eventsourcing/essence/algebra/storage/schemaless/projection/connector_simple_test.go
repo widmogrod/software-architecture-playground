@@ -7,20 +7,20 @@ import (
 )
 
 func TestGenerateHandler(t *testing.T) {
-	generate := []Message{
-		&Combine{
+	generate := []Item{
+		{
 			Data: schema.FromGo(Game{
 				Players: []string{"a", "b"},
 				Winner:  "a",
 			}),
 		},
-		&Combine{
+		{
 			Data: schema.FromGo(Game{
 				Players: []string{"a", "b"},
 				Winner:  "b",
 			}),
 		},
-		&Combine{
+		{
 			Data: schema.FromGo(Game{
 				Players: []string{"a", "b"},
 				IsDraw:  true,
@@ -29,7 +29,7 @@ func TestGenerateHandler(t *testing.T) {
 	}
 
 	h := &GenerateHandler{
-		load: func(returning func(message Message)) error {
+		load: func(returning func(message Item)) error {
 			for _, msg := range generate {
 				returning(msg)
 			}
@@ -40,7 +40,7 @@ func TestGenerateHandler(t *testing.T) {
 	l := &ListAssert{
 		t: t,
 	}
-	err := h.Process(&Combine{}, l.Returning)
+	err := h.Process(Item{}, l.Returning)
 	assert.NoError(t, err)
 
 	l.AssertLen(3)

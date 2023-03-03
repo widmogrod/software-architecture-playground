@@ -31,11 +31,11 @@ func ConvertAs[A any](x schema.Schema) (A, error) {
 
 type ListAssert struct {
 	t     *testing.T
-	Items []Message
+	Items []Item
 	Err   error
 }
 
-func (l *ListAssert) Returning(msg Message) {
+func (l *ListAssert) Returning(msg Item) {
 	if l.Err != nil {
 		panic(l.Err)
 	}
@@ -47,11 +47,11 @@ func (l *ListAssert) AssertLen(expected int) bool {
 	return assert.Equal(l.t, expected, len(l.Items))
 }
 
-func (l *ListAssert) AssertAt(index int, expected Message) bool {
+func (l *ListAssert) AssertAt(index int, expected Item) bool {
 	return assert.Equal(l.t, expected, l.Items[index])
 }
 
-func (l *ListAssert) Contains(expected Message) bool {
+func (l *ListAssert) Contains(expected Item) bool {
 	for _, item := range l.Items {
 		if assert.Equal(l.t, expected, item) {
 			return true

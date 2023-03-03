@@ -7,71 +7,15 @@ type AvgHandler struct {
 	count int
 }
 
-func (h *AvgHandler) Process(msg Message, returning func(Message)) error {
-	return MustMatchMessage(
-		msg,
-		func(x *Combine) error {
-			oldValue := schema.Number(h.avg)
+func (h *AvgHandler) Process(msg Item, returning func(Item)) error {
+	h.avg = (h.avg*float64(h.count) + schema.As[float64](msg.Data, 0)) / (float64(h.count) + 1)
+	// avg = (avg * count + x) / (count + 1)
+	h.count += 1
 
-			h.avg = (h.avg*float64(h.count) + schema.As[float64](x.Data, 0)) / (float64(h.count) + 1)
-			// avg = (avg * count + x) / (count + 1)
-			h.count += 1
+	newValue := schema.Number(h.avg)
 
-			newValue := schema.Number(h.avg)
-
-			returning(&Both{
-				Retract: Retract{
-					Data: &oldValue,
-				},
-				Combine: Combine{
-					Data: &newValue,
-				},
-			})
-
-			return nil
-		},
-		func(x *Retract) error {
-			oldValue := schema.Number(h.avg)
-
-			h.avg = (h.avg*float64(h.count) - schema.As[float64](x.Data, 0)) / (float64(h.count) - 1)
-			// avg = (avg * count - x) / (count - 1)
-			h.count -= 1
-
-			newValue := schema.Number(h.avg)
-
-			returning(&Both{
-				Retract: Retract{
-					Data: &oldValue,
-				},
-				Combine: Combine{
-					Data: &newValue,
-				},
-			})
-			return nil
-		},
-		func(x *Both) error {
-			oldValue := schema.Number(h.avg)
-
-			h.avg = (h.avg*float64(h.count) - schema.As[float64](x.Retract.Data, 0)) / (float64(h.count) - 1)
-			// avg = (avg * count - x) / (count - 1)
-			h.count -= 1
-
-			h.avg = (h.avg*float64(h.count) + schema.As[float64](x.Combine.Data, 0)) / (float64(h.count) + 1)
-			// avg = (avg * count + x) / (count + 1)
-			h.count += 1
-
-			newValue := schema.Number(h.avg)
-
-			returning(&Both{
-				Retract: Retract{
-					Data: &oldValue,
-				},
-				Combine: Combine{
-					Data: &newValue,
-				},
-			})
-
-			return nil
-		},
-	)
+	returning(Item{
+		Data: &newValue,
+	})
+	return nil
 }
