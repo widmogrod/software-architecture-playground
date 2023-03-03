@@ -1,6 +1,7 @@
 package schemaless
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -9,6 +10,7 @@ func NewInMemoryInterpreter() *InMemoryInterpreter {
 		channels: make(map[DAG]chan Message),
 		errors:   make(map[DAG]error),
 		handlers: make(map[DAG]map[string]Handler),
+		byKeys:   make(map[DAG]map[string]Message),
 	}
 }
 
@@ -17,6 +19,7 @@ type InMemoryInterpreter struct {
 	channels map[DAG]chan Message
 	errors   map[DAG]error
 	handlers map[DAG]map[string]Handler
+	byKeys   map[DAG]map[string]Message
 }
 
 func (i *InMemoryInterpreter) Run(dag DAG) error {
@@ -46,17 +49,22 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 		},
 		func(x *Merge) error {
 			go func() {
-				//fmt.Printf("Merge: gorutine starting %T\n", x)
 				for {
 					select {
 					case msg := <-i.channelForNode(x.Input[0]):
-						//fmt.Printf("Merge: recieved %T msg=%v\n", x, msg)
-						if err := i.handerByTypeAndKey(x, msg).Process(msg, i.returning(x)); err != nil {
-							i.recordError(x, err)
-							return
+						// should a merge publish new message
+						// what if merge from previous, should it recall previous mesages?
+						// in a way it's liek a reduce, so past state should be kept somewhere
+						prev, ok := i.byKey(x, i.keyFromMessage(msg))
+						if ok {
+							//fmt.Printf("Merge: recieved prev=%s msg=%s \n", i.keyFromMessage(prev), i.keyFromMessage(msg))
+							if err := x.OnMerge.Process2(prev, msg, i.returning(x)); err != nil {
+								i.recordError(x, err)
+								return
+							}
+						} else {
+							i.returning(x)(msg)
 						}
-						//case <-time.After(1 * time.Second):
-						//	fmt.Printf("Merge: timeout for %T\n", x)
 					}
 				}
 			}()
@@ -78,6 +86,17 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 
 func (i *InMemoryInterpreter) returning(x DAG) func(Message) {
 	return func(msg Message) {
+		switch x.(type) {
+		case *Merge:
+			//switch z := msg.(type) {
+			//case *Combine:
+			//	b, _ := schema.ToJSON(z.Data)
+			//	fmt.Printf("Merge: returning %s %s \n", i.keyFromMessage(msg), string(b))
+			//
+			//}
+			//delete(i.byKeys[y], i.keyFromMessage(msg))
+			i.byKeys[x][i.keyFromMessage(msg)] = msg
+		}
 		i.channelForNode(x) <- msg
 	}
 }
@@ -94,36 +113,8 @@ func (i *InMemoryInterpreter) channelForNode(x DAG) chan Message {
 func (i *InMemoryInterpreter) recordError(x DAG, err error) {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	//fmt.Printf("element %v error %s", x, err)
+	fmt.Printf("element %v error %s", x, err)
 	i.errors[x] = err
-}
-
-func (i *InMemoryInterpreter) handerByTypeAndKey(x DAG, msg Message) Handler {
-	key := i.keyFromMessage(msg)
-	if _, ok := i.handlers[x]; !ok {
-		i.handlers[x] = make(map[string]Handler)
-	}
-	if _, ok := i.handlers[x][key]; !ok {
-		i.handlers[x][key] = MustMatchDAG(
-			x,
-			func(x *Map) Handler {
-				h := x.OnMap
-				return h
-			},
-			func(x *Merge) Handler {
-				// TODO: to figure out how to make merge handler don't inhetit previous state
-				// ????? This is bug for failing test
-
-				return x.OnMerge()
-			},
-			func(x *Load) Handler {
-				h := x.OnLoad
-				return h
-			},
-		)
-	}
-
-	return i.handlers[x][key]
 }
 
 func (i *InMemoryInterpreter) keyFromMessage(msg Message) string {
@@ -139,4 +130,16 @@ func (i *InMemoryInterpreter) keyFromMessage(msg Message) string {
 			return x.Key
 		},
 	)
+}
+
+func (i *InMemoryInterpreter) byKey(x *Merge, key string) (Message, bool) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+	if _, ok := i.byKeys[x]; !ok {
+		i.byKeys[x] = make(map[string]Message)
+	}
+	if _, ok := i.byKeys[x][key]; !ok {
+		return nil, false
+	}
+	return i.byKeys[x][key], true
 }

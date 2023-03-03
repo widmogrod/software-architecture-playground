@@ -1,95 +1,56 @@
 package schemaless
 
-import "github.com/widmogrod/mkunion/x/schema"
+import (
+	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
+)
 
 type MergeHandler[A any] struct {
-	state     A
 	onCombine func(base A, x A) (A, error)
-	onRetract func(base A, x A) (A, error)
+	//onRetract func(base A, x A) (A, error)
 }
 
-func (h *MergeHandler[A]) Process(msg Message, returning func(Message)) error {
+func (h *MergeHandler[A]) Process2(a, b Message, returning func(Message)) error {
 	return MustMatchMessage(
-		msg,
+		a,
 		func(x *Combine) error {
-			data, err := ConvertAs[A](x.Data)
+			dataA, err := ConvertAs[A](x.Data)
 			if err != nil {
 				return err
 			}
 
-			oldState := h.state
+			return MustMatchMessage(
+				b,
+				func(y *Combine) error {
+					dataB, err := ConvertAs[A](y.Data)
+					if err != nil {
+						return err
+					}
 
-			newState, err := h.onCombine(oldState, data)
-			if err != nil {
-				return err
-			}
-			h.state = newState
+					res, err := h.onCombine(dataA, dataB)
+					if err != nil {
+						return err
+					}
 
-			h.returns(newState, oldState, x.Key, returning)
-			return nil
+					returning(&Combine{
+						Key:  x.Key,
+						Data: schema.FromGo(res),
+					})
+					return nil
+				},
+				func(x *Retract) error {
+					return fmt.Errorf("MergeHandler: not implemented (1)")
+				},
+				func(x *Both) error {
+					return fmt.Errorf("MergeHandler: not implemented (2)")
+				},
+			)
 		},
 		func(x *Retract) error {
-			data, err := ConvertAs[A](x.Data)
-			if err != nil {
-				return err
-			}
-
-			oldState := h.state
-
-			newState, err := h.onRetract(h.state, data)
-			if err != nil {
-				return err
-			}
-			h.state = newState
-
-			h.returns(newState, oldState, x.Key, returning)
-			return nil
+			return fmt.Errorf("MergeHandler: not implemented (3)")
 		},
 		func(x *Both) error {
-			combineData, err := ConvertAs[A](x.Combine.Data)
-			if err != nil {
-				return err
-			}
-
-			retractData, err := ConvertAs[A](x.Retract.Data)
-			if err != nil {
-				return err
-			}
-
-			oldState := h.state
-			newState, err := h.onRetract(oldState, retractData)
-			if err != nil {
-				return err
-			}
-			newState, err = h.onCombine(newState, combineData)
-			if err != nil {
-				return err
-			}
-
-			h.state = newState
-			h.returns(newState, oldState, x.Key, returning)
-			return nil
+			return fmt.Errorf("MergeHandler: not implemented (4)")
 		},
 	)
-}
-
-func (h *MergeHandler[A]) returns(newState, oldState A, key string, returning func(Message)) {
-	//if any(oldState) == nil {
-	//	returning(&Retract{
-	//		Key:  key,
-	//		Data: schema.FromGo(newState),
-	//	})
-	//} else {
-	returning(&Both{
-		Key: key,
-		Retract: Retract{
-			Key:  key,
-			Data: schema.FromGo(oldState),
-		},
-		Combine: Combine{
-			Key:  key,
-			Data: schema.FromGo(newState),
-		},
-	})
-	//}
 }

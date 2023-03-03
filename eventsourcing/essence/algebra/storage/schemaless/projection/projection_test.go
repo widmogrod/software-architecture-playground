@@ -75,19 +75,19 @@ func MapGameToStats() Handler {
 
 func MergeSessionStats() *MergeHandler[SessionsStats] {
 	return &MergeHandler[SessionsStats]{
-		state: SessionsStats{},
 		onCombine: func(base, x SessionsStats) (SessionsStats, error) {
 			return SessionsStats{
 				Wins:  base.Wins + x.Wins,
 				Draws: base.Draws + x.Draws,
+				Loose: base.Loose + x.Loose,
 			}, nil
 		},
-		onRetract: func(base, x SessionsStats) (SessionsStats, error) {
-			return SessionsStats{
-				Wins:  base.Wins - x.Wins,
-				Draws: base.Draws - x.Draws,
-			}, nil
-		},
+		//onRetract: func(base, x SessionsStats) (SessionsStats, error) {
+		//	return SessionsStats{
+		//		Wins:  base.Wins - x.Wins,
+		//		Draws: base.Draws - x.Draws,
+		//	}, nil
+		//},
 	}
 }
 
@@ -98,9 +98,7 @@ func TestProjection(t *testing.T) {
 	dag := NewBuilder()
 	games := dag.Load(GenerateData())
 	gameStats := games.Map(MapGameToStats()).Map(Log("after-map"))
-	gameStatsBySession := gameStats.Merge(func() Handler {
-		return MergeSessionStats()
-	}).Map(Log("after-merge"))
+	gameStatsBySession := gameStats.Merge(MergeSessionStats()).Map(Log("after-merge"))
 
 	end := gameStatsBySession.Map(NewRepositorySink("session", store))
 	// .Map(Log())

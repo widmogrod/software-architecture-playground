@@ -9,7 +9,7 @@ type (
 		Input DAG
 	}
 	Merge struct {
-		OnMerge func() Handler
+		OnMerge Handler2
 		Input   []DAG
 	}
 	Load struct {
@@ -43,9 +43,15 @@ type Handler interface {
 	Process(msg Message, returning func(Message)) error
 }
 
+type Handler2 interface {
+	//InputType() TypeDef
+	//OutputType() TypeDef
+	Process2(a, b Message, returning func(Message)) error
+}
+
 type Builder interface {
 	Load(f Handler) Builder
 	Map(f Handler) Builder
-	Merge(f func() Handler) Builder
+	Merge(f Handler2) Builder
 	Build() DAG
 }
