@@ -9,7 +9,7 @@ type (
 		Input DAG
 	}
 	Merge struct {
-		OnMerge Handler2
+		OnMerge Handler
 		Input   []DAG
 	}
 	Load struct {
@@ -24,21 +24,19 @@ type Item struct {
 
 //type TypeDef struct {}
 
+//type Context interface {
+//	KV() KVStore
+//}
+
 type Handler interface {
 	//InputType() TypeDef
 	//OutputType() TypeDef
 	Process(x Item, returning func(Item)) error
 }
 
-type Handler2 interface {
-	//InputType() TypeDef
-	//OutputType() TypeDef
-	Process2(a, b Item, returning func(Item)) error
-}
-
 type Builder interface {
 	Load(f Handler) Builder
 	Map(f Handler) Builder
-	Merge(f Handler2) Builder
+	Merge(f Handler) Builder
 	Build() DAG
 }

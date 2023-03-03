@@ -2,6 +2,7 @@ package schemaless
 
 import (
 	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
 )
 
@@ -57,8 +58,12 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 						// in a way it's liek a reduce, so past state should be kept somewhere
 						prev, ok := i.byKey(x, i.keyFromMessage(msg))
 						if ok {
+							merge := Item{
+								Key:  msg.Key,
+								Data: schema.MkList(prev.Data, msg.Data),
+							}
 							//fmt.Printf("Merge: recieved prev=%s msg=%s \n", i.keyFromMessage(prev), i.keyFromMessage(msg))
-							if err := x.OnMerge.Process2(prev, msg, i.returning(x)); err != nil {
+							if err := x.OnMerge.Process(merge, i.returning(x)); err != nil {
 								i.recordError(x, err)
 								return
 							}
