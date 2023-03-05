@@ -2,6 +2,7 @@ package schemaless
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
@@ -93,84 +94,63 @@ func MergeSessionStats() *MergeHandler[SessionsStats] {
 	}
 }
 
-func CountTotalSessionsStats(ctx Context, b Builder) Builder {
+func CountTotalSessionsStats(b Builder) Builder {
 	return b.
-		Map(
-			ctx.Scope("Map SessionsStats -> TotalCount").WithRetracting(),
-			&MapHandler[SessionsStats, int]{
-				F: func(x SessionsStats, returning func(key string, value int)) error {
-					returning("total", 1)
-					return nil
-				},
+		WithName("CountTotalSessionsStats:MapSessionsToStats").
+		Map(&MapHandler[SessionsStats, int]{
+			F: func(x SessionsStats, returning func(key string, value int)) error {
+				returning("total", 1)
+				return nil
 			},
-		).
-		Merge(
-			ctx.Scope("Merge TotalCount").WithRetracting(),
-			&MergeHandler[int]{
-				Combine: func(base, x int) (int, error) {
-					fmt.Println("counting(+)", base+x, base, x)
-					return base + x, nil
-				},
-				DoRetract: func(base int, x int) (int, error) {
-					fmt.Println("counting(-)", base+x, base, x)
-					return base - x, nil
-				},
+		}, WithRetraction()).
+		WithName("CountTotalSessionsStats:Count").
+		Merge(&MergeHandler[int]{
+			Combine: func(base, x int) (int, error) {
+				log.Debugln("counting(+)", base+x, base, x)
+				return base + x, nil
 			},
-		)
+			DoRetract: func(base int, x int) (int, error) {
+				log.Debugln("counting(-)", base+x, base, x)
+				return base - x, nil
+			},
+		}, WithRetraction())
 }
 
 func TestProjection(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		TimestampFormat: "",
+		PadLevelText:    true,
+	})
 	store := schemaless.NewInMemoryRepository()
 	sessionStatsRepo := typedful.NewTypedRepository[SessionsStats](store)
 	totalRepo := typedful.NewTypedRepository[int](store)
 
-	root := &DefaultContext{name: "root"}
-
 	dag := NewBuilder()
-	games := dag.Load(root.Scope("GenerateData"), GenerateData())
-	gameStats := games.Map(root.Scope("MapGameToStats"), MapGameToStats()) //.Map(Log("after-map"))
-	gameStatsBySession := gameStats.Merge(
-		root.Scope("MergeSessionStats").NoRetracting(),
-		MergeSessionStats(),
-	)
-	//Map(Log("after-merge"))
+	games := dag.
+		WithName("GenerateData").
+		Load(GenerateData())
+	gameStats := games.
+		WithName("MapGameToStats").
+		Map(MapGameToStats())
+	gameStatsBySession := gameStats.
+		WithName("MergeSessionStats").
+		Merge(MergeSessionStats(), IgnoreRetractions())
 
-	_ = CountTotalSessionsStats(root, gameStatsBySession).
-		//Map(root.Scope("Log ⚽️TotalCount"), Log("count-total")).
-		Map(
-			root.Scope("Sink ⚽️TotalCount").NoRetracting(),
-			NewRepositorySink("total", store))
+	_ = CountTotalSessionsStats(gameStatsBySession).
+		WithName("Sink ⚽️TotalCount").
+		Map(NewRepositorySink("total", store), IgnoreRetractions())
 
-	end := gameStatsBySession.Map(
-		root.Scope("NewRepositorySink").NoRetracting(),
-		NewRepositorySink("session", store))
+	end := gameStatsBySession.
+		WithName("NewRepositorySink").
+		Map(NewRepositorySink("session", store), IgnoreRetractions())
 
-	//expected := &Map{
-	//	OnMap: Log(),
-	//	Input: &Merge{
-	//		OnMerge: MergeSessionStats(),
-	//		Input: []DAG{
-	//			&Map{
-	//				OnMap: MapGameToStats(),
-	//				Input: &Map{
-	//					OnMap: GenerateData(),
-	//					Input: nil,
-	//				},
-	//			},
-	//		},
-	//	},
-	//}
-	//assert.Equal(t, expected, end.Build())
-
-	interpretation := NewInMemoryInterpreter()
-	err := interpretation.Run2(end.Build2())
-	//err := interpretation.Run(end.Build())
+	interpretation := DefaultInMemoryInterpreter()
+	err := interpretation.Run(end.Build())
 	assert.NoError(t, err)
 
 	<-time.After(1 * time.Second)
-	//interpretation.WaitUntilFinished()
-
-	assert.Equal(t, 0, len(interpretation.errors), "interpretation should be without errors")
 
 	result, err := sessionStatsRepo.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
 		RecordType: "session",

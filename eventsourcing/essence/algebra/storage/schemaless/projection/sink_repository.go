@@ -1,7 +1,7 @@
 package schemaless
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"sync"
@@ -87,7 +87,7 @@ func (s *RepositorySink) flush() error {
 	defer s.lock.Unlock()
 
 	if len(s.bufferSaving)+len(s.bufferDeleting) == 0 {
-		fmt.Println("nothing to flush")
+		log.Debugln("nothing to flush")
 		return nil
 	}
 
@@ -99,12 +99,12 @@ func (s *RepositorySink) flush() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("flushed:")
+	log.Debugln("flushed:")
 	for id, record := range s.bufferSaving {
-		fmt.Println("- saved", id, record)
+		log.Debugln("- saved", id, record)
 	}
 	for id, record := range s.bufferDeleting {
-		fmt.Println("- deleted", id, record)
+		log.Debugln("- deleted", id, record)
 	}
 
 	s.bufferSaving = map[string]schemaless.Record[schema.Schema]{}

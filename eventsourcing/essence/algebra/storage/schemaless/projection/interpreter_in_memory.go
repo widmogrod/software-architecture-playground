@@ -3,31 +3,30 @@ package schemaless
 import (
 	"container/list"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
 	"time"
 )
 
-func NewInMemoryInterpreter() *InMemoryInterpreter {
+func DefaultInMemoryInterpreter() *InMemoryInterpreter {
 	return &InMemoryInterpreter{
-		pubsub:  NewPubSub2(),
-		errors:  make(map[DAG]error),
-		byKeys:  make(map[DAG]map[string]Item),
-		running: make(map[DAG]struct{}),
+		pubsub:  NewPubSub(),
+		byKeys:  make(map[Node]map[string]Item),
+		running: make(map[Node]struct{}),
 	}
 }
 
 type InMemoryInterpreter struct {
 	lock    sync.Mutex
-	pubsub  *PubSub2
-	errors  map[DAG]error
-	byKeys  map[DAG]map[string]Item
-	running map[DAG]struct{}
+	pubsub  *PubSub
+	byKeys  map[Node]map[string]Item
+	running map[Node]struct{}
 }
 
-func (i *InMemoryInterpreter) Run2(nodes []DAG) error {
+func (i *InMemoryInterpreter) Run(nodes []Node) error {
 	for _, node := range nodes {
-		if err := i.Run(node); err != nil {
+		if err := i.run(node); err != nil {
 			return err
 		}
 	}
@@ -35,26 +34,20 @@ func (i *InMemoryInterpreter) Run2(nodes []DAG) error {
 	return nil
 }
 
-func (i *InMemoryInterpreter) Run(dag DAG) error {
+func (i *InMemoryInterpreter) run(dag Node) error {
 	if dag == nil {
 		return nil
 	}
 
 	if _, ok := i.running[dag]; ok {
-		//fmt.Printf("RUNNNIN! %s \n", i.str(dag))
 		return nil
 	}
 	i.running[dag] = struct{}{}
 
-	return MustMatchDAG(
+	return MustMatchNode(
 		dag,
 		func(x *Map) error {
-			//fmt.Println("traverse", i.str(x))
-			//ch := i.pubsub.Subscribe(x.Input, x)
 			go func() {
-				//fmt.Println("ok", i.str(x))
-				//defer i.pubsub.Unsubscribe(x)
-
 				var lastOffset int = 0
 
 				for {
@@ -64,12 +57,10 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 						continue
 					}
 					lastOffset = msg.Offset
-					//select {
-					//case msg := <-i.pubsub.Subscribe(x.Input, x)
-					fmt.Println("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+					log.Debugln("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
 					switch true {
 					case msg.Aggregate != nil && msg.Retract == nil,
-						msg.Aggregate != nil && msg.Retract != nil && !x.Name.ShouldRetract():
+						msg.Aggregate != nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
 
 						err := x.OnMap.Process(*msg.Aggregate, func(item Item) {
 							i.pubsub.Publish(x, Message{
@@ -81,7 +72,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 							panic(err)
 						}
 
-					case msg.Aggregate != nil && msg.Retract != nil && x.Name.ShouldRetract():
+					case msg.Aggregate != nil && msg.Retract != nil && x.Ctx.ShouldRetract():
 						buff := NewDual()
 						err := x.OnMap.Process(*msg.Aggregate, buff.ReturningAggregate)
 						if err != nil {
@@ -100,7 +91,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 							i.pubsub.Publish(x, *msg)
 						}
 
-					case msg.Aggregate == nil && msg.Retract != nil && x.Name.ShouldRetract():
+					case msg.Aggregate == nil && msg.Retract != nil && x.Ctx.ShouldRetract():
 						err := x.OnMap.Retract(*msg.Retract, func(item Item) {
 							i.pubsub.Publish(x, Message{
 								Key:     item.Key,
@@ -111,26 +102,21 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 							panic(err)
 						}
 
-					case msg.Aggregate == nil && msg.Retract != nil && !x.Name.ShouldRetract():
-						fmt.Println("ignored retraction", i.str(x))
+					case msg.Aggregate == nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
+						log.Debugln("ignored retraction", i.str(x))
 
 					default:
 						panic("not implemented Map(3); " + i.str(x) + " " + ToStrMessage(msg))
 					}
 
-					fmt.Println("√", i.str(x))
+					log.Debugln("√", i.str(x))
 				}
 				//}
 			}()
-			return i.Run(x.Input)
+			return i.run(x.Input)
 		},
 		func(x *Merge) error {
-			//fmt.Println("traverse", i.str(x))
-			//ch := i.pubsub.Subscribe(x.Input, x)
 			go func() {
-				//fmt.Println("ok", i.str(x))
-				//defer i.pubsub.Unsubscribe(x)
-
 				var lastOffset int = 0
 				prev := make(map[string]*Item)
 
@@ -146,12 +132,13 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 						panic("message has not Aggretate nor Retract. not implemented (1)")
 					}
 
-					fmt.Println("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+					log.Debugln("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+
 					if _, ok := prev[msg.Key]; ok {
 						base := prev[msg.Key]
 
-						if msg.Retract != nil && x.Name.ShouldRetract() {
-							fmt.Println("❌retracting in merge", i.str(x))
+						if msg.Retract != nil && x.Ctx.ShouldRetract() {
+							log.Debugln("❌retracting in merge", i.str(x))
 							retract := Item{
 								Key:  msg.Key,
 								Data: schema.MkList(base.Data, msg.Retract.Data),
@@ -169,7 +156,7 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 						}
 
 						if msg.Aggregate != nil {
-							fmt.Println("✅aggregate in merge", i.str(x))
+							log.Debugln("✅aggregate in merge", i.str(x))
 							merge := Item{
 								Key:  msg.Key,
 								Data: schema.MkList(base.Data, msg.Aggregate.Data),
@@ -192,7 +179,6 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 
 					} else {
 						if msg.Retract != nil {
-
 							panic("no previous state, and requesing retracting. not implemented (2)" + ToStrMessage(msg))
 						}
 
@@ -204,12 +190,10 @@ func (i *InMemoryInterpreter) Run(dag DAG) error {
 					}
 				}
 			}()
-			return i.Run(x.Input)
+			return i.run(x.Input)
 		},
 		func(x *Load) error {
-			//fmt.Println("traverse", i.str(x))
 			go func() {
-				//fmt.Println("ok", i.str(x))
 				if err := x.OnLoad.Process(Item{}, func(item Item) {
 					i.pubsub.Publish(x, Message{
 						Key:       item.Key,
@@ -245,35 +229,23 @@ func ToStrItem(item *Item) string {
 		item.Key, string(bytes))
 }
 
-//func (i *InMemoryInterpreter) WaitUntilFinished() {
-//	//<-i.pubsub.Drained()
-//	//<-time.After(500 * time.Millisecond)
-//}
-
-func (i *InMemoryInterpreter) str(x DAG) string {
+func (i *InMemoryInterpreter) str(x Node) string {
 	return ToStr(x)
 }
 
-func ToStr(x DAG) string {
-	return MustMatchDAG(
+func ToStr(x Node) string {
+	return MustMatchNode(
 		x,
 		func(x *Map) string {
-			return fmt.Sprintf("map(%s, r=%v)", x.Name.Name(), x.Name.ShouldRetract())
+			return fmt.Sprintf("map(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 		func(x *Merge) string {
-			return fmt.Sprintf("merge(%s, r=%v)", x.Name.Name(), x.Name.ShouldRetract())
+			return fmt.Sprintf("merge(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 		func(x *Load) string {
-			return fmt.Sprintf("load(%s, r=%v)", x.Name.Name(), x.Name.ShouldRetract())
+			return fmt.Sprintf("load(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 	)
-}
-
-func (i *InMemoryInterpreter) recordError(x DAG, err error) {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-	fmt.Printf("ERR: element %v error %s", x, err.Error())
-	i.errors[x] = err
 }
 
 func (i *InMemoryInterpreter) keyFromMessage(msg Item) string {
@@ -293,18 +265,18 @@ func (i *InMemoryInterpreter) byKey(x *Merge, key string) (Item, bool) {
 	return i.byKeys[x][key], true
 }
 
-func NewPubSub2() *PubSub2 {
-	return &PubSub2{
-		publisher: make(map[DAG]*list.List),
+func NewPubSub() *PubSub {
+	return &PubSub{
+		publisher: make(map[Node]*list.List),
 	}
 }
 
-type PubSub2 struct {
+type PubSub struct {
 	lock      sync.Mutex
-	publisher map[DAG]*list.List
+	publisher map[Node]*list.List
 }
 
-func (p *PubSub2) Subscribe(to DAG, fromOffset int) (Message, bool) {
+func (p *PubSub) Subscribe(to Node, fromOffset int) (Message, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -335,7 +307,7 @@ func (p *PubSub2) Subscribe(to DAG, fromOffset int) (Message, bool) {
 	return msg, true
 }
 
-func (p *PubSub2) Publish(key DAG, msg Message) {
+func (p *PubSub) Publish(key Node, msg Message) {
 	if msg.Offset != 0 {
 		panic("cannot publish message with offset")
 	}

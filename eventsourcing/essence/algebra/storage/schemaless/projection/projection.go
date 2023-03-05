@@ -2,20 +2,20 @@ package schemaless
 
 import "github.com/widmogrod/mkunion/x/schema"
 
-//go:generate mkunion -name=DAG
+//go:generate mkunion -name=Node
 type (
 	Map struct {
-		Name  Context
+		Ctx   *DefaultContext
 		OnMap Handler
-		Input DAG
+		Input Node
 	}
 	Merge struct {
-		Name    Context
+		Ctx     *DefaultContext
 		OnMerge Handler
-		Input   DAG
+		Input   Node
 	}
 	Load struct {
-		Name   Context
+		Ctx    *DefaultContext
 		OnLoad Handler
 	}
 )
@@ -38,21 +38,26 @@ type Handler interface {
 	Retract(x Item, returning func(Item)) error
 }
 
-type Context interface {
-	Scope(name string) Context
-	Name() string
-
-	WithRetracting() Context
-	ShouldRetract() bool
-	NoRetracting() Context
+type Builder interface {
+	WithName(string) Builder
+	Load(f Handler, opts ...ContextOptionFunc) Builder
+	Map(f Handler, opts ...ContextOptionFunc) Builder
+	Merge(f Handler, opts ...ContextOptionFunc) Builder
+	Build() []Node
 }
 
-type Builder interface {
-	Load(ctx Context, f Handler) Builder
-	Map(ctx Context, f Handler) Builder
-	Merge(ctx Context, f Handler) Builder
-	Build() DAG
-	Build2() []DAG
+type ContextOptionFunc func(c *DefaultContext)
+
+func WithRetraction() ContextOptionFunc {
+	return func(c *DefaultContext) {
+		c.retracting = true
+	}
+}
+
+func IgnoreRetractions() ContextOptionFunc {
+	return func(c *DefaultContext) {
+		c.retracting = false
+	}
 }
 
 type DefaultContext struct {
@@ -60,12 +65,12 @@ type DefaultContext struct {
 	retracting bool
 }
 
-func (c *DefaultContext) NoRetracting() Context {
+func (c *DefaultContext) NoRetracting() *DefaultContext {
 	c.retracting = false
 	return c
 }
 
-func (c *DefaultContext) WithRetracting() Context {
+func (c *DefaultContext) WithRetracting() *DefaultContext {
 	c.retracting = true
 	return c
 }
@@ -74,7 +79,7 @@ func (c *DefaultContext) ShouldRetract() bool {
 	return c.retracting
 }
 
-func (c *DefaultContext) Scope(name string) Context {
+func (c *DefaultContext) Scope(name string) *DefaultContext {
 	return &DefaultContext{
 		name:       c.name + "." + name,
 		retracting: c.retracting,

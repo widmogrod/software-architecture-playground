@@ -38,7 +38,7 @@ func TestNewDynamoDBRepository2(t *testing.T) {
 			}),
 		Sort: []SortField{
 			{
-				Field:      "Data.Name",
+				Field:      "Data.Ctx",
 				Descending: true,
 			},
 		},
@@ -61,8 +61,8 @@ func TestNewDynamoDBRepository2(t *testing.T) {
 
 	if assert.Len(t, foundRecords, 3, "dynamo should scan all records") {
 		// DynamoDB don't support sorting on attributes, that are not part of sort key
-		//assert.Equal(t, "Alice", schema.As[string](schema.Get(result.Items[0].Data, "Name"), "no-name"))
-		//assert.Equal(t, "Jane", schema.As[string](schema.Get(result.Items[1].Data, "Name"), "no-name"))
+		//assert.Equal(t, "Alice", schema.As[string](schema.Get(result.Items[0].Data, "Ctx"), "no-name"))
+		//assert.Equal(t, "Jane", schema.As[string](schema.Get(result.Items[1].Data, "Ctx"), "no-name"))
 
 		//should be able to find by id
 		for _, item := range result.Items {

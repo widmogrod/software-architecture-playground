@@ -6,20 +6,33 @@ var _ Builder = &DagBuilder{}
 
 func NewBuilder() *DagBuilder {
 	return &DagBuilder{
-		nodes: make(map[DAG]*list.List),
+		nodes: make(map[Node]*list.List),
+		dag:   nil,
+		ctx: &DefaultContext{
+			name: "root",
+		},
 	}
 }
 
 type DagBuilder struct {
-	nodes map[DAG]*list.List
-	dag   DAG
+	nodes map[Node]*list.List
+	dag   Node
+	ctx   *DefaultContext
 }
 
-func (d *DagBuilder) addNode(node DAG) {
+func (d *DagBuilder) WithName(s string) Builder {
+	return &DagBuilder{
+		nodes: d.nodes,
+		dag:   d.dag,
+		ctx:   d.ctx.Scope(s),
+	}
+}
+
+func (d *DagBuilder) addNode(node Node) {
 	d.nodes[node] = list.New()
 }
 
-func (d *DagBuilder) addDependency(from, to DAG) {
+func (d *DagBuilder) addDependency(from, to Node) {
 	if _, ok := d.nodes[from]; !ok {
 		d.addNode(from)
 	}
@@ -29,76 +42,70 @@ func (d *DagBuilder) addDependency(from, to DAG) {
 	d.nodes[from].PushBack(to)
 }
 
-func (b *DagBuilder) Map(ctx Context, handler Handler) Builder {
+func (d *DagBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope("Map")
+	for _, opt := range opts {
+		opt(ctx)
+	}
+
 	node := &Map{
-		Name:  ctx,
-		OnMap: handler,
-		Input: b.dag,
+		Ctx:   ctx,
+		OnMap: f,
+		Input: d.dag,
 	}
 
-	b.addDependency(node, b.dag)
+	d.addDependency(node, d.dag)
 
 	return &DagBuilder{
-		nodes: b.nodes,
+		nodes: d.nodes,
 		dag:   node,
+		ctx:   ctx,
 	}
 }
 
-func (b *DagBuilder) Merge(ctx Context, handler Handler) Builder {
+func (d *DagBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope("Merge")
+	for _, opt := range opts {
+		opt(ctx)
+	}
+
 	node := &Merge{
-		Name:    ctx,
-		OnMerge: handler,
-		Input:   b.dag,
+		Ctx:     ctx,
+		OnMerge: f,
+		Input:   d.dag,
 	}
 
-	b.addDependency(node, b.dag)
+	d.addDependency(node, d.dag)
 
 	return &DagBuilder{
-		nodes: b.nodes,
+		nodes: d.nodes,
 		dag:   node,
+		ctx:   ctx,
 	}
 }
 
-func (b *DagBuilder) Load(ctx Context, data Handler) Builder {
+func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope("Load")
+	for _, opt := range opts {
+		opt(ctx)
+	}
+
 	node := &Load{
-		Name:   ctx,
-		OnLoad: data,
+		Ctx:    ctx,
+		OnLoad: f,
 	}
 
-	b.addNode(node)
+	d.addNode(node)
 
 	return &DagBuilder{
-		nodes: b.nodes,
+		nodes: d.nodes,
 		dag:   node,
+		ctx:   ctx,
 	}
 }
 
-func (b *DagBuilder) Build() DAG {
-	return b.dag
-}
-
-func (d *DagBuilder) Build2() []DAG {
-	result := make([]DAG, 0, len(d.nodes))
-	//visited := make(map[DAG]bool)
-	//var visit func(node DAG)
-	//visit = func(node DAG) {
-	//	visited[node] = true
-	//	for e := d.nodes[node].Front(); e != nil; e = e.Next() {
-	//		child := e.Value.(DAG)
-	//		if !visited[child] {
-	//			visit(child)
-	//		}
-	//	}
-	//	result = append(result, node)
-	//}
-	//for node := range d.nodes {
-	//	if !visited[node] {
-	//		visit(node)
-	//	}
-	//}
-	//for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-	//	result[i], result[j] = result[j], result[i]
-	//}
+func (d *DagBuilder) Build() []Node {
+	result := make([]Node, 0, len(d.nodes))
 	for node := range d.nodes {
 		result = append(result, node)
 	}
