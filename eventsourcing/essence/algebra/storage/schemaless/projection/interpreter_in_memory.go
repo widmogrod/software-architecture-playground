@@ -207,6 +207,34 @@ func (i *InMemoryInterpreter) run(dag Node) error {
 
 			return nil
 		},
+		func(x *Join) error {
+			go func() {
+				lastOffset := make([]int, len(x.Input))
+				for idx, _ := range x.Input {
+					lastOffset[idx] = 0
+				}
+
+				for {
+					for idx, y := range x.Input {
+						msg, ok := i.pubsub.Subscribe(y, lastOffset[idx])
+						if ok {
+							lastOffset[idx] = msg.Offset
+							log.Debugln("Joining loop published", i.str(x), ToStrMessage(msg))
+							// join streams and publish
+							i.pubsub.Publish(x, Message{
+								Key:       msg.Key,
+								Aggregate: msg.Aggregate,
+								Retract:   msg.Retract,
+							})
+						}
+					}
+
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			return nil
+		},
 	)
 }
 
@@ -244,6 +272,9 @@ func ToStr(x Node) string {
 		},
 		func(x *Load) string {
 			return fmt.Sprintf("load(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
+		},
+		func(x *Join) string {
+			return fmt.Sprintf("join(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 	)
 }

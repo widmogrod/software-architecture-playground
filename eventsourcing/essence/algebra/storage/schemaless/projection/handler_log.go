@@ -1,8 +1,7 @@
 package schemaless
 
 import (
-	"fmt"
-	"github.com/widmogrod/mkunion/x/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func Log(prefix string) Handler {
@@ -16,16 +15,21 @@ type LogHandler struct {
 }
 
 func (l *LogHandler) Process(x Item, returning func(Item)) error {
-	res, err := schema.ToJSON(x.Data)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("%s: Item(%s, %s) \n", l.prefix, x.Key, res)
+	log.
+		WithField("key", x.Key).
+		//WithField("item", ToStrItem(&x)).
+		Infof("%s: Process \n", l.prefix)
+
 	returning(x)
 	return nil
 }
 
 func (l *LogHandler) Retract(x Item, returning func(Item)) error {
-	//TODO implement me
-	panic("implement me")
+	log.
+		WithField("key", x.Key).
+		WithField("item", ToStrItem(&x)).
+		Infof("%s: Retract \n", l.prefix)
+
+	returning(x)
+	return nil
 }

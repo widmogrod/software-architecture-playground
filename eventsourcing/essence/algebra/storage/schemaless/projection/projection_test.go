@@ -137,12 +137,12 @@ func TestProjection(t *testing.T) {
 		WithName("Sink ⚽️TotalCount").
 		Map(NewRepositorySink("total", store))
 
-	end := gameStatsBySession.
+	_ = gameStatsBySession.
 		WithName("NewRepositorySink").
 		Map(NewRepositorySink("session", store))
 
 	interpretation := DefaultInMemoryInterpreter()
-	err := interpretation.Run(end.Build())
+	err := interpretation.Run(dag.Build())
 	assert.NoError(t, err)
 
 	<-time.After(1 * time.Second)
@@ -179,44 +179,125 @@ func TestProjection(t *testing.T) {
 	assert.Equal(t, 2, total.Data)
 }
 
-//func TestLiveSelect(t *testing.T) {
-//	dag := NewBuilder()
-//	ddbs := dag.WithName("DynamoDB Stream")
-//	// Only latest records from database that match live select criteria are used
-//	lastState := dag.WithName("DynamoDB LastState Filtered")
-//	// Only streamed records that match live select criteria are used
-//	streamState := ddbs.WithName("DynamoDB Filtered Stream")
-//	// Joining make sure that newest version is published
-//	joined := dag.
-//		WithName("Join").
-//		// Join by key, so if db and stream has the same key, then it will be joined.
-//		Join(lastState, streamState).
-//		// Joining by key and producing a new key is like merging!
-//		Merge(&MergeHandler[schemaless.Record[Game], schemaless.Record[Game]]{
-//			Combine: func(a, b schemaless.Record[Game]) (schemaless.Record[Game], error) {
-//				if a.Version > b.Version {
-//					return a, nil
-//				} else if a.Version < b.Version {
-//					return b, nil
-//				} else {
-//					return a, nil
-//				}
-//			},
-//			DoRetract: nil,
-//		})
-//
-//	gameStats := joined.
-//		WithName("MapGameToStats").
-//		Map(MapGameToStats())
-//	gameStatsBySession := gameStats.
-//		WithName("MergeSessionStats").
-//		Merge(MergeSessionStats(), IgnoreRetractions())
-//
-//	gameStatsBySession.
-//		WithName("Store in database").
-//		Map(NewRepositorySink("session", store), IgnoreRetractions())
-//
-//	gameStatsBySession.
-//		WithName("Publish to websocket").
-//		Map(NewWebsocketSink(), IgnoreRetractions())
-//}
+func TestLiveSelect(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		TimestampFormat: "",
+		PadLevelText:    true,
+	})
+
+	// setup type registry
+	schema.RegisterRules([]schema.RuleMatcher{
+		schema.WhenPath(nil, schema.UseStruct(&schemaless.Record[Game]{})),
+		schema.WhenPath([]string{"Data"}, schema.UseStruct(Game{})),
+	})
+
+	// This is example that is aiming to explore concept of live select.
+	// Example use case in context of tic-tac-toe game:
+	// - As a player I want to see my stats in session in real time
+	// - As a player I want to see tic-tac-toe game updates in real time
+	//   (I wonder how live select would compete vs current implementation on websockets)
+	//
+	// 	LIVE SELECT
+	//      sessionID,
+	//		COUNT_BY_VALUE(winner, WHERE winnerID NOT NULL) as wins, // {"a": 1, "b": 2}
+	//		COUNT(WHERE isDraw = TRUE) as draws,
+	//      COUNT() as total
+	//  GROUP BY sessionID as group
+	//  WHERE sessionID = :sessionID
+	//    AND gameState = "GameFinished"
+	//
+	// Solving live select model with DAG, can solve also MATERIALIZED VIEW problem with ease.
+	//
+	// At some point it would be nice to have benchmarks that show where is breaking point of
+	// doing ad hock live selects vs precalculating materialized view.
+	dag := NewBuilder()
+	// Only latest records from database that match live select criteria are used
+	lastState := dag.
+		WithName("DynamoDB LastState Filtered").
+		Load(&GenerateHandler{
+			load: func(push func(message Item)) error {
+				push(Item{
+					Key: "game-1",
+					Data: schema.FromGo(schemaless.Record[Game]{
+						ID:      "game-1",
+						Version: 1,
+						Data: Game{
+							Players: []string{"a", "b"},
+							Winner:  "a",
+						},
+					}),
+				})
+
+				return nil
+			},
+		})
+	// Only streamed records that match live select criteria are used
+	streamState := dag.
+		WithName("DynamoDB Filtered Stream").
+		Load(&GenerateHandler{
+			load: func(push func(message Item)) error {
+				// This is where we would get data from stream
+				push(Item{
+					Key: "game-1",
+					Data: schema.FromGo(schemaless.Record[Game]{
+						ID:      "game-1",
+						Version: 2,
+						Data: Game{
+							Players: []string{"a", "b"},
+							Winner:  "a",
+						},
+					}),
+				})
+				return nil
+			},
+		})
+	// Joining make sure that newest version is published
+
+	joined := dag.
+		WithName("Join").
+		// Join by key, so if db and stream has the same key, then it will be joined.
+		Join(lastState, streamState).
+		// Joining by key and producing a new key is like merging!
+		Merge(&MergeHandler[schemaless.Record[Game]]{
+			Combine: func(a, b schemaless.Record[Game]) (schemaless.Record[Game], error) {
+				if a.Version > b.Version {
+					return a, nil
+				} else if a.Version < b.Version {
+					return b, nil
+				} else {
+					return a, nil
+				}
+			},
+			DoRetract: nil,
+		})
+
+	gameStats := joined.
+		WithName("MapGameToStats").
+		Map(Log("gameStats"))
+	//Map(MapGameToStats())
+
+	_ = gameStats
+
+	//gameStatsBySession := gameStats.
+	//	WithName("MergeSessionStats").
+	//	Merge(MergeSessionStats())
+
+	//// Storing in database those updates is like creating materialized view
+	//// For live select this can be skipped.
+	//store := schemaless.NewInMemoryRepository()
+	//gameStatsBySession.
+	//	WithName("Store in database").
+	//	Map(NewRepositorySink("session", store), IgnoreRetractions())
+
+	//gameStatsBySession.
+	//	WithName("Publish to websocket").
+	//	Map(NewWebsocketSink())
+
+	interpretation := DefaultInMemoryInterpreter()
+	err := interpretation.Run(dag.Build())
+	assert.NoError(t, err)
+
+	<-time.After(1 * time.Second)
+}

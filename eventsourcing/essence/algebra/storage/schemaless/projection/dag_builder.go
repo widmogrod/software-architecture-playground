@@ -42,6 +42,26 @@ func (d *DagBuilder) addDependency(from, to Node) {
 	d.nodes[from].PushBack(to)
 }
 
+func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope("Load")
+	for _, opt := range opts {
+		opt(ctx)
+	}
+
+	node := &Load{
+		Ctx:    ctx,
+		OnLoad: f,
+	}
+
+	d.addNode(node)
+
+	return &DagBuilder{
+		nodes: d.nodes,
+		dag:   node,
+		ctx:   ctx,
+	}
+}
+
 func (d *DagBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
 	ctx := d.ctx.Scope("Map")
 	for _, opt := range opts {
@@ -84,18 +104,21 @@ func (d *DagBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
 	}
 }
 
-func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope("Load")
+func (d *DagBuilder) Join(a, b Builder, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope("Join")
 	for _, opt := range opts {
 		opt(ctx)
 	}
 
-	node := &Load{
-		Ctx:    ctx,
-		OnLoad: f,
+	node := &Join{
+		Ctx: ctx,
+		Input: []Node{
+			a.(*DagBuilder).dag,
+			b.(*DagBuilder).dag,
+		},
 	}
 
-	d.addNode(node)
+	d.addDependency(node, d.dag)
 
 	return &DagBuilder{
 		nodes: d.nodes,
@@ -103,7 +126,6 @@ func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
 		ctx:   ctx,
 	}
 }
-
 func (d *DagBuilder) Build() []Node {
 	result := make([]Node, 0, len(d.nodes))
 	for node := range d.nodes {

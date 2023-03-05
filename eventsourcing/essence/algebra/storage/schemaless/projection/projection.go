@@ -9,6 +9,7 @@ type (
 		OnMap Handler
 		Input Node
 	}
+	// Merge implicitly means, merge by key
 	Merge struct {
 		Ctx     *DefaultContext
 		OnMerge Handler
@@ -17,6 +18,10 @@ type (
 	Load struct {
 		Ctx    *DefaultContext
 		OnLoad Handler
+	}
+	Join struct {
+		Ctx   *DefaultContext
+		Input []Node
 	}
 )
 
@@ -43,6 +48,7 @@ type Builder interface {
 	Load(f Handler, opts ...ContextOptionFunc) Builder
 	Map(f Handler, opts ...ContextOptionFunc) Builder
 	Merge(f Handler, opts ...ContextOptionFunc) Builder
+	Join(a, b Builder, opts ...ContextOptionFunc) Builder
 	Build() []Node
 }
 
