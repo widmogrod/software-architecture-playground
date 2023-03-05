@@ -60,9 +60,13 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 
 		storedVersion := schema.As[uint16](schema.Get(stored, "Version"), 0)
 
-		if storedVersion != record.Version {
-			return fmt.Errorf("store.InMemoryRepository.UpdateRecords ID=%s Type=%s %d != %d %w",
-				record.ID, record.Type, storedVersion, record.Version, ErrVersionConflict)
+		if x.UpdatingPolicy == PolicyIfServerNotChanged {
+			if storedVersion != record.Version {
+				return fmt.Errorf("store.InMemoryRepository.UpdateRecords ID=%s Type=%s %d != %d %w",
+					record.ID, record.Type, storedVersion, record.Version, ErrVersionConflict)
+			}
+		} else if x.UpdatingPolicy == PolicyOverwriteServerChanges {
+			record.Version = storedVersion
 		}
 	}
 

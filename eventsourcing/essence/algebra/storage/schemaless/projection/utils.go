@@ -1,33 +1,11 @@
 package schemaless
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
+	"sync"
 	"testing"
 )
-
-func ConvertAs[A any](x schema.Schema) (A, error) {
-	var a A
-	var ret any
-	var err error
-	if any(a) == nil {
-		ret, err = schema.ToGo(x)
-	} else {
-		ret, err = schema.ToGo(x, schema.WithExtraRules(schema.WhenPath(nil, schema.UseStruct(a))))
-	}
-
-	if err != nil {
-		return a, err
-	}
-
-	result, ok := ret.(A)
-	if !ok {
-		return a, fmt.Errorf("cannot convert %T to %T", ret, a)
-	}
-
-	return result, nil
-}
 
 func Each(x schema.Schema, f func(value schema.Schema)) {
 	_ = schema.MustMatchSchema(
@@ -62,6 +40,52 @@ func Each(x schema.Schema, f func(value schema.Schema)) {
 			return nil
 		},
 	)
+}
+
+func NewDual() *Dual {
+	return &Dual{}
+}
+
+type Dual struct {
+	lock sync.Mutex
+	list []*Message
+
+	aggIdx int
+	retIdx int
+}
+
+func (d *Dual) ReturningAggregate(msg Item) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.list = append(d.list, &Message{
+		Key:       msg.Key,
+		Aggregate: &msg,
+	})
+
+	d.aggIdx++
+}
+
+func (d *Dual) ReturningRetract(msg Item) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	if d.retIdx <= len(d.list) {
+		if d.list[d.retIdx].Key != msg.Key {
+			panic("key mismatch")
+		}
+
+		d.list[d.retIdx].Retract = &msg
+		d.retIdx++
+	}
+}
+
+func (d *Dual) IsValid() bool {
+	return d.aggIdx == d.retIdx
+}
+
+func (d *Dual) List() []*Message {
+	return d.list
 }
 
 type ListAssert struct {

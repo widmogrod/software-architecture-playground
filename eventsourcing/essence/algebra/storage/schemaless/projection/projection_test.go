@@ -82,43 +82,68 @@ func MergeSessionStats() *MergeHandler[SessionsStats] {
 				Loose: base.Loose + x.Loose,
 			}, nil
 		},
-		//onRetract: func(base, x SessionsStats) (SessionsStats, error) {
-		//	return SessionsStats{
-		//		Wins:  base.Wins - x.Wins,
-		//		Draws: base.Draws - x.Draws,
-		//	}, nil
-		//},
+
+		DoRetract: func(base, x SessionsStats) (SessionsStats, error) {
+			return SessionsStats{
+				Wins:  base.Wins - x.Wins,
+				Draws: base.Draws - x.Draws,
+				Loose: base.Loose - x.Loose,
+			}, nil
+		},
 	}
 }
 
-func CountTotalSessionsStats(b Builder) Builder {
+func CountTotalSessionsStats(ctx Context, b Builder) Builder {
 	return b.
-		Map(&MapHandler[SessionsStats, int]{
-			F: func(x SessionsStats, returning func(key string, value int)) error {
-				returning("total", 1)
-				return nil
+		Map(
+			ctx.Scope("Map SessionsStats -> TotalCount").WithRetracting(),
+			&MapHandler[SessionsStats, int]{
+				F: func(x SessionsStats, returning func(key string, value int)) error {
+					returning("total", 1)
+					return nil
+				},
 			},
-		}).
-		Merge(&MergeHandler[int]{
-			Combine: func(base, x int) (int, error) {
-				return base + x, nil
+		).
+		Merge(
+			ctx.Scope("Merge TotalCount").WithRetracting(),
+			&MergeHandler[int]{
+				Combine: func(base, x int) (int, error) {
+					fmt.Println("counting(+)", base+x, base, x)
+					return base + x, nil
+				},
+				DoRetract: func(base int, x int) (int, error) {
+					fmt.Println("counting(-)", base+x, base, x)
+					return base - x, nil
+				},
 			},
-		})
+		)
 }
 
 func TestProjection(t *testing.T) {
 	store := schemaless.NewInMemoryRepository()
-	typed := typedful.NewTypedRepository[SessionsStats](store)
+	sessionStatsRepo := typedful.NewTypedRepository[SessionsStats](store)
+	totalRepo := typedful.NewTypedRepository[int](store)
+
+	root := &DefaultContext{name: "root"}
 
 	dag := NewBuilder()
-	games := dag.Load(GenerateData())
-	gameStats := games.Map(MapGameToStats()).Map(Log("after-map"))
-	gameStatsBySession := gameStats.Merge(MergeSessionStats()).Map(Log("after-merge"))
+	games := dag.Load(root.Scope("GenerateData"), GenerateData())
+	gameStats := games.Map(root.Scope("MapGameToStats"), MapGameToStats()) //.Map(Log("after-map"))
+	gameStatsBySession := gameStats.Merge(
+		root.Scope("MergeSessionStats").NoRetracting(),
+		MergeSessionStats(),
+	)
+	//Map(Log("after-merge"))
 
-	_ = CountTotalSessionsStats(gameStatsBySession)
+	_ = CountTotalSessionsStats(root, gameStatsBySession).
+		//Map(root.Scope("Log ⚽️TotalCount"), Log("count-total")).
+		Map(
+			root.Scope("Sink ⚽️TotalCount").NoRetracting(),
+			NewRepositorySink("total", store))
 
-	end := gameStatsBySession.Map(NewRepositorySink("session", store))
-	// .Map(Log())
+	end := gameStatsBySession.Map(
+		root.Scope("NewRepositorySink").NoRetracting(),
+		NewRepositorySink("session", store))
 
 	//expected := &Map{
 	//	OnMap: Log(),
@@ -138,35 +163,44 @@ func TestProjection(t *testing.T) {
 	//assert.Equal(t, expected, end.Build())
 
 	interpretation := NewInMemoryInterpreter()
-	err := interpretation.Run(end.Build())
+	err := interpretation.Run2(end.Build2())
+	//err := interpretation.Run(end.Build())
 	assert.NoError(t, err)
 
-	time.Sleep(2 * time.Second)
+	<-time.After(1 * time.Second)
+	//interpretation.WaitUntilFinished()
+
 	assert.Equal(t, 0, len(interpretation.errors), "interpretation should be without errors")
 
-	result, err := typed.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{})
+	result, err := sessionStatsRepo.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
+		RecordType: "session",
+	})
 	assert.NoError(t, err)
 	assert.Len(t, result.Items, 2)
-
-	stats, err := typed.Get("session-stats-by-player:a", "session-stats-by-player")
-	assert.NoError(t, err)
-	assert.Equal(t, SessionsStats{
-		Wins:  1,
-		Loose: 1,
-		Draws: 1,
-	}, stats.Data)
-
-	stats, err = typed.Get("session-stats-by-player:b", "session-stats-by-player")
-	assert.NoError(t, err)
-	assert.Equal(t, SessionsStats{
-		Wins:  1,
-		Loose: 1,
-		Draws: 1,
-	}, stats.Data)
-
 	for _, x := range result.Items {
 		v, err := schema.ToJSON(schema.FromGo(x.Data))
 		assert.NoError(t, err)
 		fmt.Printf("item: id=%s type-%s %s\n", x.ID, x.Type, string(v))
 	}
+
+	stats, err := sessionStatsRepo.Get("session-stats-by-player:a", "session")
+	assert.NoError(t, err)
+	assert.Equal(t, SessionsStats{
+		Wins:  1,
+		Loose: 1,
+		Draws: 1,
+	}, stats.Data)
+
+	stats, err = sessionStatsRepo.Get("session-stats-by-player:b", "session")
+	assert.NoError(t, err)
+	assert.Equal(t, SessionsStats{
+		Wins:  1,
+		Loose: 1,
+		Draws: 1,
+	}, stats.Data)
+
+	total, err := totalRepo.Get("total", "total")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, total.Data)
+
 }

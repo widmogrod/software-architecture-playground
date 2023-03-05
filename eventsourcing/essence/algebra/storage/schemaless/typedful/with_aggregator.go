@@ -40,8 +40,9 @@ func (r *TypedRepoWithAggregator[T, C]) Get(recordID string, recordType RecordTy
 
 func (r *TypedRepoWithAggregator[T, C]) UpdateRecords(s UpdateRecords[Record[T]]) error {
 	schemas := UpdateRecords[Record[schema.Schema]]{
-		Saving:   make(map[string]Record[schema.Schema]),
-		Deleting: make(map[string]Record[schema.Schema]),
+		UpdatingPolicy: s.UpdatingPolicy,
+		Saving:         make(map[string]Record[schema.Schema]),
+		Deleting:       make(map[string]Record[schema.Schema]),
 	}
 
 	// This is fix to in memory aggregator
@@ -87,10 +88,11 @@ func (r *TypedRepoWithAggregator[T, C]) UpdateRecords(s UpdateRecords[Record[T]]
 
 func (r *TypedRepoWithAggregator[T, C]) FindingRecords(query FindingRecords[Record[T]]) (PageResult[Record[T]], error) {
 	found, err := r.store.FindingRecords(FindingRecords[Record[schema.Schema]]{
-		Where: query.Where,
-		Sort:  query.Sort,
-		Limit: query.Limit,
-		After: query.After,
+		RecordType: query.RecordType,
+		Where:      query.Where,
+		Sort:       query.Sort,
+		Limit:      query.Limit,
+		After:      query.After,
 	})
 	if err != nil {
 		return PageResult[Record[T]]{}, fmt.Errorf("store.TypedRepoWithAggregator.FindingRecords store error %w", err)
