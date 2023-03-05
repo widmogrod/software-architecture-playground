@@ -82,7 +82,7 @@ but what if we would emply idenpotency of request, consisten caching and state o
 would be capure by ie eventsourcing aggregate?
 
 
-## TicTacToe mkunion and others ideas
+## TicTacToe mkunion and others ideas 
 - [ ] Keyed Aggregate to support Deletion (with versioning)
 - [ ] storage.RepositoryWithAggregator to support index building
 - [ ] DataProcessing in Golang

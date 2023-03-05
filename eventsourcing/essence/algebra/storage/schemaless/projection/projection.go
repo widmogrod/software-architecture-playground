@@ -50,39 +50,36 @@ type ContextOptionFunc func(c *DefaultContext)
 
 func WithRetraction() ContextOptionFunc {
 	return func(c *DefaultContext) {
-		c.retracting = true
+		yes := true
+		c.retracting = &yes
 	}
 }
 
 func IgnoreRetractions() ContextOptionFunc {
 	return func(c *DefaultContext) {
-		c.retracting = false
+		no := false
+		c.retracting = &no
 	}
 }
 
 type DefaultContext struct {
 	name       string
-	retracting bool
-}
-
-func (c *DefaultContext) NoRetracting() *DefaultContext {
-	c.retracting = false
-	return c
-}
-
-func (c *DefaultContext) WithRetracting() *DefaultContext {
-	c.retracting = true
-	return c
+	retracting *bool
 }
 
 func (c *DefaultContext) ShouldRetract() bool {
-	return c.retracting
+	if c.retracting == nil {
+		return false
+	}
+
+	return *c.retracting
 }
 
 func (c *DefaultContext) Scope(name string) *DefaultContext {
 	return &DefaultContext{
-		name:       c.name + "." + name,
-		retracting: c.retracting,
+		name: c.name + "." + name,
+		// Should we copy this?
+		//retracting: c.retracting,
 	}
 }
 

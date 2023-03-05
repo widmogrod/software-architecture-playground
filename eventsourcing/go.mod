@@ -21,6 +21,7 @@ require (
 	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/rs/cors v1.8.3
 	github.com/segmentio/ksuid v1.0.3
+	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.8.1
 	github.com/widmogrod/mkunion v1.11.0
 	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2

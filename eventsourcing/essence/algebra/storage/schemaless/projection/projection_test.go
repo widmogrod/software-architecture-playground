@@ -83,13 +83,8 @@ func MergeSessionStats() *MergeHandler[SessionsStats] {
 				Loose: base.Loose + x.Loose,
 			}, nil
 		},
-
 		DoRetract: func(base, x SessionsStats) (SessionsStats, error) {
-			return SessionsStats{
-				Wins:  base.Wins - x.Wins,
-				Draws: base.Draws - x.Draws,
-				Loose: base.Loose - x.Loose,
-			}, nil
+			panic("retraction on SessionStats should not happen")
 		},
 	}
 }
@@ -136,15 +131,15 @@ func TestProjection(t *testing.T) {
 		Map(MapGameToStats())
 	gameStatsBySession := gameStats.
 		WithName("MergeSessionStats").
-		Merge(MergeSessionStats(), IgnoreRetractions())
+		Merge(MergeSessionStats())
 
 	_ = CountTotalSessionsStats(gameStatsBySession).
 		WithName("Sink ⚽️TotalCount").
-		Map(NewRepositorySink("total", store), IgnoreRetractions())
+		Map(NewRepositorySink("total", store))
 
 	end := gameStatsBySession.
 		WithName("NewRepositorySink").
-		Map(NewRepositorySink("session", store), IgnoreRetractions())
+		Map(NewRepositorySink("session", store))
 
 	interpretation := DefaultInMemoryInterpreter()
 	err := interpretation.Run(end.Build())
@@ -182,5 +177,46 @@ func TestProjection(t *testing.T) {
 	total, err := totalRepo.Get("total", "total")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, total.Data)
-
 }
+
+//func TestLiveSelect(t *testing.T) {
+//	dag := NewBuilder()
+//	ddbs := dag.WithName("DynamoDB Stream")
+//	// Only latest records from database that match live select criteria are used
+//	lastState := dag.WithName("DynamoDB LastState Filtered")
+//	// Only streamed records that match live select criteria are used
+//	streamState := ddbs.WithName("DynamoDB Filtered Stream")
+//	// Joining make sure that newest version is published
+//	joined := dag.
+//		WithName("Join").
+//		// Join by key, so if db and stream has the same key, then it will be joined.
+//		Join(lastState, streamState).
+//		// Joining by key and producing a new key is like merging!
+//		Merge(&MergeHandler[schemaless.Record[Game], schemaless.Record[Game]]{
+//			Combine: func(a, b schemaless.Record[Game]) (schemaless.Record[Game], error) {
+//				if a.Version > b.Version {
+//					return a, nil
+//				} else if a.Version < b.Version {
+//					return b, nil
+//				} else {
+//					return a, nil
+//				}
+//			},
+//			DoRetract: nil,
+//		})
+//
+//	gameStats := joined.
+//		WithName("MapGameToStats").
+//		Map(MapGameToStats())
+//	gameStatsBySession := gameStats.
+//		WithName("MergeSessionStats").
+//		Merge(MergeSessionStats(), IgnoreRetractions())
+//
+//	gameStatsBySession.
+//		WithName("Store in database").
+//		Map(NewRepositorySink("session", store), IgnoreRetractions())
+//
+//	gameStatsBySession.
+//		WithName("Publish to websocket").
+//		Map(NewWebsocketSink(), IgnoreRetractions())
+//}
