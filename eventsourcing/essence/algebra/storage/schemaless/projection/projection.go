@@ -94,7 +94,8 @@ func (c *DefaultContext) Name() string {
 }
 
 type Message struct {
-	Offset    int
+	Offset int
+	// at some point of time i may need to pass type reference
 	Key       string
 	Aggregate *Item
 	Retract   *Item

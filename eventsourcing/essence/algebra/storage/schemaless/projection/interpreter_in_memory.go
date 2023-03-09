@@ -2,6 +2,7 @@ package schemaless
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
@@ -18,10 +19,15 @@ func DefaultInMemoryInterpreter() *InMemoryInterpreter {
 }
 
 type InMemoryInterpreter struct {
-	lock    sync.Mutex
-	pubsub  *PubSub
-	byKeys  map[Node]map[string]Item
-	running map[Node]struct{}
+	lock     sync.Mutex
+	pubsub   *PubSub
+	byKeys   map[Node]map[string]Item
+	running  map[Node]struct{}
+	finished sync.WaitGroup
+	// what difference between process time and event time
+	// should answers question
+	// - are there any events in the system, that a process should wait?
+	watermark time.Time
 }
 
 func (i *InMemoryInterpreter) Run(nodes []Node) error {
@@ -47,153 +53,170 @@ func (i *InMemoryInterpreter) run(dag Node) error {
 	return MustMatchNode(
 		dag,
 		func(x *Map) error {
+			i.finished.Add(1)
 			go func() {
+				defer i.finished.Done()
+
 				var lastOffset int = 0
 
 				for {
-					msg, ok := i.pubsub.Subscribe(x.Input, lastOffset)
-					if !ok {
-						<-time.After(10 * time.Millisecond)
-						continue
-					}
-					lastOffset = msg.Offset
-					log.Debugln("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
-					switch true {
-					case msg.Aggregate != nil && msg.Retract == nil,
-						msg.Aggregate != nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
+					msg, err := i.pubsub.Subscribe(x.Input, lastOffset)
+					if i.shouldClose(err) {
+						log.Debugln("Map: close", i.str(x))
+						i.pubsub.Finish(x)
+						return
+					} else if i.shouldProcess(err) {
+						lastOffset = msg.Offset
+						log.Debugln("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+						switch true {
+						case msg.Aggregate != nil && msg.Retract == nil,
+							msg.Aggregate != nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
 
-						err := x.OnMap.Process(*msg.Aggregate, func(item Item) {
-							i.pubsub.Publish(x, Message{
-								Key:       item.Key,
-								Aggregate: &item,
-							})
-						})
-						if err != nil {
-							panic(err)
-						}
-
-					case msg.Aggregate != nil && msg.Retract != nil && x.Ctx.ShouldRetract():
-						buff := NewDual()
-						err := x.OnMap.Process(*msg.Aggregate, buff.ReturningAggregate)
-						if err != nil {
-							panic(err)
-						}
-						err = x.OnMap.Retract(*msg.Retract, buff.ReturningRetract)
-						if err != nil {
-							panic(err)
-						}
-
-						if !buff.IsValid() {
-							panic("Map(1); asymmetry " + i.str(x))
-						}
-
-						for _, msg := range buff.List() {
-							i.pubsub.Publish(x, *msg)
-						}
-
-					case msg.Aggregate == nil && msg.Retract != nil && x.Ctx.ShouldRetract():
-						err := x.OnMap.Retract(*msg.Retract, func(item Item) {
-							i.pubsub.Publish(x, Message{
-								Key:     item.Key,
-								Retract: &item,
-							})
-						})
-						if err != nil {
-							panic(err)
-						}
-
-					case msg.Aggregate == nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
-						log.Debugln("ignored retraction", i.str(x))
-
-					default:
-						panic("not implemented Map(3); " + i.str(x) + " " + ToStrMessage(msg))
-					}
-
-					log.Debugln("√", i.str(x))
-				}
-				//}
-			}()
-			return i.run(x.Input)
-		},
-		func(x *Merge) error {
-			go func() {
-				var lastOffset int = 0
-				prev := make(map[string]*Item)
-
-				for {
-					msg, ok := i.pubsub.Subscribe(x.Input, lastOffset)
-					if !ok {
-						<-time.After(10 * time.Millisecond)
-						continue
-					}
-					lastOffset = msg.Offset
-
-					if msg.Retract == nil && msg.Aggregate == nil {
-						panic("message has not Aggretate nor Retract. not implemented (1)")
-					}
-
-					log.Debugln("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
-
-					if _, ok := prev[msg.Key]; ok {
-						base := prev[msg.Key]
-
-						if msg.Retract != nil && x.Ctx.ShouldRetract() {
-							log.Debugln("❌retracting in merge", i.str(x))
-							retract := Item{
-								Key:  msg.Key,
-								Data: schema.MkList(base.Data, msg.Retract.Data),
-							}
-
-							if err := x.OnMerge.Retract(retract, func(item Item) {
-								base = &item
+							err := x.OnMap.Process(*msg.Aggregate, func(item Item) {
 								i.pubsub.Publish(x, Message{
-									Key:     msg.Key,
-									Retract: &item,
-								})
-							}); err != nil {
-								panic(err)
-							}
-						}
-
-						if msg.Aggregate != nil {
-							log.Debugln("✅aggregate in merge", i.str(x))
-							merge := Item{
-								Key:  msg.Key,
-								Data: schema.MkList(base.Data, msg.Aggregate.Data),
-							}
-							err := x.OnMerge.Process(merge, func(item Item) {
-								p := base
-								base = &item
-								i.pubsub.Publish(x, Message{
-									Key:       msg.Key,
+									Key:       item.Key,
 									Aggregate: &item,
-									Retract:   p,
 								})
 							})
 							if err != nil {
 								panic(err)
 							}
+
+						case msg.Aggregate != nil && msg.Retract != nil && x.Ctx.ShouldRetract():
+							buff := NewDual()
+							err := x.OnMap.Process(*msg.Aggregate, buff.ReturningAggregate)
+							if err != nil {
+								panic(err)
+							}
+							err = x.OnMap.Retract(*msg.Retract, buff.ReturningRetract)
+							if err != nil {
+								panic(err)
+							}
+
+							if !buff.IsValid() {
+								panic("Map(1); asymmetry " + i.str(x))
+							}
+
+							for _, msg := range buff.List() {
+								i.pubsub.Publish(x, *msg)
+							}
+
+						case msg.Aggregate == nil && msg.Retract != nil && x.Ctx.ShouldRetract():
+							err := x.OnMap.Retract(*msg.Retract, func(item Item) {
+								i.pubsub.Publish(x, Message{
+									Key:     item.Key,
+									Retract: &item,
+								})
+							})
+							if err != nil {
+								panic(err)
+							}
+
+						case msg.Aggregate == nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
+							log.Debugln("ignored retraction", i.str(x))
+
+						default:
+							panic("not implemented Map(3); " + i.str(x) + " " + ToStrMessage(msg))
 						}
 
-						prev[msg.Key] = base
-
+						log.Debugln("√", i.str(x))
 					} else {
-						if msg.Retract != nil {
-							panic("no previous state, and requesing retracting. not implemented (2)" + ToStrMessage(msg))
+						<-time.After(10 * time.Millisecond)
+					}
+				}
+			}()
+			return i.run(x.Input)
+		},
+		func(x *Merge) error {
+			i.finished.Add(1)
+			go func() {
+				defer i.finished.Done()
+
+				var lastOffset int = 0
+				prev := make(map[string]*Item)
+
+				for {
+					msg, err := i.pubsub.Subscribe(x.Input, lastOffset)
+					if i.shouldClose(err) {
+						log.Debugln("Merge: close", i.str(x))
+						i.pubsub.Finish(x)
+						return
+					} else if i.shouldProcess(err) {
+						lastOffset = msg.Offset
+
+						if msg.Retract == nil && msg.Aggregate == nil {
+							panic("message has not Aggretate nor Retract. not implemented (1)")
 						}
 
-						prev[msg.Key] = msg.Aggregate
-						i.pubsub.Publish(x, Message{
-							Key:       msg.Key,
-							Aggregate: msg.Aggregate,
-						})
+						log.Debugln("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+
+						if _, ok := prev[msg.Key]; ok {
+							base := prev[msg.Key]
+
+							if msg.Retract != nil && x.Ctx.ShouldRetract() {
+								log.Debugln("❌retracting in merge", i.str(x))
+								retract := Item{
+									Key:  msg.Key,
+									Data: schema.MkList(base.Data, msg.Retract.Data),
+								}
+
+								if err := x.OnMerge.Retract(retract, func(item Item) {
+									base = &item
+									i.pubsub.Publish(x, Message{
+										Key:     msg.Key,
+										Retract: &item,
+									})
+								}); err != nil {
+									panic(err)
+								}
+							}
+
+							if msg.Aggregate != nil {
+								log.Debugln("✅aggregate in merge", i.str(x))
+								merge := Item{
+									Key:  msg.Key,
+									Data: schema.MkList(base.Data, msg.Aggregate.Data),
+								}
+								err := x.OnMerge.Process(merge, func(item Item) {
+									p := base
+									base = &item
+									i.pubsub.Publish(x, Message{
+										Key:       msg.Key,
+										Aggregate: &item,
+										Retract:   p,
+									})
+								})
+								if err != nil {
+									panic(err)
+								}
+							}
+
+							prev[msg.Key] = base
+
+						} else {
+							if msg.Retract != nil {
+								panic("no previous state, and requesing retracting. not implemented (2)" + ToStrMessage(msg))
+							}
+
+							prev[msg.Key] = msg.Aggregate
+							i.pubsub.Publish(x, Message{
+								Key:       msg.Key,
+								Aggregate: msg.Aggregate,
+							})
+						}
+					} else {
+						// wait
+						<-time.After(10 * time.Millisecond)
 					}
 				}
 			}()
 			return i.run(x.Input)
 		},
 		func(x *Load) error {
+			i.finished.Add(1)
 			go func() {
+				defer i.finished.Done()
+
 				if err := x.OnLoad.Process(Item{}, func(item Item) {
 					i.pubsub.Publish(x, Message{
 						Key:       item.Key,
@@ -203,12 +226,17 @@ func (i *InMemoryInterpreter) run(dag Node) error {
 				}); err != nil {
 					panic(err)
 				}
+				log.Debugln("Load: finish", i.str(x))
+				i.pubsub.Finish(x)
 			}()
 
 			return nil
 		},
 		func(x *Join) error {
+			i.finished.Add(1)
 			go func() {
+				defer i.finished.Done()
+
 				lastOffset := make([]int, len(x.Input))
 				for idx, _ := range x.Input {
 					lastOffset[idx] = 0
@@ -216,26 +244,35 @@ func (i *InMemoryInterpreter) run(dag Node) error {
 
 				for {
 					for idx, y := range x.Input {
-						msg, ok := i.pubsub.Subscribe(y, lastOffset[idx])
-						if ok {
-							lastOffset[idx] = msg.Offset
+						msg, err := i.pubsub.Subscribe(y, lastOffset[idx])
+						if i.shouldClose(err) {
+							log.Debugln("Joining close", i.str(x), err)
+							i.pubsub.Finish(x)
+							return
+						} else if i.shouldProcess(err) {
 							log.Debugln("Joining loop published", i.str(x), ToStrMessage(msg))
+							lastOffset[idx] = msg.Offset
 							// join streams and publish
 							i.pubsub.Publish(x, Message{
 								Key:       msg.Key,
 								Aggregate: msg.Aggregate,
 								Retract:   msg.Retract,
 							})
+						} else {
+							// wait for next message
+							time.Sleep(100 * time.Millisecond)
 						}
 					}
-
-					time.Sleep(100 * time.Millisecond)
 				}
 			}()
 
 			return nil
 		},
 	)
+}
+
+func (i *InMemoryInterpreter) WaitForDone() {
+	i.finished.Wait()
 }
 
 func ToStrMessage(msg Message) string {
@@ -296,27 +333,46 @@ func (i *InMemoryInterpreter) byKey(x *Merge, key string) (Item, bool) {
 	return i.byKeys[x][key], true
 }
 
+func (i *InMemoryInterpreter) shouldClose(err error) bool {
+	return errors.Is(err, ErrFinished)
+}
+
+func (i *InMemoryInterpreter) shouldProcess(err error) bool {
+	return err == nil
+}
+
 func NewPubSub() *PubSub {
 	return &PubSub{
 		publisher: make(map[Node]*list.List),
+		finished:  make(map[Node]bool),
 	}
 }
 
 type PubSub struct {
 	lock      sync.Mutex
 	publisher map[Node]*list.List
+	finished  map[Node]bool
 }
 
-func (p *PubSub) Subscribe(to Node, fromOffset int) (Message, bool) {
+var (
+	ErrNoPublisher      = errors.New("cannot subscribe, no publisher")
+	ErrFinished         = errors.New("cannot subscribe, to finished publisher")
+	ErrAboveKnownOffset = errors.New("cannot subscribe, above known offset")
+)
+
+func (p *PubSub) Subscribe(to Node, fromOffset int) (Message, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	if _, ok := p.publisher[to]; !ok {
-		return Message{}, false
+		return Message{}, ErrNoPublisher
 	}
 
 	if p.publisher[to].Len() <= fromOffset {
-		return Message{}, false
+		if _, ok := p.finished[to]; ok {
+			return Message{}, ErrFinished
+		}
+		return Message{}, ErrAboveKnownOffset
 	}
 
 	var i int
@@ -335,7 +391,7 @@ func (p *PubSub) Subscribe(to Node, fromOffset int) (Message, bool) {
 		panic("offset not found")
 	}
 
-	return msg, true
+	return msg, nil
 }
 
 func (p *PubSub) Publish(key Node, msg Message) {
@@ -345,10 +401,21 @@ func (p *PubSub) Publish(key Node, msg Message) {
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	if _, ok := p.finished[key]; ok {
+		panic("cannot publish to finished node")
+	}
+
 	if _, ok := p.publisher[key]; !ok {
 		p.publisher[key] = list.New()
 	}
 
 	msg.Offset = p.publisher[key].Len() + 1
 	p.publisher[key].PushBack(msg)
+}
+
+// Finish is called when a node won't publish any more messages
+func (p *PubSub) Finish(key Node) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.finished[key] = true
 }

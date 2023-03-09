@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"fmt"
+	"github.com/widmogrod/mkunion/x/schema"
 	"golang.org/x/exp/slices"
 	"strings"
 )
@@ -9,6 +10,10 @@ import (
 type WherePredicates struct {
 	Predicate Predicate
 	Params    ParamBinds
+}
+
+func (w *WherePredicates) Evaluate(data schema.Schema) bool {
+	return Evaluate(w.Predicate, data, w.Params)
 }
 
 func Where(query string, params ParamBinds) (*WherePredicates, error) {

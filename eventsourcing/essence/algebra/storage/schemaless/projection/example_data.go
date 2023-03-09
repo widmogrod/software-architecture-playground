@@ -1,9 +1,10 @@
 package schemaless
 
 type Game struct {
-	Players []string
-	Winner  string
-	IsDraw  bool
+	SessionID string
+	Players   []string
+	Winner    string
+	IsDraw    bool
 }
 
 type SessionsStats struct {

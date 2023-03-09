@@ -17,7 +17,7 @@ type LogHandler struct {
 func (l *LogHandler) Process(x Item, returning func(Item)) error {
 	log.
 		WithField("key", x.Key).
-		//WithField("item", ToStrItem(&x)).
+		WithField("item", ToStrItem(&x)).
 		Infof("%s: Process \n", l.prefix)
 
 	returning(x)
