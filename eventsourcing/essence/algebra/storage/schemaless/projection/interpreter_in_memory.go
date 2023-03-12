@@ -1,7 +1,8 @@
-package schemaless
+package projection
 
 import (
 	"container/list"
+	"context"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -37,6 +38,10 @@ func (i *InMemoryInterpreter) Run(nodes []Node) error {
 		}
 	}
 
+	return nil
+}
+
+func (i *InMemoryInterpreter) RunWithContext(ctx context.Context, nodes []Node) error {
 	return nil
 }
 
@@ -258,9 +263,9 @@ func (i *InMemoryInterpreter) run(dag Node) error {
 								Aggregate: msg.Aggregate,
 								Retract:   msg.Retract,
 							})
+							log.Debugln("Joining loop published [END]", i.str(x), ToStrMessage(msg))
 						} else {
-							// wait for next message
-							time.Sleep(100 * time.Millisecond)
+							<-time.After(10 * time.Millisecond)
 						}
 					}
 				}
@@ -308,7 +313,7 @@ func ToStr(x Node) string {
 			return fmt.Sprintf("merge(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 		func(x *Load) string {
-			return fmt.Sprintf("load(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
+			return fmt.Sprintf("Load(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())
 		},
 		func(x *Join) string {
 			return fmt.Sprintf("join(%s, r=%v)", x.Ctx.Name(), x.Ctx.ShouldRetract())

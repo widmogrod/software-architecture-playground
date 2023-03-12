@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
+	"strconv"
 	"testing"
-	"time"
 )
 
 var generateData = []Item{
@@ -38,7 +38,7 @@ var generateData = []Item{
 
 func GenerateData() *GenerateHandler {
 	return &GenerateHandler{
-		load: func(returning func(message Item)) error {
+		Load: func(returning func(message Item)) error {
 			for _, msg := range generateData {
 				returning(msg)
 			}
@@ -146,7 +146,7 @@ func TestProjection(t *testing.T) {
 	err := interpretation.Run(dag.Build())
 	assert.NoError(t, err)
 
-	<-time.After(1 * time.Second)
+	interpretation.WaitForDone()
 
 	result, err := sessionStatsRepo.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
 		RecordType: "session",
@@ -218,10 +218,43 @@ func TestLiveSelect(t *testing.T) {
 	// doing ad hock live selects vs precalculating materialized view.
 	// ---
 	// This example works, and there are few things to solve
-	// - detect when there is no updates
-	//   - let's data producer send a signal that it finished, and no frther updates will sent
-	//   - add watermarking, to detect, what are latest events in system
-	// - closing live select, when connection is closed
+	// - detect when there is no updates [v]
+	//   - let's data producer send a signal that it finished, and no frther updates will sent [v]
+	//   - add watermarking, to detect, what are latest events in system [TODO when there will be windowing]
+	// - closing live select, when connection is closed [TODO add context]
+	//------------------------------------
+	// - DAG compilation, like loading data from stream,
+	//   - if steam is Kinesis, there is limit of consumers that can be attached to stream.
+	//     this means, that when there can be few milion of live select, there will be need to have some other way to Load data to DAG
+	//     - one way is to have part of DAG to recognise this limitation, and act within limit of kinesis, an have only few consumers
+	//       that push data to a solution, that can handle millions of lightweight consumers,
+	//			- RabbitMQ, it's all about topology of messages, few thousen of consumers should be fine
+	//          - Redis?
+	//     	    - In memeory, since DAG for live select is already in memeory, to could be able to route messaged to at lewast few thousend of consumers
+	//          - if DAG would push message to API Gateway Websocket, then state on one node is not concerned,
+	//            but what is, is that each node may have some data, and then it will need to re route them to other nodes to create final aggregate
+	//            which means that each node needs to have knowladge which node process process which kays ranges
+	//
+	// - Load node1
+	//   - Select repository (Optimise and cache)
+	//   - Take events related to a filter from stream (steam reads from a partition, so it has olny potion of data)
+	//   - Map & Merge
+	//   - Push to web socket
+	//
+	//   since every above optimisation would require some kind of cluster, and mitigates some limitations,
+	//   but since live select is always from a point of time, and later is interested in having only latest data pushes, maybe it make sense
+	//   to have only data for that window in memory. Then all steam data whenever live select request for it or now, would be computer for recently change data
+	//   that way, cluster only works for time horizon. Time horizon is smaller than all data,
+	//     it still could be horizontly scaled, each node would have it's own range of keys
+	//
+	//  Framing problem of live select as select on record with only one element that exists in database (no joins)
+	//  when connected with RepositoryWithAggregate, solves live select by only working with stream and waiting for updates, no need to past data, only updates
+	//  that way, select to DynamoDB won't be needed, and thise other otimisations (like caching DAX or Reads from OpenSearch) won't be needed
+	//
+	//
+	//
+	//
+	//---------------------------------
 	// - optimiastion of DAGs, few edges in line, withotu forks, can be executed in memory, without need of streams between them
 	// - what if different partitions needs to merge? like count total,
 	//   data from different counting nodes, should be send to one selected node
@@ -232,7 +265,7 @@ func TestLiveSelect(t *testing.T) {
 	//   - but what if there will be a lot of new DAGs, that need to process all data fron whole db?
 	//      my initial assumption, was that DAGs can be lightwaight, so that I can add new forks on runtime,
 	//      but fork on "joined" will be from zero oldest offset, and may not have data from DB, so it's point in time
-	//      maybe this means that instead of having easy way of forking, just DAGs can be deployed with full load from DB
+	//      maybe this means that instead of having easy way of forking, just DAGs can be deployed with full Load from DB
 	//      since such situation can happen multiple times, that would mean that database needs to be optimised for massive parallel reads
 	//
 	//      	Premature optimisation: In context of DDB, this will consume a lot of RCUs,
@@ -259,7 +292,7 @@ func TestLiveSelect(t *testing.T) {
 	lastState := dag.
 		WithName("DynamoDB LastState Filtered").
 		Load(&GenerateHandler{
-			load: func(push func(message Item)) error {
+			Load: func(push func(message Item)) error {
 				push(Item{
 					Key: "game-1",
 					Data: schema.FromGo(schemaless.Record[Game]{
@@ -292,7 +325,7 @@ func TestLiveSelect(t *testing.T) {
 	streamState := dag.
 		WithName("DynamoDB Filtered Stream").
 		Load(&GenerateHandler{
-			load: func(push func(message Item)) error {
+			Load: func(push func(message Item)) error {
 				// This is where we would get data from stream
 				push(Item{
 					Key: "game-1",
@@ -377,6 +410,73 @@ func TestLiveSelect(t *testing.T) {
 		WithName("Publish to websocket").
 		Map(Log("publish-web-socket"))
 	//Map(NewWebsocketSink())
+
+	interpretation := DefaultInMemoryInterpreter()
+	err := interpretation.Run(dag.Build())
+	assert.NoError(t, err)
+	interpretation.WaitForDone()
+}
+
+func TestMergeDifferentInputsTypes(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		TimestampFormat: "",
+		PadLevelText:    true,
+	})
+
+	dag := NewBuilder()
+
+	ints := dag.Load(&GenerateHandler{
+		Load: func(push func(message Item)) error {
+			push(Item{
+				Key:  "int-1",
+				Data: schema.FromGo(1),
+			})
+			return nil
+		},
+	})
+
+	strings := dag.Load(&GenerateHandler{
+		Load: func(push func(message Item)) error {
+			push(Item{
+				Key:  "string-1",
+				Data: schema.FromGo("string-1"),
+			})
+			return nil
+		},
+	})
+
+	_ = dag.
+		// Push to the same channel different keys
+		Join(ints, strings).
+		// Map, don't look at keys, so it can squash them into one
+		Map(&MapHandler[any, any]{
+			F: func(x any, returning func(key string, value any)) error {
+				switch y := x.(type) {
+				case int:
+					returning("key", strconv.Itoa(y))
+				case float64:
+					returning("key", strconv.FormatFloat(y, 'f', -1, 64))
+				case string:
+					returning("key", y)
+				default:
+					return fmt.Errorf("unknown type %T", x)
+				}
+				return nil
+			},
+		}).
+		// Merge is always MergeByKey, and since we have only one key, it will merge all incoming data
+		Merge(&MergeHandler[string]{
+			Combine: func(a, b string) (string, error) {
+				return a + b, nil
+			},
+		}).
+		//Map(&DebounceHandler{
+		//	MaxSize: 10,
+		//	MaxTime: 10 * time.Millisecond,
+		//}).
+		Map(Log("merged"))
 
 	interpretation := DefaultInMemoryInterpreter()
 	err := interpretation.Run(dag.Build())

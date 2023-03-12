@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -29,7 +29,7 @@ func TestGenerateHandler(t *testing.T) {
 	}
 
 	h := &GenerateHandler{
-		load: func(returning func(message Item)) error {
+		Load: func(returning func(message Item)) error {
 			for _, msg := range generate {
 				returning(msg)
 			}

@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import (
 	log "github.com/sirupsen/logrus"

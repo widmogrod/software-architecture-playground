@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import (
 	"github.com/stretchr/testify/assert"

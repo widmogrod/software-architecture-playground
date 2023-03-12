@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import "container/list"
 

@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import "github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 

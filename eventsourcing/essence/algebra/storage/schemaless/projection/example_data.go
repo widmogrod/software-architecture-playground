@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 type Game struct {
 	SessionID string

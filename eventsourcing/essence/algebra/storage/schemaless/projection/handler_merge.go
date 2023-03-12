@@ -1,4 +1,4 @@
-package schemaless
+package projection
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 var _ Handler = &MergeHandler[any]{}
 
 type MergeHandler[A any] struct {
-	Combine   func(base A, x A) (A, error)
-	DoRetract func(base A, x A) (A, error)
+	Combine   func(a, b A) (A, error)
+	DoRetract func(a, b A) (A, error)
 }
 
 func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
