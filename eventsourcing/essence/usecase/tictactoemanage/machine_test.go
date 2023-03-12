@@ -86,6 +86,14 @@ func TestNewMachine(t *testing.T) {
 						SecondPlayerID: "2",
 					},
 				},
+				&GameActionCMD{
+					SessionID: "a",
+					GameID:    "g1",
+					Action: &tictacstatemachine.StartGameCMD{
+						FirstPlayerID:  "1",
+						SecondPlayerID: "2",
+					},
+				},
 			},
 			err: []error{
 				nil,
@@ -103,6 +111,7 @@ func TestNewMachine(t *testing.T) {
 				ErrNotTheSameSessions,
 				ErrNotTheSameGame,
 				nil,
+				ErrGameState,
 			},
 			states: []State{
 				&SessionWaitingForPlayers{
@@ -188,6 +197,23 @@ func TestNewMachine(t *testing.T) {
 						MovesOrder:       []tictacstatemachine.Move{},
 					},
 				},
+				&SessionInGame{
+					SessionID: "a",
+					Players:   []PlayerID{"2", "1"},
+					GameID:    "g1",
+					GameState: &tictacstatemachine.GameProgress{
+						TicTacToeBaseState: tictacstatemachine.TicTacToeBaseState{
+							FirstPlayerID:  "1",
+							SecondPlayerID: "2",
+							BoardRows:      3,
+							BoardCols:      3,
+							WinningLength:  3,
+						},
+						NextMovePlayerID: "1",
+						MovesTaken:       map[tictacstatemachine.Move]tictacstatemachine.PlayerID{},
+						MovesOrder:       []tictacstatemachine.Move{},
+					},
+				},
 			},
 		},
 
@@ -245,7 +271,7 @@ func TestNewMachine(t *testing.T) {
 			for i, cmd := range uc.commands {
 				err := m.Handle(cmd)
 				assert.Equal(t, uc.states[i], m.State(), "state at index: %d", i)
-				assert.Equal(t, uc.err[i], err, "error at index: %d", i)
+				assert.ErrorIs(t, err, uc.err[i], "error at index: %d", i)
 			}
 		})
 	}

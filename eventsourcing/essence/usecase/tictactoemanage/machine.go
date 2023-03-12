@@ -2,6 +2,7 @@ package tictactoemanage
 
 import (
 	"errors"
+	"fmt"
 	"github.com/widmogrod/mkunion/x/machine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictacstatemachine"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoeaggregate"
@@ -19,6 +20,7 @@ var (
 	ErrSessionNotReadyToAcceptGameInput = errors.New("session is not ready to accept game input")
 	ErrNotTheSameGame                   = errors.New("not the same game")
 	ErrNotExpectedListsOfCommands       = errors.New("not expected lists of commands")
+	ErrGameState                        = errors.New("game state error")
 )
 
 func Transition(cmd Command, state State) (State, error) {
@@ -178,6 +180,10 @@ func Transition(cmd Command, state State) (State, error) {
 			}
 
 			err := game.Handle(action)
+			if err != nil {
+				return nil, fmt.Errorf("%w, %s", ErrGameState, err)
+			}
+
 			if err == nil {
 				if _, ok := action.(*tictacstatemachine.MoveCMD); ok {
 					if progress, ok := game.State().(*tictacstatemachine.GameProgress); ok {
