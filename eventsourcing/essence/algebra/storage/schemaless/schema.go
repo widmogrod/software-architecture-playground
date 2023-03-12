@@ -10,15 +10,17 @@ import (
 
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
-		store: make(map[string]schema.Schema),
+		store:     make(map[string]schema.Schema),
+		appendLog: NewAppendLog[schema.Schema](),
 	}
 }
 
 var _ Repository[schema.Schema] = &InMemoryRepository{}
 
 type InMemoryRepository struct {
-	store map[string]schema.Schema
-	mux   sync.Mutex
+	store     map[string]schema.Schema
+	appendLog *AppendLog[schema.Schema]
+	mux       sync.Mutex
 }
 
 func (s *InMemoryRepository) Get(recordID, recordType string) (Record[schema.Schema], error) {
@@ -48,6 +50,8 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
+	newLog := NewAppendLog[schema.Schema]()
+
 	for _, record := range x.Saving {
 		stored, ok := s.store[record.ID+record.Type]
 		if !ok {
@@ -71,15 +75,46 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 	}
 
 	for _, record := range x.Saving {
+		var err error
+		var before Record[schema.Schema]
+		if _, ok := s.store[s.toKey(record)]; ok {
+			before, err = s.toTyped(s.store[s.toKey(record)])
+			if err != nil {
+				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: to typed failed %s %w", err, ErrInternalError))
+			}
+		}
+
 		record.Version += 1
-		s.store[record.ID+record.Type] = s.fromTyped(record)
+		s.store[s.toKey(record)] = s.fromTyped(record)
+
+		err = newLog.Change(before, record)
+		if err != nil {
+			panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: append log failed (1) %s %w", err, ErrInternalError))
+		}
 	}
 
-	for _, id := range x.Deleting {
-		delete(s.store, id.ID+id.Type)
+	for _, record := range x.Deleting {
+		if _, ok := s.store[s.toKey(record)]; ok {
+			before, err := s.toTyped(s.store[s.toKey(record)])
+			if err != nil {
+				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: to typed failed %s %w", err, ErrInternalError))
+			}
+			err = newLog.Delete(before)
+			if err != nil {
+				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: append log failed (2) %s %w", err, ErrInternalError))
+			}
+		}
+
+		delete(s.store, s.toKey(record))
 	}
+
+	s.appendLog.Append(newLog)
 
 	return nil
+}
+
+func (s *InMemoryRepository) toKey(record Record[schema.Schema]) string {
+	return record.ID + record.Type
 }
 
 func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
@@ -100,7 +135,7 @@ func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.S
 
 	if query.Where != nil {
 		newRecords := make([]schema.Schema, 0)
-		for _, record := range s.store {
+		for _, record := range records {
 			if predicate.Evaluate(query.Where.Predicate, record, query.Where.Params) {
 				newRecords = append(newRecords, record)
 			}
@@ -181,6 +216,10 @@ func (s *InMemoryRepository) toTyped(record schema.Schema) (Record[schema.Schema
 		return Record[schema.Schema]{}, fmt.Errorf("store.InMemoryRepository.FindingRecords corrupted record: %v", record)
 	}
 	return typed, nil
+}
+
+func (s *InMemoryRepository) AppendLog() *AppendLog[schema.Schema] {
+	return s.appendLog
 }
 
 func sortRecords(records []schema.Schema, sortFields []SortField) []schema.Schema {
