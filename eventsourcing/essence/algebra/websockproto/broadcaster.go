@@ -1,10 +1,10 @@
 package websockproto
 
 import (
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
-	"log"
 )
 
 type Broadcaster interface {
@@ -73,6 +73,9 @@ func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string
 }
 
 func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
+	log.Debugln("BroadcastToSession sessionID [start]:", sessionID, "msg:", string(msg))
+	defer log.Debugln("BroadcastToSession sessionID [end]:", sessionID, "msg:", string(msg))
+
 	cursor := schemaless.FindingRecords[schemaless.Record[ConnectionToSession]]{
 		Where: predicate.MustWhere(
 			"Type = :type AND Data.SessionID = :sessionID",
@@ -86,15 +89,15 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 	for {
 		result, err := i.repository.FindingRecords(cursor)
 		if err != nil {
-			log.Println("InMemoryBroadcaster.BroadcastToSession FindingRecords error:", err)
+			log.Warnln("InMemoryBroadcaster.BroadcastToSession FindingRecords error:", err)
 		}
 
 		for _, item := range result.Items {
-			log.Println("BroadcastToSession connectionID:", item.Data.ConnectionID)
+			log.Debugln("BroadcastToSession connectionID: publish", item.Data.ConnectionID)
 			err = i.publisher.Publish(item.Data.ConnectionID, msg)
 			// TODO handle this differently
 			if err != nil {
-				log.Println("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
+				log.Warnln("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
 			}
 		}
 
@@ -109,11 +112,11 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 func (i *InMemoryBroadcaster) SendBackToSender(connectionID string, msg []byte) {
 	item, err := i.repository.Get(connectionID, "connectionToSession")
 	if err != nil {
-		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
+		log.Warnln("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 
 	err = i.publisher.Publish(item.Data.ConnectionID, msg)
 	if err != nil {
-		log.Println("InMemoryBroadcaster.SendBackToSender error:", err)
+		log.Warnln("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -46,7 +46,7 @@ func (s *InMemoryProtocol) ConnectionOpen(conn net.Conn) {
 
 	err := s.OnConnect(connectionID)
 	if err != nil {
-		log.Printf("ConnectionOpen: OnConnect(%s) error: %v ", connectionID, err)
+		log.Warnf("ConnectionOpen: OnConnect(%s) error: %v ", connectionID, err)
 		return
 	}
 }
@@ -69,13 +69,13 @@ func (s *InMemoryProtocol) ConnectionClose(conn net.Conn) {
 
 	err = s.OnDisconnect(connectionID)
 	if err != nil {
-		log.Printf("ConnectionClose: OnDisconnect(%s) error %v \n", connectionID, err)
+		log.Warnf("ConnectionClose: OnDisconnect(%s) error %v \n", connectionID, err)
 	}
 }
 
 func (s *InMemoryProtocol) ConnectionReceiveData(conn net.Conn) error {
 	msg, _, err := wsutil.ReadClientData(conn)
-	log.Println("msg", string(msg))
+	log.Debugln("msg", string(msg))
 	if err != nil {
 		return err
 	}
@@ -92,20 +92,20 @@ func (s *InMemoryProtocol) PublishLoop() {
 	for {
 		select {
 		case pub := <-s.publish:
-			log.Printf("PublishLoop: %s %s \n", pub.ConnectionID, string(pub.Data))
+			log.Debugf("PublishLoop: %s %s \n", pub.ConnectionID, string(pub.Data))
 			conn, err := s.connByID(pub.ConnectionID)
 			if err != nil {
-				log.Println("PublishLoop: connByID error", err)
+				log.Warnln("PublishLoop: connByID error", err)
 				continue
 			}
 
 			err = wsutil.WriteServerMessage(conn, ws.OpText, pub.Data)
 			if err != nil {
-				log.Println("PublishLoop: WriteServerMessage:", err)
+				log.Warnln("PublishLoop: WriteServerMessage:", err)
 				s.ConnectionClose(conn)
 			}
 
-			log.Println("PublishLoop: published:", string(pub.Data))
+			log.Debugln("PublishLoop: published:", string(pub.Data))
 		}
 	}
 }
@@ -129,6 +129,7 @@ func (s *InMemoryProtocol) connByID(connectionID ConnectionID) (net.Conn, error)
 }
 
 func (s *InMemoryProtocol) Publish(connectionID string, msg []byte) error {
+	log.Debugln("Publish:", connectionID, string(msg))
 	i := Item{
 		ConnectionID: connectionID,
 		Data:         msg,
@@ -151,13 +152,15 @@ func (s *InMemoryProtocol) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer conn.Close()
 
 		for {
+			log.Infof("ConnectionReceiveData: Start")
 			err = s.ConnectionReceiveData(conn)
+			log.Infof("ConnectionReceiveData: End")
 			if err != nil {
 				if err == io.EOF {
-					log.Println("ConnectionReceiveData: CLOSED")
+					log.Infof("ConnectionReceiveData: CLOSED")
 					break
 				}
-				log.Println("ConnectionReceiveData:", err)
+				log.Errorln("ConnectionReceiveData error:", err)
 				continue
 			}
 		}
