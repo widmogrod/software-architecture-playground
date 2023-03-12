@@ -162,8 +162,8 @@ function Board2({movesTaken, playersStyle, rows, cols, winingSequence, onSquareC
 
 
 function serverURL(sessionID) {
-    return 'wss://al0ofi3lke.execute-api.eu-west-1.amazonaws.com/dev'
-    // return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
+    // return 'wss://al0ofi3lke.execute-api.eu-west-1.amazonaws.com/dev'
+    return 'ws://' + document.location.hostname + ':8080/play/' + sessionID
 }
 
 function gameURL(sessionID) {
@@ -183,6 +183,7 @@ export function Game() {
 
     const [currentGameState, setGameState] = useState({});
     const [currentStats, setStats] = useState({});
+    const [currentError, setError] = useState("");
     const [cookies, setCookie] = useCookies(['playerID']);
 
     const [socketUrl, setSocketUrl] = useState(null)
@@ -211,6 +212,8 @@ export function Game() {
     useEffect(() => {
         if (lastJsonMessage?.SessionStatsResult) {
             setStats(lastJsonMessage)
+        } else if (lastJsonMessage?.error) {
+            setError(lastJsonMessage.error)
         } else {
             setGameState(lastJsonMessage)
         }
@@ -228,7 +231,9 @@ export function Game() {
                 manage.CreateSessionCMD(sessionID, 2),
                 manage.JoinGameSessionCMD(sessionID, cookies.playerID)
             ]))
-            sendJsonMessage(manage.SessionStatsQuery(sessionID))
+
+            sendJsonMessage(manage.SessionStatsSubscription(sessionID))
+            // sendJsonMessage(manage.SessionStatsQuery(sessionID))
             // Automatically create a game if the playerID is already set
             // sendJsonMessage(CreateGameCMD(cookies.playerID))
         } else if (currentGameState?.SessionWaitingForPlayers) {
@@ -250,7 +255,8 @@ export function Game() {
             currentGameState?.SessionInGame?.GameState?.GameEndWithWin
             || currentGameState?.SessionInGame?.GameState?.GameEndWithDraw
         ) {
-            sendJsonMessage(manage.SessionStatsQuery(sessionID))
+            // sendJsonMessage(manage.SessionStatsQuery(sessionID))
+            // sendJsonMessage(manage.SessionStatsSubscription(sessionID))
         }
 
         //eslint-disable-next-line
@@ -370,6 +376,7 @@ export function Game() {
                     <p>GameID: {currentGameState?.SessionInGame?.GameID}</p>
                     <p>Game server is currently {connectionStatus}</p>
                     <p><code>{currentGameState?.SessionInGame?.GameProblem}</code></p>
+                    {currentError && <p>❓<code>{currentError}</code></p>}
                 </div>
             </div>
         </>

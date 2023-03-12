@@ -59,3 +59,11 @@ export function SessionStatsQuery(sessionID) {
         },
     }
 }
+
+export function SessionStatsSubscription(sessionID) {
+    return {
+        "SessionStatsSubscription": {
+            "SessionID": sessionID,
+        },
+    }
+}
