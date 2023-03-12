@@ -92,7 +92,7 @@ func TestNewRepositoryInMemory(t *testing.T) {
 		),
 		Sort: []SortField{
 			{
-				Field:      "Data.Ctx",
+				Field:      "Data.Name",
 				Descending: true,
 			},
 		},
