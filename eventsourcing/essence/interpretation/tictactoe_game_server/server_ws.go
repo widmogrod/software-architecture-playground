@@ -3,8 +3,6 @@ package tictactoe_game_server
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
@@ -13,13 +11,13 @@ import (
 
 func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 	var err error
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
+	//cfg, err := config.LoadDefaultConfig(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	//store := schemaless.NewInMemoryRepository()
-	store := schemaless.NewDynamoDBRepository(dynamodb.NewFromConfig(cfg), "test-repo-record")
+	store := schemaless.NewInMemoryRepository()
+	//store := schemaless.NewDynamoDBRepository(dynamodb.NewFromConfig(cfg), "test-repo-record")
 
 	connRepo := typedful.NewTypedRepository[websockproto.ConnectionToSession](store)
 	//connRepo := schemaless.NewDynamoDBRepository(
@@ -61,6 +59,11 @@ func NewWebSocket(ctx context.Context) (*websockproto.InMemoryProtocol, error) {
 		broadcast:           broadcaster,
 		gameStateRepository: stateRepo,
 		query:               query,
+		liveSelect: NewLiveSelect(
+			store.AppendLog(),
+			typedful.NewTypedRepository[tictactoemanage.State](store),
+			broadcaster,
+		),
 	}
 
 	wshandler.OnMessage = game.OnMessage

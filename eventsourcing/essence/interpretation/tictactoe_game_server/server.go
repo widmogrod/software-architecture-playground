@@ -1,13 +1,15 @@
 package tictactoe_game_server
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
-	"log"
+	"time"
 )
 
 func init() {
@@ -18,6 +20,7 @@ func UnmarshalQueryOrCommand(
 	data []byte,
 	onCommand func(tictactoemanage.Command) error,
 	onQuery func(tictactoemanage.Query) error,
+	onSubscription func(tictactoemanage.Subscription) error,
 ) error {
 	sch, err := schema.FromJSON(data)
 	if err != nil {
@@ -31,6 +34,8 @@ func UnmarshalQueryOrCommand(
 		return onCommand(x)
 	case tictactoemanage.Query:
 		return onQuery(x)
+	case tictactoemanage.Subscription:
+		return onSubscription(x)
 	}
 
 	return fmt.Errorf("JsonUnmarshal: %T not a command or query", goo)
@@ -99,6 +104,7 @@ type Game struct {
 	broadcast           websockproto.Broadcaster
 	gameStateRepository schemaless.Repository[tictactoemanage.State]
 	query               Query
+	liveSelect          *LiveSelect
 }
 
 func (g *Game) OnMessage(connectionID string, data []byte) error {
@@ -111,51 +117,70 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 
 			stateRecord, err := g.gameStateRepository.Get(sessionID, "session")
 			if err != nil && !errors.Is(err, schemaless.ErrNotFound) {
-				log.Println("OnMessage: Get: err", err)
+				log.Errorln("OnMessage: Get: err", err)
 				return err
 			}
 
 			machine := tictactoemanage.NewMachineWithState(stateRecord.Data)
 			err = machine.Handle(cmd)
 			if err != nil {
-				log.Println("Handle error continued:", err)
-				//return err
+				msg, err := schema.ToJSON(schema.MkMap(
+					schema.MkField("error", schema.MkString(err.Error())),
+				))
+				if err != nil {
+					log.Warnf("machine.Handle() %s \n", err)
+					return err
+				} else {
+					g.broadcast.SendBackToSender(connectionID, msg)
+					msg, err := MarshalState(stateRecord.Data)
+					if err != nil {
+						log.Warnf("MarshalState() %s \n", err)
+						return err
+					} else {
+						g.broadcast.SendBackToSender(connectionID, msg)
+					}
+				}
+				return nil
 			}
 
 			newState := machine.State()
-			if newState != nil {
-				// session has also latest stateRecord
-				update := schemaless.UpdateRecords[schemaless.Record[tictactoemanage.State]]{
-					Saving: map[string]schemaless.Record[tictactoemanage.State]{
-						sessionID: {
-							ID:      sessionID,
-							Type:    "session",
-							Data:    newState,
-							Version: stateRecord.Version,
-						},
-					},
-				}
+			if newState == nil {
+				// TODO convert to error
+				log.Warnln("OnMessage: newState is nil")
+				return nil
+			}
 
-				// but pass game stateRecord are also valuable, for example to calculate leaderboards and stats
-				if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
-					update.Saving[inGame.GameID] = schemaless.Record[tictactoemanage.State]{
-						ID:      inGame.GameID,
-						Type:    "game",
+			// session has also latest stateRecord
+			update := schemaless.UpdateRecords[schemaless.Record[tictactoemanage.State]]{
+				Saving: map[string]schemaless.Record[tictactoemanage.State]{
+					sessionID: {
+						ID:      sessionID,
+						Type:    "session",
 						Data:    newState,
 						Version: stateRecord.Version,
-					}
-				}
+					},
+				},
+			}
 
-				err = g.gameStateRepository.UpdateRecords(update)
-				if err != nil {
-					log.Println("OnMessage: Set: err", err)
-					return err
+			// but pass game stateRecord are also valuable, for example to calculate leaderboards and stats
+			if inGame, ok := newState.(*tictactoemanage.SessionInGame); ok {
+				update.Saving[inGame.GameID] = schemaless.Record[tictactoemanage.State]{
+					ID:      inGame.GameID,
+					Type:    "game",
+					Data:    newState,
+					Version: stateRecord.Version,
 				}
+			}
+
+			err = g.gameStateRepository.UpdateRecords(update)
+			if err != nil {
+				log.Println("OnMessage: Set: err", err)
+				return err
 			}
 
 			msg, err := MarshalState(newState)
 			if err != nil {
-				log.Println("OnMessage: MarshalState: err", err)
+				log.Errorln("OnMessage: MarshalState: err", err)
 				return err
 			}
 			log.Println("stateRecord", string(msg))
@@ -180,18 +205,37 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 					var err error
 					result, err = g.query.Query(*x)
 					if err != nil {
-						log.Println("OnMessage(query): g.query.Query: err", err)
+						log.Errorln("OnMessage(query): g.query.Query: err", err)
 						return err
 					}
 
 					sch := schema.FromGo(result)
 					msg, err := schema.ToJSON(sch)
 					if err != nil {
-						log.Println("OnMessage(query): schema.ToJSON", err)
+						log.Errorln("OnMessage(query): schema.ToJSON", err)
 						return err
 					}
 
 					g.broadcast.SendBackToSender(connectionID, msg)
+					return nil
+				},
+			)
+		},
+		func(s tictactoemanage.Subscription) error {
+			log.Printf("OnMessage: subscription %#v \n", s)
+			return tictactoemanage.MustMatchSubscription(
+				s,
+				func(x *tictactoemanage.SessionStatsSubscription) error {
+					log.Printf("OnMessage(subscription): SessionStatsSubscription %#v \n", *x)
+					ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+					go func() {
+						err := g.liveSelect.Process(ctx, x.SessionID)
+						if err != nil {
+							log.Errorf("SessionStatsSubscription(): liveSelect.Process: %v", err)
+						}
+					}()
+
+					log.Printf("OnMessage(subscription) [return]: SessionStatsSubscription %#v \n", *x)
 					return nil
 				},
 			)
