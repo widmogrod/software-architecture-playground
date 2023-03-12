@@ -82,3 +82,10 @@ type (
 		PlayerWins map[PlayerID]int
 	}
 )
+
+//go:generate mkunion -name=Subscription
+type (
+	SessionStatsSubscription struct {
+		SessionID SessionID
+	}
+)
