@@ -1,11 +1,14 @@
 package projection
 
-import "container/list"
+import (
+	"container/list"
+	"fmt"
+)
 
-var _ Builder = &DagBuilder{}
+var _ Builder = &DAGBuilder{}
 
-func NewBuilder() *DagBuilder {
-	return &DagBuilder{
+func NewDAGBuilder() *DAGBuilder {
+	return &DAGBuilder{
 		nodes: make(map[Node]*list.List),
 		dag:   nil,
 		ctx: &DefaultContext{
@@ -14,36 +17,44 @@ func NewBuilder() *DagBuilder {
 	}
 }
 
-type DagBuilder struct {
+type DAGBuilder struct {
 	nodes map[Node]*list.List
 	dag   Node
 	ctx   *DefaultContext
 }
 
-func (d *DagBuilder) WithName(s string) Builder {
-	return &DagBuilder{
-		nodes: d.nodes,
-		dag:   d.dag,
-		ctx:   d.ctx.Scope(s),
-	}
+func (d *DAGBuilder) nextNumber() int {
+	return len(d.nodes)
 }
 
-func (d *DagBuilder) addNode(node Node) {
+func (d *DAGBuilder) addNode(node Node) {
+
+	// check if node name is already in use, yes - fail
+	for n := range d.nodes {
+		if n == nil || node == nil {
+			panic("node is nil")
+		}
+
+		if GetCtx(n).Name() == GetCtx(node).Name() {
+			panic(fmt.Sprintf("node name %s is already in use", GetCtx(node).Name()))
+		}
+	}
+
 	d.nodes[node] = list.New()
 }
 
-func (d *DagBuilder) addDependency(from, to Node) {
-	if _, ok := d.nodes[from]; !ok {
-		d.addNode(from)
-	}
-	if _, ok := d.nodes[to]; !ok {
-		d.addNode(to)
-	}
-	d.nodes[from].PushBack(to)
-}
+//func (d *DAGBuilder) addDependency(from, to Node) {
+//	if _, ok := d.nodes[from]; !ok {
+//		d.addNode(from)
+//	}
+//	if _, ok := d.nodes[to]; !ok {
+//		d.addNode(to)
+//	}
+//	d.nodes[from].PushBack(to)
+//}
 
-func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope("Load")
+func (d *DAGBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("Load%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
@@ -55,15 +66,15 @@ func (d *DagBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
 
 	d.addNode(node)
 
-	return &DagBuilder{
+	return &DAGBuilder{
 		nodes: d.nodes,
 		dag:   node,
 		ctx:   ctx,
 	}
 }
 
-func (d *DagBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope("Map")
+func (d *DAGBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("Map%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
@@ -74,17 +85,18 @@ func (d *DagBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
 		Input: d.dag,
 	}
 
-	d.addDependency(node, d.dag)
+	d.addNode(node)
+	//d.addDependency(node, d.dag)
 
-	return &DagBuilder{
+	return &DAGBuilder{
 		nodes: d.nodes,
 		dag:   node,
 		ctx:   ctx,
 	}
 }
 
-func (d *DagBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope("Merge")
+func (d *DAGBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("Merge%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
@@ -95,17 +107,18 @@ func (d *DagBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
 		Input:   d.dag,
 	}
 
-	d.addDependency(node, d.dag)
+	d.addNode(node)
+	//d.addDependency(node, d.dag)
 
-	return &DagBuilder{
+	return &DAGBuilder{
 		nodes: d.nodes,
 		dag:   node,
 		ctx:   ctx,
 	}
 }
 
-func (d *DagBuilder) Join(a, b Builder, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope("Join")
+func (d *DAGBuilder) Join(a, b Builder, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("Join%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
@@ -113,23 +126,45 @@ func (d *DagBuilder) Join(a, b Builder, opts ...ContextOptionFunc) Builder {
 	node := &Join{
 		Ctx: ctx,
 		Input: []Node{
-			a.(*DagBuilder).dag,
-			b.(*DagBuilder).dag,
+			a.(*DAGBuilder).dag,
+			b.(*DAGBuilder).dag,
 		},
 	}
 
-	d.addDependency(node, d.dag)
+	d.addNode(node)
+	//d.addDependency(node, d.dag)
 
-	return &DagBuilder{
+	return &DAGBuilder{
 		nodes: d.nodes,
 		dag:   node,
 		ctx:   ctx,
 	}
 }
-func (d *DagBuilder) Build() []Node {
+func (d *DAGBuilder) Build() []Node {
 	result := make([]Node, 0, len(d.nodes))
 	for node := range d.nodes {
 		result = append(result, node)
 	}
 	return result
+}
+
+func (d *DAGBuilder) GetByName(name string) (*DAGBuilder, error) {
+	//TODO fix me!
+
+	for node := range d.nodes {
+
+		if node == nil {
+			//continue
+			panic("node is nil")
+		}
+
+		if GetCtx(node).Name() == name {
+			return &DAGBuilder{
+				nodes: d.nodes,
+				dag:   node,
+				ctx:   GetCtx(node),
+			}, nil
+		}
+	}
+	return nil, ErrNotFound
 }

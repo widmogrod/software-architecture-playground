@@ -1,6 +1,7 @@
 package projection
 
 import (
+	"context"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -92,14 +93,12 @@ func MergeSessionStats() *MergeHandler[SessionsStats] {
 
 func CountTotalSessionsStats(b Builder) Builder {
 	return b.
-		WithName("CountTotalSessionsStats:MapSessionsToStats").
 		Map(&MapHandler[SessionsStats, int]{
 			F: func(x SessionsStats, returning func(key string, value int)) error {
 				returning("total", 1)
 				return nil
 			},
-		}, WithRetraction()).
-		WithName("CountTotalSessionsStats:Count").
+		}, WithRetraction(), WithName("CountTotalSessionsStats:MapSessionsToStats")).
 		Merge(&MergeHandler[int]{
 			Combine: func(base, x int) (int, error) {
 				log.Debugln("counting(+)", base+x, base, x)
@@ -109,7 +108,7 @@ func CountTotalSessionsStats(b Builder) Builder {
 				log.Debugln("counting(-)", base+x, base, x)
 				return base - x, nil
 			},
-		}, WithRetraction())
+		}, WithRetraction(), WithName("CountTotalSessionsStats:Count"))
 }
 
 func TestProjection(t *testing.T) {
@@ -123,30 +122,25 @@ func TestProjection(t *testing.T) {
 	sessionStatsRepo := typedful.NewTypedRepository[SessionsStats](store)
 	totalRepo := typedful.NewTypedRepository[int](store)
 
-	dag := NewBuilder()
+	dag := NewDAGBuilder()
 	games := dag.
-		WithName("GenerateData").
-		Load(GenerateData())
+		Load(GenerateData(), WithName("GenerateData"))
 	gameStats := games.
-		WithName("MapGameToStats").
-		Map(MapGameToStats())
+		Map(MapGameToStats(), WithName("MapGameToStats"))
 	gameStatsBySession := gameStats.
-		WithName("MergeSessionStats").
-		Merge(MergeSessionStats())
+		Merge(MergeSessionStats(), WithName("MergeSessionStats"))
 
 	_ = CountTotalSessionsStats(gameStatsBySession).
-		WithName("Sink ⚽️TotalCount").
-		Map(NewRepositorySink("total", store))
+		Map(NewRepositorySink("total", store), WithName("Sink ⚽️TotalCount"))
 
 	_ = gameStatsBySession.
-		WithName("NewRepositorySink").
-		Map(NewRepositorySink("session", store))
+		Map(NewRepositorySink("session", store), WithName("NewRepositorySink"))
 
 	interpretation := DefaultInMemoryInterpreter()
-	err := interpretation.Run(dag.Build())
+	err := interpretation.Run(context.Background(), dag.Build())
 	assert.NoError(t, err)
 
-	interpretation.WaitForDone()
+	interpretation.waitForDone()
 
 	result, err := sessionStatsRepo.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
 		RecordType: "session",
@@ -232,7 +226,7 @@ func TestLiveSelect(t *testing.T) {
 	//          - Redis?
 	//     	    - In memeory, since DAG for live select is already in memeory, to could be able to route messaged to at lewast few thousend of consumers
 	//          - if DAG would push message to API Gateway Websocket, then state on one node is not concerned,
-	//            but what is, is that each node may have some data, and then it will need to re route them to other nodes to create final aggregate
+	//            but what is, is that each node may have some data, and then it will need to re route them to other nodeDAGBuilders to create final aggregate
 	//            which means that each node needs to have knowladge which node process process which kays ranges
 	//
 	// - Load node1
@@ -257,7 +251,7 @@ func TestLiveSelect(t *testing.T) {
 	//---------------------------------
 	// - optimiastion of DAGs, few edges in line, withotu forks, can be executed in memory, without need of streams between them
 	// - what if different partitions needs to merge? like count total,
-	//   data from different counting nodes, should be send to one selected node
+	//   data from different counting nodeDAGBuilders, should be send to one selected node
 	//   - How to sove such partitioning? would RabbitMQ help or make things harder?
 	// - DynamoDB loader, can have information on how many RUs to use, like 5% percent
 	// - when system is on production, and there will be more live select DAGs,
@@ -287,10 +281,9 @@ func TestLiveSelect(t *testing.T) {
 	//  - Fast message and reliable message delivery platform
 	//  - Fast change detection
 	//
-	dag := NewBuilder()
+	dag := NewDAGBuilder()
 	// Only latest records from database that match live select criteria are used
 	lastState := dag.
-		WithName("DynamoDB LastState Filtered").
 		Load(&GenerateHandler{
 			Load: func(push func(message Item)) error {
 				push(Item{
@@ -320,10 +313,9 @@ func TestLiveSelect(t *testing.T) {
 
 				return nil
 			},
-		})
+		}, WithName("DynamoDB LastState Filtered"))
 	// Only streamed records that match live select criteria are used
 	streamState := dag.
-		WithName("DynamoDB Filtered Stream").
 		Load(&GenerateHandler{
 			Load: func(push func(message Item)) error {
 				// This is where we would get data from stream
@@ -341,13 +333,12 @@ func TestLiveSelect(t *testing.T) {
 				})
 				return nil
 			},
-		})
+		}, WithName("DynamoDB Filtered Stream"))
 	// Joining make sure that newest version is published
 
 	joined := dag.
-		WithName("Join").
 		// Join by key, so if db and stream has the same key, then it will be joined.
-		Join(lastState, streamState).
+		Join(lastState, streamState, WithName("Join")).
 		Map(&FilterHandler{
 			Where: predicate.MustWhere(
 				"Data.SessionID = :sessionID",
@@ -366,8 +357,7 @@ func TestLiveSelect(t *testing.T) {
 		})
 
 	gameStats := joined.
-		WithName("MapGameToStats").
-		Map(Log("gameStats")).
+		Map(Log("gameStats"), WithName("MapGameToStats")).
 		Map(&MapHandler[schemaless.Record[Game], SessionsStats]{
 			F: func(x schemaless.Record[Game], returning func(key string, value SessionsStats)) error {
 				y := x.Data
@@ -396,8 +386,7 @@ func TestLiveSelect(t *testing.T) {
 		})
 
 	gameStatsBySession := gameStats.
-		WithName("MergeSessionStats").
-		Merge(MergeSessionStats())
+		Merge(MergeSessionStats(), WithName("MergeSessionStats"))
 
 	//// Storing in database those updates is like creating materialized view
 	//// For live select this can be skipped.
@@ -407,14 +396,12 @@ func TestLiveSelect(t *testing.T) {
 	//	Map(NewRepositorySink("session", store), IgnoreRetractions())
 
 	gameStatsBySession.
-		WithName("Publish to websocket").
-		Map(Log("publish-web-socket"))
+		Map(Log("publish-web-socket"), WithName("Publish to websocket"))
 	//Map(NewWebsocketSink())
 
 	interpretation := DefaultInMemoryInterpreter()
-	err := interpretation.Run(dag.Build())
+	err := interpretation.Run(context.Background(), dag.Build())
 	assert.NoError(t, err)
-	interpretation.WaitForDone()
 }
 
 func TestMergeDifferentInputsTypes(t *testing.T) {
@@ -425,7 +412,7 @@ func TestMergeDifferentInputsTypes(t *testing.T) {
 		PadLevelText:    true,
 	})
 
-	dag := NewBuilder()
+	dag := NewDAGBuilder()
 
 	ints := dag.Load(&GenerateHandler{
 		Load: func(push func(message Item)) error {
@@ -479,7 +466,6 @@ func TestMergeDifferentInputsTypes(t *testing.T) {
 		Map(Log("merged"))
 
 	interpretation := DefaultInMemoryInterpreter()
-	err := interpretation.Run(dag.Build())
+	err := interpretation.Run(context.Background(), dag.Build())
 	assert.NoError(t, err)
-	interpretation.WaitForDone()
 }

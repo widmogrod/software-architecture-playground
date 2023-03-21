@@ -1,6 +1,11 @@
 package projection
 
-import "github.com/widmogrod/mkunion/x/schema"
+import (
+	"errors"
+	"github.com/widmogrod/mkunion/x/schema"
+)
+
+var ErrNotFound = errors.New("node not found")
 
 //go:generate mkunion -name=Node
 type (
@@ -23,11 +28,24 @@ type (
 		Ctx   *DefaultContext
 		Input []Node
 	}
+	//TODO add for completness Split
+	//Split struct {}
 )
 
+func GetCtx(node Node) *DefaultContext {
+	return MustMatchNode(
+		node,
+		func(node *Map) *DefaultContext { return node.Ctx },
+		func(node *Merge) *DefaultContext { return node.Ctx },
+		func(node *Load) *DefaultContext { return node.Ctx },
+		func(node *Join) *DefaultContext { return node.Ctx },
+	)
+}
+
 type Item struct {
-	Key  string
-	Data schema.Schema
+	Key       string
+	Data      schema.Schema
+	EventTime int64
 }
 
 //type TypeDef struct {}
@@ -44,7 +62,6 @@ type Handler interface {
 }
 
 type Builder interface {
-	WithName(string) Builder
 	Load(f Handler, opts ...ContextOptionFunc) Builder
 	Map(f Handler, opts ...ContextOptionFunc) Builder
 	Merge(f Handler, opts ...ContextOptionFunc) Builder
@@ -54,6 +71,11 @@ type Builder interface {
 
 type ContextOptionFunc func(c *DefaultContext)
 
+func WithName(name string) ContextOptionFunc {
+	return func(c *DefaultContext) {
+		c.name = name
+	}
+}
 func WithRetraction() ContextOptionFunc {
 	return func(c *DefaultContext) {
 		yes := true
@@ -69,8 +91,9 @@ func IgnoreRetractions() ContextOptionFunc {
 }
 
 type DefaultContext struct {
-	name       string
-	retracting *bool
+	name        string
+	contextName string
+	retracting  *bool
 }
 
 func (c *DefaultContext) ShouldRetract() bool {
@@ -84,8 +107,6 @@ func (c *DefaultContext) ShouldRetract() bool {
 func (c *DefaultContext) Scope(name string) *DefaultContext {
 	return &DefaultContext{
 		name: c.name + "." + name,
-		// Should we copy this?
-		//retracting: c.retracting,
 	}
 }
 
@@ -100,3 +121,5 @@ type Message struct {
 	Aggregate *Item
 	Retract   *Item
 }
+
+type Stats = map[string]int
