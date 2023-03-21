@@ -1,6 +1,6 @@
 module github.com/widmogrod/software-architecture-playground/eventsourcing
 
-go 1.19
+go 1.20
 
 require (
 	github.com/EventStore/EventStore-Client-Go v0.0.0-20201109153453-2eb2093c8197
@@ -8,10 +8,11 @@ require (
 	github.com/apache/beam/sdks/v2 v2.44.0
 	github.com/aws/aws-cdk-go/awscdk/v2 v2.60.0
 	github.com/aws/aws-lambda-go v1.37.0
-	github.com/aws/aws-sdk-go-v2 v1.17.5
+	github.com/aws/aws-sdk-go-v2 v1.17.6
 	github.com/aws/aws-sdk-go-v2/config v1.18.8
 	github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi v1.11.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.18.5
+	github.com/aws/aws-sdk-go-v2/service/kinesis v1.17.7
 	github.com/aws/constructs-go/constructs/v10 v10.1.218
 	github.com/aws/jsii-runtime-go v1.73.0
 	github.com/gobwas/ws v1.1.0
@@ -37,10 +38,11 @@ require (
 	cloud.google.com/go/profiler v0.3.0 // indirect
 	cloud.google.com/go/storage v1.28.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.10 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.8 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.21 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.29 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.30 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.24 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.28 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.7.23 // indirect
