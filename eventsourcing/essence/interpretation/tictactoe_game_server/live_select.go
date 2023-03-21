@@ -8,7 +8,6 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/projection"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
-	"time"
 )
 
 //go:generate moq -out live_select_broadcaster_moq_test.go . Broadcaster
@@ -18,14 +17,16 @@ type Broadcaster interface {
 }
 
 type Stream interface {
-	Subscribe(fromOffset int) (schemaless.Change[schema.Schema], int)
-	Subscribe2() <-chan schemaless.Change[schema.Schema]
+	Subscribe(ctx context.Context, fromOffset int, f func(change schemaless.Change[schema.Schema])) error
 }
 
 type LiveSelect struct {
 	stream    Stream
 	store     schemaless.Repository[tictactoemanage.State]
 	broadcast Broadcaster
+	//root           *projection.DAGBuilder
+	//streamState    projection.Builder
+	//interpretation *projection.InMemoryInterpreter
 }
 
 func NewLiveSelect(
@@ -37,10 +38,37 @@ func NewLiveSelect(
 		stream:    stream,
 		store:     store,
 		broadcast: broadcast,
+		//interpretation: projection.DefaultInMemoryInterpreter(),
 	}
 }
 
 func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
+	//if l.root == nil {
+	//	l.root = projection.NewDAGBuilder()
+	//
+	//	// Register streaming consumption only once
+	//	l.streamState = l.root.
+	//		//WithName("DynamoDB Filtered Stream").
+	//		Load(&projection.GenerateHandler{
+	//			Load: func(push func(message projection.Item)) error {
+	//				log.Debugln("Load function called")
+	//				return l.stream.Subscribe(ctx, 0, func(change schemaless.Change[schema.Schema]) {
+	//					if change.Deleted {
+	//						log.Warnf("Item was deleted: %v, live select skip on it", change)
+	//						return
+	//					}
+	//
+	//					record := *change.After
+	//
+	//					push(projection.Item{
+	//						Key:  record.ID,
+	//						Data: l.fromUnTyped(record),
+	//					})
+	//				})
+	//			},
+	//		}, projection.WithName("DynamoDB Stream"))
+	//}
+
 	where := predicate.MustWhere(
 		"Data.SessionInGame.SessionID = :sessionID AND Type = :type",
 		map[predicate.BindValue]schema.Schema{
@@ -49,10 +77,11 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 		},
 	)
 
-	dag := projection.NewBuilder()
+	//dag := l.root
+	dag := projection.NewDAGBuilder()
 	// Only latest records from database that match live select criteria are used
 	lastState := dag.
-		WithName("DynamoDB LastState Filtered").
+		//WithName("DynamoDB LastState Filtered").
 		Load(&projection.GenerateHandler{
 			Load: func(push func(message projection.Item)) error {
 				results, err := l.store.FindingRecords(schemaless.FindingRecords[schemaless.Record[tictactoemanage.State]]{
@@ -73,73 +102,42 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 
 				return nil
 			},
-		})
+		}, projection.WithName("Load DynamoDB LastState Filtered"))
 	// Only streamed records that match live select criteria are used
 	streamState := dag.
-		WithName("DynamoDB Filtered Stream").
 		Load(&projection.GenerateHandler{
 			Load: func(push func(message projection.Item)) error {
-				//for {
-				//	select {
-				//	case <-ctx.Done():
-				//		return nil
-				//	case item := <-l.stream.Subscribe2():
-				//		if item.Deleted {
-				//			log.Warnf("Item was deleted: %v, live select skip on it", item)
-				//			continue
-				//		}
-				//
-				//		// we are interested in the latest state
-				//		record := *item.After
-				//
-				//		push(projection.Item{
-				//			Key:  record.ID,
-				//			Data: l.fromUnTyped(record),
-				//		})
-				//	}
-				//}
-				var lastOffset int = 0
-				for {
-					select {
-					case <-ctx.Done():
-						return nil
-
-					default:
-						item, offset := l.stream.Subscribe(lastOffset)
-						if offset == lastOffset {
-							<-time.After(10 * time.Millisecond)
-							continue
-						}
-
-						lastOffset = offset
-
-						if item.Deleted {
-							log.Warnf("Item was deleted: %v, live select skip on it", item)
-							continue
-						}
-
-						// we are interested in the latest state
-						record := *item.After
-
-						push(projection.Item{
-							Key:  record.ID,
-							Data: l.fromUnTyped(record),
-						})
+				return l.stream.Subscribe(ctx, 0, func(change schemaless.Change[schema.Schema]) {
+					if change.Deleted {
+						log.Warnf("Item was deleted: %v, live select skip on it", change)
+						return
 					}
-				}
 
-				return nil
+					record := *change.After
+
+					push(projection.Item{
+						Key:  record.ID,
+						Data: l.fromUnTyped(record),
+					})
+				})
 			},
-		})
+		}, projection.WithName("DynamoDB Stream"))
 	// Joining make sure that newest version is published
 
+	//streamState, err := dag.GetByName("DynamoDB Filtered Stream")
+	//if err != nil {
+	//	log.Errorln("GetByName(DynamoDB Filtered Stream)", err)
+	//	return err
+	//}
+	//streamState := l.streamState
+
 	joined := dag.
-		WithName("Join DB & Stream").
+		//WithName("Join DB & Stream").
 		// Join by key, so if db and stream has the same key, then it will be joined.
-		Join(lastState, streamState).
+		Join(lastState, streamState, projection.WithName("Join [DB & Stream]")).
 		Map(&projection.FilterHandler{
 			Where: where,
-		}).
+		}, projection.WithName("Filter[Join [DB & Stream]]")).
 		// Joining by key and producing a new key is like merging!
 		Merge(&projection.JoinHandler[schemaless.Record[tictactoemanage.State]]{
 			F: func(a, b schemaless.Record[tictactoemanage.State], returning func(schemaless.Record[tictactoemanage.State])) error {
@@ -148,28 +146,28 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 				}
 				return nil
 			},
-		})
+		}, projection.WithName("Merge (version)[Join [DB & Stream]]"))
 
 	gameStats := joined.
-		WithName("MapGameToStats").
+		//WithName("MapGameToStats").
 		Map(&projection.MapHandler[schemaless.Record[tictactoemanage.State], tictactoemanage.SessionStatsResult]{
 			F: func(x schemaless.Record[tictactoemanage.State], returning func(key string, value tictactoemanage.SessionStatsResult)) error {
 				returning(GroupByKey(x.Data))
 				return nil
 			},
-		})
+		}, projection.WithName("Map GameToStats"))
 
 	gameStatsBySession := gameStats.
-		WithName("MergeSessionStats").
+		//WithName("MergeSessionStats").
 		Merge(&projection.MergeHandler[tictactoemanage.SessionStatsResult]{
 			Combine: CombineByKey,
 			DoRetract: func(base tictactoemanage.SessionStatsResult, x tictactoemanage.SessionStatsResult) (tictactoemanage.SessionStatsResult, error) {
 				panic("retract not implemented")
 			},
-		})
+		}, projection.WithName("Merge SessionStats"))
 
 	gameStatsBySession.
-		WithName("Publish to websocket, only when changed").
+		//WithName("Publish to websocket, only when changed").
 		Map(&projection.MapHandler[tictactoemanage.SessionStatsResult, any]{
 			F: func(x tictactoemanage.SessionStatsResult, returning func(key string, value any)) error {
 				var r tictactoemanage.QueryResult = &x
@@ -182,16 +180,16 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 				l.broadcast.BroadcastToSession(x.ID, msg)
 				return nil
 			},
-		})
+		}, projection.WithName("Publish to websocket"))
 
 	interpretation := projection.DefaultInMemoryInterpreter()
-	err := interpretation.Run(dag.Build())
+	//interpretation := l.interpretation
+	err := interpretation.Run(ctx, dag.Build())
 	if err != nil {
 		return err
 	}
 	//TODO figure out how to do closing down live select!
 	//when connecion is closed
-	interpretation.WaitForDone()
 	return nil
 }
 

@@ -8,7 +8,6 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"testing"
-	"time"
 )
 
 func TestNewLiveSelect(t *testing.T) {
@@ -21,6 +20,7 @@ func TestNewLiveSelect(t *testing.T) {
 
 	store := schemaless.NewInMemoryRepository()
 	stream := store.AppendLog()
+
 	typedStore := typedful.NewTypedRepository[tictactoemanage.State](store)
 	//broadcast := websockproto.NewBroadcaster(
 	//	websockproto.NewInMemoryProtocol(),
@@ -63,8 +63,13 @@ func TestNewLiveSelect(t *testing.T) {
 	err := typedStore.UpdateRecords(update)
 	assert.NoError(t, err)
 
+	// send signal for DAG to not wait for any future changes
+	// there won't be any.
+	stream.Close()
+
 	live := NewLiveSelect(stream, typedStore, broadcast)
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx := context.TODO()
+	//ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
 	err = live.Process(ctx, "session-1")
 	assert.NoError(t, err)
 
@@ -80,4 +85,8 @@ func TestNewLiveSelect(t *testing.T) {
 		Msg:       []byte(`{"SessionStatsResult":{"ID":"session-1","TotalGames":3.000000,"TotalDraws":1.000000,"PlayerWins":{"player-1":2.000000}}}`),
 	}, broadcast.BroadcastToSessionCalls()[2])
 
+	err = live.Process(ctx, "session-1")
+	assert.NoError(t, err)
+
+	assert.Len(t, broadcast.BroadcastToSessionCalls(), 6)
 }
