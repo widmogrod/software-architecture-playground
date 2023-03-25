@@ -117,13 +117,13 @@ func (os *OpenSearchStorage) Query(query tictactoemanage.SessionStatsQuery) (*ti
 
 	stats := &tictactoemanage.SessionStatsResult{
 		ID:         query.SessionID,
-		TotalDraws: schema.As[int](schema.Get(data, "aggregations.draws.buckets.[0].doc_count"), 0),
+		TotalDraws: schema.AsDefault[int](schema.Get(data, "aggregations.draws.buckets.[0].doc_count"), 0),
 		PlayerWins: schema.Reduce[map[tictactoemanage.PlayerID]int](
 			schema.Get(data, "aggregations.wins.buckets"),
 			map[tictactoemanage.PlayerID]int{},
 			func(x schema.Schema, agg map[tictactoemanage.PlayerID]int) map[tictactoemanage.PlayerID]int {
-				playerID := schema.As[tictactoemanage.PlayerID](schema.Get(x, "key"), "n/a")
-				winds := schema.As[int](schema.Get(x, "doc_count"), 0)
+				playerID := schema.AsDefault[tictactoemanage.PlayerID](schema.Get(x, "key"), "n/a")
+				winds := schema.AsDefault[int](schema.Get(x, "doc_count"), 0)
 				agg[playerID] = winds
 
 				return agg

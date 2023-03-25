@@ -22,10 +22,6 @@ func TestNewLiveSelect(t *testing.T) {
 	stream := store.AppendLog()
 
 	typedStore := typedful.NewTypedRepository[tictactoemanage.State](store)
-	//broadcast := websockproto.NewBroadcaster(
-	//	websockproto.NewInMemoryProtocol(),
-	//	typedful.NewTypedRepository[websockproto.ConnectionToSession](store),
-	//)
 	broadcast := &BroadcasterMock{
 		BroadcastToSessionFunc: func(sessionID string, msg []byte) {},
 	}
@@ -68,8 +64,7 @@ func TestNewLiveSelect(t *testing.T) {
 	stream.Close()
 
 	live := NewLiveSelect(stream, typedStore, broadcast)
-	ctx := context.TODO()
-	//ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx := context.Background()
 	err = live.Process(ctx, "session-1")
 	assert.NoError(t, err)
 

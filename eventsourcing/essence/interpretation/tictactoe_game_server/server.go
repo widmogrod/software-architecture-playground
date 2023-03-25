@@ -88,11 +88,12 @@ type SessionWithGame struct {
 	CurrentGameID string
 }
 
-func NewGame(b websockproto.Broadcaster, r schemaless.Repository[tictactoemanage.State], q Query) *Game {
+func NewGame(b websockproto.Broadcaster, r schemaless.Repository[tictactoemanage.State], q Query, liveSelect *LiveSelect) *Game {
 	return &Game{
 		broadcast:           b,
 		gameStateRepository: r,
 		query:               q,
+		liveSelect:          liveSelect,
 	}
 }
 
@@ -100,11 +101,15 @@ type Query interface {
 	Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error)
 }
 
+type LiveSelectI interface {
+	Process(ctx context.Context, sessionID string) error
+}
+
 type Game struct {
 	broadcast           websockproto.Broadcaster
 	gameStateRepository schemaless.Repository[tictactoemanage.State]
 	query               Query
-	liveSelect          *LiveSelect
+	liveSelect          LiveSelectI
 }
 
 func (g *Game) OnMessage(connectionID string, data []byte) error {
