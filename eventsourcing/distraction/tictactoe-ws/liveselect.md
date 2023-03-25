@@ -1,3 +1,16 @@
+## TODO
+## v0.1.0
+- [ ] In memory interpretation with error handling (not panics) and stoping DAGs
+- [ ] Kinesis Stream with simplere multi subscriber implementation
+- [ ] Deploy on separate Stack different architecture concepts (OpenSearch, Synchronous, Live Select games)
+
+## v0.2.0
+- [ ] In memory interpretation with graceful shutdown
+- [ ] Support scalability of each dag node
+- [ ] Introduce concept of control plain, so that each dag can assume roles
+- [ ] In memory interpretation is control plain aware
+
+
 Configuration of projection runtime could looke like this:
 ```yaml
 default:
