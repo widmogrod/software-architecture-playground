@@ -18,8 +18,7 @@ type OnDisconnectFunc func(id ConnectionID) error
 
 func NewInMemoryProtocol() *InMemoryProtocol {
 	return &InMemoryProtocol{
-		publish: make(chan Item),
-
+		publish:     make(chan Item),
 		connections: sync.Map{},
 	}
 }
