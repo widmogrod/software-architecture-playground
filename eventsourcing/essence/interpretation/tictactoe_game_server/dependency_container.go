@@ -250,7 +250,8 @@ func (di *DI) GetGame() *Game {
 			broadcast:           di.GetBroadcaster(),
 			gameStateRepository: di.GetTicTacToeManageStateRepository(),
 			query:               di.GetQueryUsingStorage(),
-			liveSelect:          di.GetLiveSelectClient(),
+			//liveSelect:          di.GetLiveSelect(),
+			liveSelect: di.GetLiveSelectClient(),
 		}
 	}).(*Game)
 }

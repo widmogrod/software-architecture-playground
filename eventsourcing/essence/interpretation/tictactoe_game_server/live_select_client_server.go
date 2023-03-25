@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -62,7 +61,7 @@ func (l *LiveSelectClient) Process(ctx context.Context, sessionID string) error 
 func NewLiveSelectServer(liveSelect *LiveSelect) *LiveSelectServer {
 	return &LiveSelectServer{
 		liveSelect:    liveSelect,
-		maxSelectTime: 5 * time.Second,
+		maxSelectTime: 5 * time.Minute,
 		workerQueue:   make(chan LiveSelectRequest),
 	}
 }
@@ -105,26 +104,18 @@ func (server LiveSelectServer) ServeHTTP(writer http.ResponseWriter, request *ht
 
 func (server *LiveSelectServer) Start(ctx context.Context) {
 	server.workerQueue = make(chan LiveSelectRequest)
+	// TODO this will not trigger, when below for loop is running
 	defer close(server.workerQueue)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for req := range server.workerQueue {
-			wg.Add(1)
-			go func(req LiveSelectRequest) {
-				defer wg.Done()
+	for req := range server.workerQueue {
+		go func(req LiveSelectRequest) {
+			log.Infof("livve-select: PROCESSING: %v", req)
 
-				log.Info("live-select: PROCESSING: ", req)
-
-				ctx, _ := context.WithTimeout(ctx, server.maxSelectTime)
-				err := server.liveSelect.Process(ctx, req.SessionID)
-				if err != nil {
-					log.Errorf("%s ", err)
-				}
-			}(req)
-		}
-	}()
-	wg.Wait()
+			ctx2, _ := context.WithTimeout(ctx, server.maxSelectTime)
+			err := server.liveSelect.Process(ctx2, req.SessionID)
+			if err != nil {
+				log.Errorf("%s ", err)
+			}
+		}(req)
+	}
 }
