@@ -29,6 +29,7 @@ var (
 	ErrNoPublisher       = errors.New("no publisher")
 	ErrFinished          = errors.New("publisher is finished")
 	ErrContextDone       = errors.New("context is done")
+	ErrHandlerReturnErr  = errors.New("handler returned error")
 	ErrPublishWithOffset = errors.New("cannot publish message with offset")
 )
 
@@ -93,7 +94,7 @@ func (p *PubSub[T]) Finish(key T) {
 
 //TODO: refactor PubSub and Kinesis to share as much as they can!
 
-func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f func(Message)) error {
+func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f func(Message) error) error {
 	//log.Errorf("pubsub.Subscribe(%s, %d)\n", GetCtx(any(node).(Node)).name, fromOffset)
 	//p.cond.L.Lock()
 	//for _, ok := p.publisher[node]; !ok; {
@@ -114,8 +115,12 @@ func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f fun
 
 	// Until, there is no messages, wait
 	p.cond.L.Lock()
-	for appendLog.Len() == 0 {
+	for appendLog.Len() == 0 && !p.finished[node] {
 		p.cond.Wait()
+	}
+	if appendLog.Len() == 0 && p.finished[node] {
+		p.cond.L.Unlock()
+		return nil
 	}
 
 	// Select the offset to start reading messages from
@@ -147,7 +152,11 @@ func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f fun
 		default:
 			msg := prev.Value.(Message)
 
-			f(msg)
+			//log.Errorf("pubsub.Subscribe CALL (%s)\n", GetCtx(any(node).(Node)).name)
+			err := f(msg)
+			if err != nil {
+				return fmt.Errorf("pubsub.Subscribe %s %w", err, ErrHandlerReturnErr)
+			}
 
 			// Wait for new changes to be available
 			p.cond.L.Lock()

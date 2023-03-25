@@ -39,13 +39,13 @@ func TestDefaultInMemoryInterpreter(t *testing.T) {
 	})
 
 	// should be able to run again the same DAG
-
-	t.Run("run on closed context should not execute", func(t *testing.T) {
+	t.Run("run on closed context should not execute, end return error", func(t *testing.T) {
 		// should not execute when context is cancelled
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
 		interpreter := DefaultInMemoryInterpreter()
+		// TODO fix this, to proper error handling
 		err := interpreter.Run(ctx, dag.Build())
 		assert.NoError(t, err)
 

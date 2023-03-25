@@ -2,7 +2,6 @@ package projection
 
 import (
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 )
 
 var _ Handler = &MapHandler[any, any]{}
@@ -18,7 +17,7 @@ func (h *MapHandler[A, B]) Process(x Item, returning func(Item)) error {
 			Data: schema.FromGo(value),
 		})
 	}
-	data, err := schemaless.ConvertAs[A](x.Data)
+	data, err := schema.ToGoG[A](x.Data)
 	if err != nil {
 		return err
 	}

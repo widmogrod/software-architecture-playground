@@ -140,8 +140,6 @@ func TestProjection(t *testing.T) {
 	err := interpretation.Run(context.Background(), dag.Build())
 	assert.NoError(t, err)
 
-	interpretation.waitForDone()
-
 	result, err := sessionStatsRepo.FindingRecords(schemaless.FindingRecords[schemaless.Record[SessionsStats]]{
 		RecordType: "session",
 	})

@@ -6,7 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
-	"time"
 )
 
 func DefaultInMemoryInterpreter() *InMemoryInterpreter {
@@ -32,12 +31,11 @@ var (
 )
 
 type InMemoryInterpreter struct {
-	lock     sync.Mutex
-	pubsub   *PubSub[Node]
-	byKeys   map[Node]map[string]Item
-	running  map[Node]struct{}
-	finished sync.WaitGroup
-	status   ExecutionStatus
+	lock    sync.Mutex
+	pubsub  *PubSub[Node]
+	byKeys  map[Node]map[string]Item
+	running map[Node]struct{}
+	status  ExecutionStatus
 	// what difference between process time and event time
 	// should answers question
 	// - are there any events in the system, that a process should wait?
@@ -53,6 +51,12 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 	}
 	i.status = ExecutionStatusRunning
 	i.lock.Unlock()
+
+	ctx, cancel := context.WithCancel(ctx)
+	group := &ExecutionGroup{
+		ctx:    ctx,
+		cancel: cancel,
+	}
 
 	// Registering new nodes makes sure that, in case of non-deterministic concurrency
 	// when goroutine want to subscribe to a node, it will be registered, even if it's not publishing yet
@@ -76,16 +80,21 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 			continue
 		}
 
-		if err := i.run(ctx, node); err != nil {
-			i.lock.Lock()
-			i.status = ExecutionStatusError
-			i.lock.Unlock()
-
-			return fmt.Errorf("interpreter.Run(2) %w", err)
-		}
+		func(node Node) {
+			group.Go(func() (err error) {
+				return i.run(ctx, node)
+			})
+		}(node)
 	}
 
-	i.waitForDone()
+	if err := group.Wait(); err != nil {
+		i.lock.Lock()
+		i.status = ExecutionStatusError
+		i.lock.Unlock()
+
+		return fmt.Errorf("interpreter.Run(2) %w", err)
+	}
+
 	i.lock.Lock()
 	i.status = ExecutionStatusFinished
 	i.lock.Unlock()
@@ -94,312 +103,256 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 }
 
 func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
-	// this is because a dag builder when use WithName creates empty node
-	// fix this!
 	if dag == nil {
 		//panic("fix nodes that are nil! fix dag builder!")
 		return nil
 	}
 
-	//if _, ok := i.running[dag]; ok {
-	//	return nil
-	//}
-	//i.running[dag] = struct{}{}
-
-	err := i.pubsub.Register(dag)
-	if err != nil {
-		panic(err)
-	}
-
 	return MustMatchNode(
 		dag,
 		func(x *Map) error {
-			i.finished.Add(1)
-			go func() {
-				// continue
-				defer i.finished.Done()
+			var lastOffset int = 0
 
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
+			err := i.pubsub.Subscribe(
+				ctx,
+				x.Input,
+				lastOffset,
+				func(msg Message) error {
+					lastOffset = msg.Offset
+					log.Debugln("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+					log.Debugf("✉️: %+v %s\n", msg, i.str(x))
+					switch true {
+					case msg.Aggregate != nil && msg.Retract == nil,
+						msg.Aggregate != nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
 
-				var lastOffset int = 0
+						err := x.OnMap.Process(*msg.Aggregate, func(item Item) {
+							i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
 
-				err := i.pubsub.Subscribe(
-					ctx,
-					x.Input,
-					lastOffset,
-					func(msg Message) {
-						lastOffset = msg.Offset
-						log.Debugln("Map: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
-						log.Debugf("✉️: %+v %s\n", msg, i.str(x))
-						switch true {
-						case msg.Aggregate != nil && msg.Retract == nil,
-							msg.Aggregate != nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
-
-							err := x.OnMap.Process(*msg.Aggregate, func(item Item) {
-								i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
-
-								err := i.pubsub.Publish(ctx, x, Message{
-									Key:       item.Key,
-									Aggregate: &item,
-								})
-								if err != nil {
-									panic(err)
-								}
+							err := i.pubsub.Publish(ctx, x, Message{
+								Key:       item.Key,
+								Aggregate: &item,
 							})
 							if err != nil {
 								panic(err)
 							}
+						})
+						if err != nil {
+							panic(err)
+						}
 
-						case msg.Aggregate != nil && msg.Retract != nil && x.Ctx.ShouldRetract():
-							buff := NewDual()
-							err := x.OnMap.Process(*msg.Aggregate, buff.ReturningAggregate)
+					case msg.Aggregate != nil && msg.Retract != nil && x.Ctx.ShouldRetract():
+						buff := NewDual()
+						err := x.OnMap.Process(*msg.Aggregate, buff.ReturningAggregate)
+						if err != nil {
+							panic(err)
+						}
+						err = x.OnMap.Retract(*msg.Retract, buff.ReturningRetract)
+						if err != nil {
+							panic(err)
+						}
+
+						if !buff.IsValid() {
+							panic("Map(1); asymmetry " + i.str(x))
+						}
+
+						for _, msg := range buff.List() {
+							i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
+							i.stats.Incr(fmt.Sprintf("map[%s].returning.retract", x.Ctx.Name()), 1)
+
+							err := i.pubsub.Publish(ctx, x, *msg)
 							if err != nil {
 								panic(err)
 							}
-							err = x.OnMap.Retract(*msg.Retract, buff.ReturningRetract)
+						}
+
+					case msg.Aggregate == nil && msg.Retract != nil && x.Ctx.ShouldRetract():
+						err := x.OnMap.Retract(*msg.Retract, func(item Item) {
+
+							i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
+
+							err := i.pubsub.Publish(ctx, x, Message{
+								Key:     item.Key,
+								Retract: &item,
+							})
 							if err != nil {
 								panic(err)
 							}
+						})
+						if err != nil {
+							panic(err)
+						}
 
-							if !buff.IsValid() {
-								panic("Map(1); asymmetry " + i.str(x))
+					case msg.Aggregate == nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
+						log.Debugln("ignored retraction", i.str(x))
+
+					default:
+						panic("not implemented Map(3); " + i.str(x) + " " + ToStrMessage(msg))
+					}
+
+					log.Debugln("√", i.str(x))
+
+					return nil
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("interpreter.Map(1) %w", err)
+			}
+
+			log.Debugln("Map: Finish", i.str(x))
+			i.pubsub.Finish(x)
+
+			return nil
+		},
+		func(x *Merge) error {
+			var lastOffset int = 0
+			prev := make(map[string]*Item)
+
+			err := i.pubsub.Subscribe(
+				ctx,
+				x.Input,
+				lastOffset,
+				func(msg Message) error {
+					lastOffset = msg.Offset
+
+					if msg.Retract == nil && msg.Aggregate == nil {
+						panic("message has not Aggretate nor Retract. not implemented (1)")
+					}
+
+					log.Debugln("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
+
+					if _, ok := prev[msg.Key]; ok {
+						base := prev[msg.Key]
+
+						if msg.Retract != nil && x.Ctx.ShouldRetract() {
+							log.Debugln("❌retracting in merge", i.str(x))
+							retract := Item{
+								Key:  msg.Key,
+								Data: schema.MkList(base.Data, msg.Retract.Data),
 							}
 
-							for _, msg := range buff.List() {
-								i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
-								i.stats.Incr(fmt.Sprintf("map[%s].returning.retract", x.Ctx.Name()), 1)
+							if err := x.OnMerge.Retract(retract, func(item Item) {
 
-								err := i.pubsub.Publish(ctx, x, *msg)
-								if err != nil {
-									panic(err)
-								}
-							}
+								i.stats.Incr(fmt.Sprintf("merge[%s].returning.retract", x.Ctx.Name()), 1)
 
-						case msg.Aggregate == nil && msg.Retract != nil && x.Ctx.ShouldRetract():
-							err := x.OnMap.Retract(*msg.Retract, func(item Item) {
-
-								i.stats.Incr(fmt.Sprintf("map[%s].returning.aggregate", x.Ctx.Name()), 1)
-
+								base = &item
 								err := i.pubsub.Publish(ctx, x, Message{
-									Key:     item.Key,
+									Key:     msg.Key,
 									Retract: &item,
 								})
 								if err != nil {
 									panic(err)
 								}
-							})
-							if err != nil {
+							}); err != nil {
 								panic(err)
 							}
-
-						case msg.Aggregate == nil && msg.Retract != nil && !x.Ctx.ShouldRetract():
-							log.Debugln("ignored retraction", i.str(x))
-
-						default:
-							panic("not implemented Map(3); " + i.str(x) + " " + ToStrMessage(msg))
 						}
 
-						log.Debugln("√", i.str(x))
-					},
-				)
-				if err != nil {
-					panic(err)
-				}
-
-				log.Debugln("Map: Finish", i.str(x))
-				i.pubsub.Finish(x)
-			}()
-
-			//return i.run(x.Input)
-			return nil
-		},
-		func(x *Merge) error {
-			i.finished.Add(1)
-			go func() {
-				// continue
-				defer i.finished.Done()
-
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				var lastOffset int = 0
-				prev := make(map[string]*Item)
-
-				err := i.pubsub.Subscribe(
-					ctx,
-					x.Input,
-					lastOffset,
-					func(msg Message) {
-						lastOffset = msg.Offset
-
-						if msg.Retract == nil && msg.Aggregate == nil {
-							panic("message has not Aggretate nor Retract. not implemented (1)")
-						}
-
-						log.Debugln("Merge 👯: ", i.str(x), msg.Aggregate != nil, msg.Retract != nil)
-
-						if _, ok := prev[msg.Key]; ok {
-							base := prev[msg.Key]
-
-							if msg.Retract != nil && x.Ctx.ShouldRetract() {
-								log.Debugln("❌retracting in merge", i.str(x))
-								retract := Item{
-									Key:  msg.Key,
-									Data: schema.MkList(base.Data, msg.Retract.Data),
-								}
-
-								if err := x.OnMerge.Retract(retract, func(item Item) {
-
-									i.stats.Incr(fmt.Sprintf("merge[%s].returning.retract", x.Ctx.Name()), 1)
-
-									base = &item
-									err := i.pubsub.Publish(ctx, x, Message{
-										Key:     msg.Key,
-										Retract: &item,
-									})
-									if err != nil {
-										panic(err)
-									}
-								}); err != nil {
-									panic(err)
-								}
+						if msg.Aggregate != nil {
+							log.Debugln("✅aggregate in merge", i.str(x))
+							merge := Item{
+								Key:  msg.Key,
+								Data: schema.MkList(base.Data, msg.Aggregate.Data),
 							}
+							err := x.OnMerge.Process(merge, func(item Item) {
+								i.stats.Incr(fmt.Sprintf("merge[%s].returning.aggregate", x.Ctx.Name()), 1)
 
-							if msg.Aggregate != nil {
-								log.Debugln("✅aggregate in merge", i.str(x))
-								merge := Item{
-									Key:  msg.Key,
-									Data: schema.MkList(base.Data, msg.Aggregate.Data),
-								}
-								err := x.OnMerge.Process(merge, func(item Item) {
-									i.stats.Incr(fmt.Sprintf("merge[%s].returning.aggregate", x.Ctx.Name()), 1)
-
-									p := base
-									base = &item
-									err := i.pubsub.Publish(ctx, x, Message{
-										Key:       msg.Key,
-										Aggregate: &item,
-										Retract:   p,
-									})
-									if err != nil {
-										panic(err)
-									}
+								p := base
+								base = &item
+								err := i.pubsub.Publish(ctx, x, Message{
+									Key:       msg.Key,
+									Aggregate: &item,
+									Retract:   p,
 								})
 								if err != nil {
 									panic(err)
 								}
-							}
-
-							prev[msg.Key] = base
-
-						} else {
-							if msg.Retract != nil {
-								panic("no previous state, and requesing retracting. not implemented (2)" + ToStrMessage(msg))
-							}
-
-							i.stats.Incr(fmt.Sprintf("merge[%s].returning.aggregate", x.Ctx.Name()), 1)
-
-							prev[msg.Key] = msg.Aggregate
-							err := i.pubsub.Publish(ctx, x, Message{
-								Key:       msg.Key,
-								Aggregate: msg.Aggregate,
 							})
 							if err != nil {
 								panic(err)
 							}
 						}
-					},
-				)
-				if err != nil {
-					panic(err)
-				}
 
-				log.Debugln("Merge: Finish", i.str(x))
-				i.pubsub.Finish(x)
-			}()
+						prev[msg.Key] = base
 
-			//return i.run(x.Input)
+					} else {
+						if msg.Retract != nil {
+							panic("no previous state, and requesing retracting. not implemented (2)" + ToStrMessage(msg))
+						}
+
+						i.stats.Incr(fmt.Sprintf("merge[%s].returning.aggregate", x.Ctx.Name()), 1)
+
+						prev[msg.Key] = msg.Aggregate
+						err := i.pubsub.Publish(ctx, x, Message{
+							Key:       msg.Key,
+							Aggregate: msg.Aggregate,
+						})
+						if err != nil {
+							return fmt.Errorf("interpreter.Merge(1) %w", err)
+						}
+					}
+
+					return nil
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("interpreter.Merge(1) %w", err)
+			}
+
+			log.Debugln("Merge: Finish", i.str(x))
+			i.pubsub.Finish(x)
+
 			return nil
 		},
 		func(x *Load) error {
-			i.finished.Add(1)
-			go func() {
-				defer i.finished.Done()
-
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				err := x.OnLoad.Process(Item{}, func(item Item) {
-					if item.EventTime == 0 {
-						item.EventTime = time.Now().UnixNano()
-					}
-
-					// calculate watermark
-					if item.EventTime > i.watermark {
-						i.watermark = item.EventTime
-					}
-
-					i.stats.Incr(fmt.Sprintf("load[%s].returning", x.Ctx.Name()), 1)
-
-					err := i.pubsub.Publish(ctx, x, Message{
-						Key:       item.Key,
-						Aggregate: &item,
-						Retract:   nil,
-					})
-					if err != nil {
-						panic(err)
-					}
-				})
-
+			var err error
+			err = x.OnLoad.Process(Item{}, func(item Item) {
 				if err != nil {
-					panic(err)
+					return
 				}
 
-				log.Debugln("Load: Finish", i.str(x))
-				i.pubsub.Finish(x)
-			}()
+				//if item.EventTime == 0 {
+				//	item.EventTime = time.Now().UnixNano()
+				//}
+				//
+				//// calculate watermark
+				//if item.EventTime > i.watermark {
+				//	i.watermark = item.EventTime
+				//}
+
+				i.stats.Incr(fmt.Sprintf("load[%s].returning", x.Ctx.Name()), 1)
+
+				err = i.pubsub.Publish(ctx, x, Message{
+					Key:       item.Key,
+					Aggregate: &item,
+					Retract:   nil,
+				})
+			})
+
+			if err != nil {
+				return fmt.Errorf("interpreter.Load(1) %w", err)
+			}
+
+			log.Debugln("Load: Finish", i.str(x))
+			i.pubsub.Finish(x)
 
 			return nil
 		},
 		func(x *Join) error {
-			i.finished.Add(1)
-			go func() {
-				defer i.finished.Done()
+			lastOffset := make([]int, len(x.Input))
+			for idx, _ := range x.Input {
+				lastOffset[idx] = 0
+			}
 
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					// continue
-				}
+			group := ExecutionGroup{ctx: ctx}
 
-				lastOffset := make([]int, len(x.Input))
-				for idx, _ := range x.Input {
-					lastOffset[idx] = 0
-				}
-
-				wg := sync.WaitGroup{}
-				for idx, y := range x.Input {
-					wg.Add(1)
-
-					go func(idx int, y Node) {
-						defer wg.Done()
-
-						err := i.pubsub.Subscribe(
+			for idx := range x.Input {
+				func(idx int) {
+					group.Go(func() error {
+						return i.pubsub.Subscribe(
 							ctx,
-							y,
+							x.Input[idx],
 							lastOffset[idx],
-							func(msg Message) {
+							func(msg Message) error {
 								lastOffset[idx] = msg.Offset
 
 								i.stats.Incr(fmt.Sprintf("join[%s].returning", x.Ctx.Name()), 1)
@@ -410,30 +363,28 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 									Aggregate: msg.Aggregate,
 									Retract:   msg.Retract,
 								})
+
 								if err != nil {
-									panic(err)
+									return fmt.Errorf("interpreter.Join(1) %w", err)
 								}
+
+								return nil
 							},
 						)
+					})
+				}(idx)
+			}
 
-						if err != nil {
-							panic(err)
-						}
-					}(idx, y)
-				}
-				wg.Wait()
+			if err := group.Wait(); err != nil {
+				return fmt.Errorf("interpreter.Join(1) %w", err)
+			}
 
-				log.Debugln("Join: Finish", i.str(x))
-				i.pubsub.Finish(x)
-			}()
+			log.Debugln("Join: Finish", i.str(x))
+			i.pubsub.Finish(x)
 
 			return nil
 		},
 	)
-}
-
-func (i *InMemoryInterpreter) waitForDone() {
-	i.finished.Wait()
 }
 
 func ToStrMessage(msg Message) string {
@@ -479,4 +430,50 @@ func ToStr(x Node) string {
 
 func (i *InMemoryInterpreter) StatsSnapshotAndReset() Stats {
 	return i.stats.Snapshot()
+}
+
+type ExecutionGroup struct {
+	ctx    context.Context
+	cancel func()
+	wg     sync.WaitGroup
+	err    error
+	once   sync.Once
+}
+
+func (g *ExecutionGroup) Go(f func() error) {
+	g.wg.Add(1)
+	go func() {
+		defer g.wg.Done()
+
+		select {
+		case <-g.ctx.Done():
+			if err := g.ctx.Err(); err != nil {
+				g.once.Do(func() {
+					g.err = err
+					if g.cancel != nil {
+						g.cancel()
+					}
+				})
+			}
+
+		default:
+			err := f()
+			if err != nil {
+				g.once.Do(func() {
+					g.err = err
+					if g.cancel != nil {
+						g.cancel()
+					}
+				})
+			}
+		}
+	}()
+}
+
+func (g *ExecutionGroup) Wait() error {
+	g.wg.Wait()
+	if g.cancel != nil {
+		g.cancel()
+	}
+	return nil
 }

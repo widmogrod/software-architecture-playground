@@ -159,10 +159,10 @@ func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.S
 
 		scanInput.ExclusiveStartKey = map[string]types.AttributeValue{
 			"ID": &types.AttributeValueMemberS{
-				Value: schema.As[string](schema.Get(schemed, "ID"), ""),
+				Value: schema.AsDefault[string](schema.Get(schemed, "ID"), ""),
 			},
 			"Type": &types.AttributeValueMemberS{
-				Value: schema.As[string](schema.Get(schemed, "Type"), ""),
+				Value: schema.AsDefault[string](schema.Get(schemed, "Type"), ""),
 			},
 		}
 	}
@@ -234,10 +234,10 @@ func (d *DynamoDBRepository) fromTyped(record Record[schema.Schema]) *schema.Map
 
 func (d *DynamoDBRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
 	typed := Record[schema.Schema]{
-		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
+		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
+		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-type-corrupted"),
 		Data:    schema.Get(record, "Data"),
-		Version: schema.As[uint16](schema.Get(record, "Version"), 0),
+		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
 	}
 	if typed.Type == "record-id-corrupted" &&
 		typed.ID == "record-id-corrupted" &&

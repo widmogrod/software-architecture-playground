@@ -41,12 +41,12 @@ func TestPubSubTest_Subscribe(t *testing.T) {
 	err = pubsub.Publish(ctx, n, msg2)
 	assert.NoError(t, err)
 
-	assertCalled := func() func(result Message) {
+	assertCalled := func() func(result Message) error {
 		order := 0
 
 		asserts := []Message{msg, msg2}
 
-		return func(result Message) {
+		return func(result Message) error {
 			defer func() { order++ }()
 
 			if order >= len(asserts) {
@@ -55,6 +55,8 @@ func TestPubSubTest_Subscribe(t *testing.T) {
 				assert.Equal(t, asserts[order].Aggregate, result.Aggregate)
 				assert.Equal(t, asserts[order].Retract, result.Retract)
 			}
+
+			return nil
 		}
 	}
 
@@ -62,7 +64,7 @@ func TestPubSubTest_Subscribe(t *testing.T) {
 	// we need to run it in a goroutine
 	done := make(chan struct{})
 	go func() {
-		err = pubsub.Subscribe(context.Background(), n, 0, assertCalled())
+		err := pubsub.Subscribe(context.Background(), n, 0, assertCalled())
 		assert.NoError(t, err)
 		done <- struct{}{}
 	}()

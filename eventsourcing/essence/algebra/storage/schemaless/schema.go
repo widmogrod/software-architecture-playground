@@ -20,7 +20,7 @@ var _ Repository[schema.Schema] = &InMemoryRepository{}
 type InMemoryRepository struct {
 	store     map[string]schema.Schema
 	appendLog *AppendLog[schema.Schema]
-	mux       sync.Mutex
+	mux       sync.RWMutex
 }
 
 func (s *InMemoryRepository) Get(recordID, recordType string) (Record[schema.Schema], error) {
@@ -62,7 +62,7 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 			continue
 		}
 
-		storedVersion := schema.As[uint16](schema.Get(stored, "Version"), 0)
+		storedVersion := schema.AsDefault[uint16](schema.Get(stored, "Version"), 0)
 
 		if x.UpdatingPolicy == PolicyIfServerNotChanged {
 			if storedVersion != record.Version {
@@ -118,6 +118,8 @@ func (s *InMemoryRepository) toKey(record Record[schema.Schema]) string {
 }
 
 func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.Schema]]) (PageResult[Record[schema.Schema]], error) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
 	records := make([]schema.Schema, 0)
 	for _, v := range s.store {
 		records = append(records, v)
@@ -205,10 +207,10 @@ func (s *InMemoryRepository) fromTyped(record Record[schema.Schema]) *schema.Map
 
 func (s *InMemoryRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
 	typed := Record[schema.Schema]{
-		ID:      schema.As[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.As[string](schema.Get(record, "Type"), "record-type-corrupted"),
+		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
+		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-id-corrupted"),
 		Data:    schema.Get(record, "Data"),
-		Version: schema.As[uint16](schema.Get(record, "Version"), 0),
+		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
 	}
 	if typed.Type == "record-id-corrupted" &&
 		typed.ID == "record-id-corrupted" &&

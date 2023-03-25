@@ -3,7 +3,6 @@ package projection
 import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 )
 
 var _ Handler = &JoinHandler[any]{}
@@ -23,7 +22,7 @@ func (j *JoinHandler[T]) Process(x Item, returning func(Item)) error {
 			return
 		}
 
-		elem, err = schemaless.ConvertAs[T](value)
+		elem, err = schema.ToGoG[T](value)
 		if err != nil {
 			return
 		}

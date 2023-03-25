@@ -3,7 +3,6 @@ package projection
 import (
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 )
 
 var _ Handler = &MergeHandler[any]{}
@@ -23,7 +22,7 @@ func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
 			return
 		}
 
-		elem, err = schemaless.ConvertAs[A](value)
+		elem, err = schema.ToGoG[A](value)
 		if err != nil {
 			return
 		}
@@ -63,7 +62,7 @@ func (h *MergeHandler[A]) Retract(x Item, returning func(Item)) error {
 			return
 		}
 
-		elem, err = schemaless.ConvertAs[A](value)
+		elem, err = schema.ToGoG[A](value)
 		if err != nil {
 			return
 		}
