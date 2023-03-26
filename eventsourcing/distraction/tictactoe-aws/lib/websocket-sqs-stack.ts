@@ -180,15 +180,15 @@ export class WebsocketSqSStack extends cdk.Stack {
         const dockerImageAsset = new ecr_assets.DockerImageAsset(this, 'LiveSelectDocker', {
             directory: './fargate/live-select/',
             platform: ecr_assets.Platform.LINUX_ARM64,
-            extraHash: '12',
+            extraHash: '19',
             invalidation: {
                 extraHash: true,
             }
         });
 
         const taskDefinition = new ecs.FargateTaskDefinition(this, 'LiveSelectTask', {
-            cpu: 1024,
-            memoryLimitMiB: 2048,
+            cpu: 256,
+            memoryLimitMiB: 512,
             runtimePlatform: {
                 operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
                 cpuArchitecture: ecs.CpuArchitecture.ARM64,
@@ -238,7 +238,7 @@ export class WebsocketSqSStack extends cdk.Stack {
                 TABLE_NAME: table.tableName,
                 OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
                 KINESIS_STREAM_NAME: stream.streamName,
-                LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName + "/live-select",
+                LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName,
                 DOMAIN_NAME: webSocketApi.apiEndpoint,
                 STAGE_NAME: apiStage.stageName,
             },
@@ -251,6 +251,16 @@ export class WebsocketSqSStack extends cdk.Stack {
         webSocketApi.grantManageConnections(queueHandler)
         table.grantReadWriteData(queueHandler)
 
+
+        const liveSelectPush = new golang.GoFunction(this, 'LiveSelectPushGo', {
+            entry: 'lambda/dybamo-db-to-live-select',
+            environment: {
+                LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName,
+            },
+        });
+        liveSelectPush.addEventSource(new DynamoEventSource(table, {
+            startingPosition: lambda.StartingPosition.LATEST,
+        }));
 
         // define the websocket API endpoint
         new cdk.CfnOutput(this, "WebsocketSQSEndpoint", {

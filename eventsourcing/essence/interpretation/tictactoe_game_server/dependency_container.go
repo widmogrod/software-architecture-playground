@@ -188,14 +188,18 @@ func (di *DI) GetLiveSelect() *LiveSelect {
 		switch di.mode {
 		case RunLocalInMemoryDevelopment:
 			return NewLiveSelect(
-				di.GetInMemoryStore().AppendLog(),
 				di.GetTicTacToeManageStateRepository(),
 				di.GetBroadcaster(),
-			)
+			).UseStreamToPush(di.GetInMemoryStore().AppendLog())
 
-		case RunLocalAWS, RunAWS:
+		case RunLocalAWS:
 			return NewLiveSelect(
-				di.GetKinesisStream(),
+				di.GetTicTacToeManageStateRepository(),
+				di.GetBroadcaster(),
+			).UseStreamToPush(di.GetKinesisStream())
+
+		case RunAWS:
+			return NewLiveSelect(
 				di.GetTicTacToeManageStateRepository(),
 				di.GetBroadcaster(),
 			)
@@ -209,7 +213,7 @@ func (di *DI) GetLiveSelectServerEndpoint() string {
 	return di.keyCache.Get("live-select-server-endpoint", func() any {
 		endpoint := os.Getenv("LIVE_SELECT_SERVER_ENDPOINT")
 		if endpoint == "" {
-			endpoint = "http://localhost:8080/live-select"
+			endpoint = "http://localhost:8080"
 		}
 		return endpoint
 	}).(string)

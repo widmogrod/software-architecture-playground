@@ -31,7 +31,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.FileServer(http.Dir("../tictactoe-app/build")).ServeHTTP)
 	mux.HandleFunc("/play/", wshandler.ServeHTTP)
-	mux.HandleFunc("/live-select", liveSelect.ServeHTTP)
+	mux.HandleFunc("/live-select-process", liveSelect.ProcessServeHTTP)
+	mux.HandleFunc("/live-select-push", liveSelect.DynamoDBStreamServeHTTP)
 
 	handler := cors.AllowAll().Handler(mux)
 	err := http.ListenAndServe(":8080", handler)

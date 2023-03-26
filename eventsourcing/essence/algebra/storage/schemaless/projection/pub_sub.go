@@ -26,8 +26,8 @@ type PubSub[T comparable] struct {
 }
 
 var (
-	ErrNoPublisher       = errors.New("no publisher")
-	ErrFinished          = errors.New("publisher is finished")
+	ErrNoPublisher       = errors.New("no appendLog")
+	ErrFinished          = errors.New("appendLog is finished")
 	ErrContextDone       = errors.New("context is done")
 	ErrHandlerReturnErr  = errors.New("handler returned error")
 	ErrPublishWithOffset = errors.New("cannot publish message with offset")
@@ -95,14 +95,6 @@ func (p *PubSub[T]) Finish(key T) {
 //TODO: refactor PubSub and Kinesis to share as much as they can!
 
 func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f func(Message) error) error {
-	//log.Errorf("pubsub.Subscribe(%s, %d)\n", GetCtx(any(node).(Node)).name, fromOffset)
-	//p.cond.L.Lock()
-	//for _, ok := p.publisher[node]; !ok; {
-	//	p.cond.Wait()
-	//}
-	//appendLog := p.publisher[node]
-	//p.cond.L.Unlock()
-
 	p.lock.RLock()
 	appendLog, ok := p.publisher[node]
 	if !ok {

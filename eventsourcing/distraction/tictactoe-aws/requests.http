@@ -23,3 +23,197 @@ Content-Type: application/json
 {
   "ok": true
 }
+
+
+###
+POST http://localhost:8080/live-select-push
+Content-Type: application/json
+
+{
+    "Records": [
+        {
+            "eventID": "ae4eee956ee8ed4dc8e8a09f438afdbf",
+            "eventName": "MODIFY",
+            "eventVersion": "1.1",
+            "eventSource": "aws:dynamodb",
+            "awsRegion": "eu-west-1",
+            "dynamodb": {
+                "ApproximateCreationDateTime": 1679854959,
+                "Keys": {
+                    "Type": {
+                        "S": "session"
+                    },
+                    "ID": {
+                        "S": "ae2b8b13-539d-4ef5-9d72-e73ad4d9c780"
+                    }
+                },
+                "NewImage": {
+                    "Type": {
+                        "S": "session"
+                    },
+                    "Version": {
+                        "N": "43"
+                    },
+                    "Data": {
+                        "M": {
+                            "SessionInGame": {
+                                "M": {
+                                    "GameState": {
+                                        "M": {
+                                            "GameProgress": {
+                                                "M": {
+                                                    "MovesOrder": {
+                                                        "L": [
+                                                            {
+                                                                "S": "2.1"
+                                                            },
+                                                            {
+                                                                "S": "1.1"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "TicTacToeBaseState": {
+                                                        "M": {
+                                                            "BoardCols": {
+                                                                "N": "3"
+                                                            },
+                                                            "WinningLength": {
+                                                                "N": "3"
+                                                            },
+                                                            "FirstPlayerID": {
+                                                                "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                                            },
+                                                            "BoardRows": {
+                                                                "N": "3"
+                                                            },
+                                                            "SecondPlayerID": {
+                                                                "S": "i-am-bot"
+                                                            }
+                                                        }
+                                                    },
+                                                    "NextMovePlayerID": {
+                                                        "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                                    },
+                                                    "MovesTaken": {
+                                                        "M": {
+                                                            "1.1": {
+                                                                "S": "i-am-bot"
+                                                            },
+                                                            "2.1": {
+                                                                "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "GameProblem": {
+                                        "NULL": true
+                                    },
+                                    "SessionID": {
+                                        "S": "ae2b8b13-539d-4ef5-9d72-e73ad4d9c780"
+                                    },
+                                    "Players": {
+                                        "L": [
+                                            {
+                                                "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                            },
+                                            {
+                                                "S": "i-am-bot"
+                                            }
+                                        ]
+                                    },
+                                    "GameID": {
+                                        "S": "0b3d581b-944f-4ace-9a94-02982246cd42"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "ID": {
+                        "S": "ae2b8b13-539d-4ef5-9d72-e73ad4d9c780"
+                    }
+                },
+                "OldImage": {
+                    "Type": {
+                        "S": "session"
+                    },
+                    "Version": {
+                        "N": "42"
+                    },
+                    "Data": {
+                        "M": {
+                            "SessionInGame": {
+                                "M": {
+                                    "GameState": {
+                                        "M": {
+                                            "GameProgress": {
+                                                "M": {
+                                                    "MovesOrder": {
+                                                        "L": []
+                                                    },
+                                                    "TicTacToeBaseState": {
+                                                        "M": {
+                                                            "BoardCols": {
+                                                                "N": "3"
+                                                            },
+                                                            "WinningLength": {
+                                                                "N": "3"
+                                                            },
+                                                            "FirstPlayerID": {
+                                                                "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                                            },
+                                                            "BoardRows": {
+                                                                "N": "3"
+                                                            },
+                                                            "SecondPlayerID": {
+                                                                "S": "i-am-bot"
+                                                            }
+                                                        }
+                                                    },
+                                                    "NextMovePlayerID": {
+                                                        "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                                    },
+                                                    "MovesTaken": {
+                                                        "M": {}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "SessionID": {
+                                        "S": "ae2b8b13-539d-4ef5-9d72-e73ad4d9c780"
+                                    },
+                                    "GameProblem": {
+                                        "NULL": true
+                                    },
+                                    "Players": {
+                                        "L": [
+                                            {
+                                                "S": "e475bcfd-653b-44e1-9546-d3bdeedbad63"
+                                            },
+                                            {
+                                                "S": "i-am-bot"
+                                            }
+                                        ]
+                                    },
+                                    "GameID": {
+                                        "S": "0b3d581b-944f-4ace-9a94-02982246cd42"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "ID": {
+                        "S": "ae2b8b13-539d-4ef5-9d72-e73ad4d9c780"
+                    }
+                },
+                "SequenceNumber": "3255300000000018387278793",
+                "SizeBytes": 1081,
+                "StreamViewType": "NEW_AND_OLD_IMAGES"
+            },
+            "eventSourceARN": "arn:aws:dynamodb:eu-west-1:483648412454:table/WebsocketSqSStack-WebsocketSQSConnectionsE7E03438-GQUNZR7GVSF5/stream/2023-03-25T22:12:13.701"
+        }
+    ]
+}

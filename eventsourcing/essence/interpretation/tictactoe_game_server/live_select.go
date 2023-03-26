@@ -8,6 +8,7 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/projection"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
+	"sync"
 )
 
 //go:generate moq -out live_select_broadcaster_moq_test.go . Broadcaster
@@ -21,21 +22,48 @@ type Stream interface {
 }
 
 type LiveSelect struct {
-	stream    Stream
 	store     schemaless.Repository[tictactoemanage.State]
 	broadcast Broadcaster
+	pubsub    *projection.PubSubChan[schemaless.Change[schema.Schema]]
+	once      sync.Once
 }
 
 func NewLiveSelect(
-	stream Stream,
 	store schemaless.Repository[tictactoemanage.State],
 	broadcast Broadcaster,
 ) *LiveSelect {
 	return &LiveSelect{
-		stream:    stream,
 		store:     store,
 		broadcast: broadcast,
+		pubsub:    projection.NewPubSubChan[schemaless.Change[schema.Schema]](),
 	}
+}
+
+func (l *LiveSelect) Push(ctx context.Context, change schemaless.Change[schema.Schema]) error {
+	log.Infoln("LiveSelect.Push", "change", change)
+	l.once.Do(func() {
+		go l.pubsub.Process()
+	})
+	return l.pubsub.Publish(change)
+}
+
+func (l *LiveSelect) UseStreamToPush(stream Stream) *LiveSelect {
+	go func() {
+		defer l.pubsub.Close()
+
+		ctx := context.Background()
+		err := stream.Subscribe(ctx, 0, func(change schemaless.Change[schema.Schema]) {
+			err := l.Push(ctx, change)
+			if err != nil {
+				log.WithError(err).Error("failed to push change to live select")
+			}
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to subscribe to stream")
+		}
+	}()
+
+	return l
 }
 
 func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
@@ -74,21 +102,26 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 	streamState := dag.
 		Load(&projection.GenerateHandler{
 			Load: func(push func(message projection.Item)) error {
-				return l.stream.Subscribe(ctx, 0, func(change schemaless.Change[schema.Schema]) {
+				log.Infoln("LiveSelect.Process", "subscribing to pubsub")
+				defer log.Infoln("LiveSelect.Process", "subscribing to pubsub END")
+				return l.pubsub.Subscribe(func(change schemaless.Change[schema.Schema]) error {
+					log.Infoln("LiveSelect.Process received", "change", change)
 					if change.Deleted {
 						log.Warnf("Item was deleted: %v, live select skip on it", change)
-						return
+						return nil
 					}
 
 					record := *change.After
 
+					log.Infoln("LiveSelect.Process pushed", "change", change)
 					push(projection.Item{
 						Key:  record.ID,
 						Data: l.fromUnTyped(record),
 					})
+					return nil
 				})
 			},
-		}, projection.WithName("2. DynamoDB Stream"))
+		}, projection.WithName("2. Load changes from channel"))
 	// Joining make sure that newest version is published
 
 	joined := dag.

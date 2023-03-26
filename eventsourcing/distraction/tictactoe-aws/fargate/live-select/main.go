@@ -29,7 +29,9 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, rq *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.HandleFunc("/live-select", liveSelect.ServeHTTP)
+	mux.HandleFunc("/live-select-process", liveSelect.ProcessServeHTTP)
+	mux.HandleFunc("/live-select-push", liveSelect.DynamoDBStreamServeHTTP)
+
 	mux.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
 		sessionID := request.URL.Query().Get("sessionID")
 		writer.WriteHeader(http.StatusOK)
