@@ -11,6 +11,11 @@ import * as python from '@aws-cdk/aws-lambda-python-alpha';
 import * as opensearchservice from "aws-cdk-lib/aws-opensearchservice";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as kinesis from "aws-cdk-lib/aws-kinesis";
+import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
+import * as ecs from "aws-cdk-lib/aws-ecs";
+import * as ecsp from "aws-cdk-lib/aws-ecs-patterns";
+
 
 export class WebsocketSqSStack extends cdk.Stack {
     // constructor for the stack
@@ -22,6 +27,12 @@ export class WebsocketSqSStack extends cdk.Stack {
             // visibilityTimeout: cdk.Duration.seconds(20),
             // receiveMessageWaitTime: cdk.Duration.seconds(5),
         })
+
+        const stream = new kinesis.Stream(this, 'Stream', {
+            streamName: 'tictactie',
+            shardCount: 1,
+            retentionPeriod: cdk.Duration.hours(48),
+        });
 
         const table = new dynamodb.Table(this, 'WebsocketSQSConnections', {
             partitionKey: {
@@ -36,7 +47,7 @@ export class WebsocketSqSStack extends cdk.Stack {
             billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
             pointInTimeRecovery: false,
             stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-
+            kinesisStream: stream,
         });
 
         const domain = new opensearchservice.Domain(this, 'DynamoDBProjection', {
@@ -166,12 +177,70 @@ export class WebsocketSqSStack extends cdk.Stack {
             autoDeploy: true,
         });
 
+        const dockerImageAsset = new ecr_assets.DockerImageAsset(this, 'LiveSelectDocker', {
+            directory: './fargate/live-select/',
+            platform: ecr_assets.Platform.LINUX_ARM64,
+            extraHash: '12',
+            invalidation: {
+                extraHash: true,
+            }
+        });
+
+        const taskDefinition = new ecs.FargateTaskDefinition(this, 'LiveSelectTask', {
+            cpu: 1024,
+            memoryLimitMiB: 2048,
+            runtimePlatform: {
+                operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
+                cpuArchitecture: ecs.CpuArchitecture.ARM64,
+            },
+        });
+
+        taskDefinition.addContainer('LiveSelectContainer', {
+            image: ecs.ContainerImage.fromDockerImageAsset(dockerImageAsset),
+            entryPoint: ['./main'],
+            healthCheck: {
+                command: ['exit 0'],
+                // command: ['CMD-SHELL', 'curl -f localhost/health || exit 1'],
+                interval: cdk.Duration.seconds(10),
+                retries: 3,
+                timeout: cdk.Duration.seconds(2),
+            },
+            portMappings: [{
+                containerPort: 80,
+                hostPort: 80,
+            }],
+            logging: new ecs.AwsLogDriver({
+                streamPrefix: 'LiveSelectContainer',
+            }),
+            environment: {
+                TABLE_NAME: table.tableName,
+                OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+                KINESIS_STREAM_NAME: stream.streamName,
+                DOMAIN_NAME: webSocketApi.apiEndpoint,
+                STAGE_NAME: apiStage.stageName,
+            }
+        })
+
+        const fargateService = new ecsp.ApplicationLoadBalancedFargateService(this, 'LiveSelectServer', {
+            taskDefinition: taskDefinition,
+            publicLoadBalancer: true,
+        });
+        queue.grantConsumeMessages(taskDefinition.taskRole)
+        webSocketApi.grantManageConnections(taskDefinition.taskRole)
+        table.grantReadWriteData(taskDefinition.taskRole)
+        stream.grantReadWrite(taskDefinition.taskRole)
+
+
         const queueHandler = new golang.GoFunction(this, 'SQSQueueHandlerGo', {
             // entry: 'lambda/go-tic-reciver',
             entry: 'lambda/go-tic-game-handler',
             environment: {
                 TABLE_NAME: table.tableName,
                 OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+                KINESIS_STREAM_NAME: stream.streamName,
+                LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName + "/live-select",
+                DOMAIN_NAME: webSocketApi.apiEndpoint,
+                STAGE_NAME: apiStage.stageName,
             },
         });
         queueHandler.addEventSource(new SqsEventSource(queue, {

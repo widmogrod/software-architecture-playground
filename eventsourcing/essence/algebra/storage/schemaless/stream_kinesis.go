@@ -2,6 +2,7 @@ package schemaless
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
@@ -79,7 +80,7 @@ func (s *KinesisStream) processShard(ctx context.Context, shardIterator *string,
 		}
 
 		if diff := time.Now().Sub(lastRequest); diff < time.Second/5 {
-			log.Debugf("🗺Sleeping for %s", time.Second/5-diff)
+			//log.Debugf("🗺Sleeping for %s", time.Second/5-diff)
 			time.Sleep(time.Second/5 - diff)
 		}
 
@@ -90,11 +91,21 @@ func (s *KinesisStream) processShard(ctx context.Context, shardIterator *string,
 			//StreamARN:     shard.ShardId,
 		})
 		if err != nil {
-			log.Errorln("🗺GetRecords:", err)
+			// check if error is ProvisionedThroughputExceededException
+			// if so, sleep for 1 second and try again
+			var ptee *types.ProvisionedThroughputExceededException
+			if ok := errors.As(err, &ptee); ok {
+				//log.Warnln("kinesis.GetRecords: SLEEP(B) ProvisionedThroughputExceededException:", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			log.Errorln("kinesis.GetRecords: ", err)
 			panic(err)
 		}
 
 		for _, record := range records.Records {
+			//log.Infoln("🗺Kaflka Stream Record:", string(record.Data))
 			schemed, err := schema.FromJSON(record.Data)
 			if err != nil {
 				panic(err)
@@ -158,7 +169,8 @@ func (s *KinesisStream) processShard(ctx context.Context, shardIterator *string,
 		}
 
 		if records.NextShardIterator == nil {
-			break
+			log.Infoln("🗺ShardIterator is nil, exiting")
+			return
 		}
 		shardIterator = records.NextShardIterator
 	}
@@ -167,6 +179,7 @@ func (s *KinesisStream) processShard(ctx context.Context, shardIterator *string,
 func (s *KinesisStream) Subscribe(ctx context.Context, fromOffset int, f func(Change[schema.Schema])) error {
 	done := make(chan struct{})
 
+	//log.Errorf("🗺store.KinesisStream SUBSCRIBE")
 	s.lock.Lock()
 	s.subscribers = append(s.subscribers, f)
 	s.done = append(s.done, done)
@@ -186,8 +199,11 @@ func (s *KinesisStream) Process() {
 		s.lock.RUnlock()
 	}()
 
+	//log.Errorf("🗺store.KinesisStream PROCESS")
+	//defer log.Errorf("🗺store.KinesisStream PROCESS END")
 	for result := range s.Pull() {
 		s.lock.RLock()
+		//log.Errorf("🗺store.KinesisStream subscribers: %d %#v \n", len(s.subscribers), result)
 		for _, f := range s.subscribers {
 			f(result)
 		}

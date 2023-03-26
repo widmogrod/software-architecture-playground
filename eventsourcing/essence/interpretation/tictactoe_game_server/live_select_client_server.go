@@ -72,26 +72,29 @@ type LiveSelectServer struct {
 	maxSelectTime time.Duration
 }
 
-func (server LiveSelectServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	log.Info("live-select: REQUEST")
+func (server *LiveSelectServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	log.Info("🌀live-select: REQUEST")
 	body, err := io.ReadAll(request.Body)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(writer, "live-select:error(1): %s", err)
+		fmt.Fprintf(writer, "🌀live-select:error(1): %s", err)
+		log.Errorln("🌀live-select:error(1): ", err)
 		return
 	}
 
 	schemed, err := schema.FromJSON(body)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(writer, "live-select:error(2): %s", err)
+		fmt.Fprintf(writer, "🌀live-select:error(2): %s", err)
+		log.Errorln("🌀live-select:error(2): ", err)
 		return
 	}
 
 	re, err := schema.ToGoG[LiveSelectRequest](schemed)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(writer, "live-select:error(3): %s", err)
+		fmt.Fprintf(writer, "🌀live-select:error(3): %s", err)
+		log.Errorln("🌀live-select:error(3): ", err)
 		return
 	}
 
@@ -99,22 +102,24 @@ func (server LiveSelectServer) ServeHTTP(writer http.ResponseWriter, request *ht
 
 	writer.WriteHeader(http.StatusOK)
 	fmt.Fprintf(writer, "ok")
-	log.Info("live-select: ", re)
 }
 
 func (server *LiveSelectServer) Start(ctx context.Context) {
+	log.Infof("🌀 live-select: BACKGROUND")
+	defer log.Infof("🌀 live-select: BACKGROUND END")
 	server.workerQueue = make(chan LiveSelectRequest)
 	// TODO this will not trigger, when below for loop is running
 	defer close(server.workerQueue)
 
 	for req := range server.workerQueue {
+		log.Infof("🌀 live-select: JOB : %v", req)
 		go func(req LiveSelectRequest) {
-			log.Infof("livve-select: PROCESSING: %v", req)
+			log.Infof("🌀 live-select: PROCESSING: %v", req)
 
 			ctx2, _ := context.WithTimeout(ctx, server.maxSelectTime)
 			err := server.liveSelect.Process(ctx2, req.SessionID)
 			if err != nil {
-				log.Errorf("%s ", err)
+				log.Errorf("🌀 live-select: ERR %s ", err)
 			}
 		}(req)
 	}

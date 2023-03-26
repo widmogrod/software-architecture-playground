@@ -11,6 +11,7 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
+	"net/url"
 	"os"
 	"sync"
 )
@@ -108,6 +109,12 @@ func (di *DI) GetKinesisStreamName() string {
 func (di *DI) GetAWSWebSocketPublisher() *websockproto.AWSPublisher {
 	return di.keyCache.Get("aws-websocket-publisher", func() any {
 		domainName := os.Getenv("DOMAIN_NAME")
+
+		domainURL, err := url.Parse(domainName)
+		if err == nil {
+			domainName = domainURL.Host
+		}
+
 		stageName := os.Getenv("STAGE_NAME")
 
 		return websockproto.NewPublisher(

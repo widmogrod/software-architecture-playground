@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/url"
 )
 
@@ -35,7 +35,7 @@ type AWSPublisher struct {
 }
 
 func (a *AWSPublisher) Publish(connectionID string, msg []byte) error {
-	log.Println("Publishing to connectionID:", connectionID, "msg:", string(msg))
+	log.Infoln("Publishing to connectionID:", connectionID, "msg:", string(msg))
 	_, err := a.client.PostToConnection(context.Background(), &apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: &connectionID,
 		Data:         msg,

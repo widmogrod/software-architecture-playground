@@ -1,0 +1,25 @@
+###
+POST http://Webso-LiveS-OAMPT4IDBCYE-252696250.eu-west-1.elb.amazonaws.com/health
+Content-Type: application/json
+
+###
+POST http://Webso-LiveS-OAMPT4IDBCYE-252696250.eu-west-1.elb.amazonaws.com/live-select
+Content-Type: application/json
+
+{
+  "SessionID": "70597160-cc4d-4680-a9b7-29adc127763b"
+}
+
+###
+POST http://Webso-LiveS-OAMPT4IDBCYE-252696250.eu-west-1.elb.amazonaws.com/test?sessionID=70597160-cc4d-4680-a9b7-29adc127763b
+Content-Type: application/json
+
+
+
+###
+POST https://7r9jbwjd5e.execute-api.eu-west-1.amazonaws.com/dev
+Content-Type: application/json
+
+{
+  "ok": true
+}

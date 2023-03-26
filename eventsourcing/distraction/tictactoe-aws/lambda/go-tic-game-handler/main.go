@@ -6,15 +6,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/interpretation/tictactoe_game_server"
-	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
-	"log"
-	"os"
 )
 
 type Payload struct {
@@ -24,53 +17,20 @@ type Payload struct {
 }
 
 func main() {
-	cfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		fmt.Printf("ERR: LoadDefaultConfig: %s \n", err)
-		panic(err)
-	}
+	log.SetLevel(log.WarnLevel)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		TimestampFormat: "",
+		PadLevelText:    true,
+	})
 
-	tableName := os.Getenv("TABLE_NAME")
-	store := schemaless.NewDynamoDBRepository(dynamodb.NewFromConfig(cfg), tableName)
-	connRepo := typedful.NewTypedRepository[websockproto.ConnectionToSession](store)
-	stateRepo := typedful.NewTypedRepoWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
-		store,
-		func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
-			return tictactoe_game_server.NewTictactoeManageStateAggregate(store)
-		},
+	di := tictactoe_game_server.DefaultDI(
+		tictactoe_game_server.RunAWS,
 	)
 
-	//connRepo := storage.NewDynamoDBRepository(
-	//	dynamodb.NewFromConfig(cfg),
-	//	tableName,
-	//	func() websockproto.ConnectionToSession {
-	//		panic("not supported creation of ConnectionToSession")
-	//	})
-
-	//stateRepo := storage.NewDynamoDBRepository(
-	//	dynamodb.NewFromConfig(cfg),
-	//	tableName,
-	//	func() tictactoemanage.State {
-	//		return nil
-	//	})
-
-	query := tictactoe_game_server.NewQueryUsingStorage(
-		typedful.NewTypedRepository[tictactoemanage.SessionStatsResult](store),
-	)
-	//openSearchHost := os.Getenv("OPENSEARCH_HOST")
-	//query, err := tictactoe_game_server.NewQuery(
-	//	openSearchHost,
-	//	"lambda-index",
-	//)
-	if err != nil {
-		fmt.Printf("ERR: tictactoe_game_server.NewQuery: %s \n", err)
-		panic(err)
-	}
+	game := di.GetGame()
 
 	lambda.Start(func(ctx context.Context, event events.SQSEvent) {
-		tableName := os.Getenv("TABLE_NAME")
-		log.Println("TABLE_NAME: ", tableName)
-
 		for i := range event.Records {
 			record := event.Records[i]
 			payload := Payload{}
@@ -82,14 +42,6 @@ func main() {
 
 			log.Printf("payload: %#v \n", payload)
 
-			wshandler := websockproto.NewPublisher(
-				payload.RequestContext.DomainName,
-				payload.RequestContext.Stage,
-				cfg,
-			)
-			broadcaster := websockproto.NewBroadcaster(wshandler, connRepo)
-
-			game := tictactoe_game_server.NewGame(broadcaster, stateRepo, query)
 			err = game.OnMessage(payload.ConnectionID, []byte(payload.Body))
 			if err != nil {
 				fmt.Printf("ERR: OnMessage: %s \n", err)
