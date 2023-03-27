@@ -17,11 +17,11 @@ type Payload struct {
 }
 
 func main() {
-	log.SetLevel(log.WarnLevel)
+	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.TextFormatter{
-		ForceColors:     true,
-		TimestampFormat: "",
-		PadLevelText:    true,
+		ForceColors:      false,
+		DisableQuote:     true,
+		DisableTimestamp: true,
 	})
 
 	di := tictactoe_game_server.DefaultDI(

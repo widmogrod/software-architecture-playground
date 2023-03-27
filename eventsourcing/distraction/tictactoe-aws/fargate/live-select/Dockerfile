@@ -10,10 +10,10 @@
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
-EXPOSE 80
+EXPOSE 8080
 #COPY --from=builder /app/main .
 COPY main .
 RUN uname -a
-RUN apk add --update binutils
+RUN apk add --update binutils curl
 RUN readelf -h ./main
 CMD ["./main"]

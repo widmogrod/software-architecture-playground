@@ -10,11 +10,19 @@ import (
 )
 
 func main() {
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.TextFormatter{
-		ForceColors:     false,
-		TimestampFormat: "",
+		ForceColors:      false,
+		DisableQuote:     true,
+		DisableTimestamp: true,
 	})
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorln("LiveSelectServer panic", r)
+		}
+	}()
+	defer log.Infoln("LiveSelectServer stopped gracefully")
 
 	di := tictactoe_game_server.DefaultDI(
 		tictactoe_game_server.RunAWS,
@@ -26,7 +34,7 @@ func main() {
 	go liveSelect.Start(ctx)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, rq *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, rq *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/live-select-process", liveSelect.ProcessServeHTTP)
@@ -40,7 +48,7 @@ func main() {
 	})
 
 	handler := cors.AllowAll().Handler(mux)
-	err := http.ListenAndServe(":80", handler)
+	err := http.ListenAndServe(":8080", handler)
 	if err != nil {
 		log.Fatal(err)
 	}

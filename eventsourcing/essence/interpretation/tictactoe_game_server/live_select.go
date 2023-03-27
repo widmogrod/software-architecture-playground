@@ -67,6 +67,8 @@ func (l *LiveSelect) UseStreamToPush(stream Stream) *LiveSelect {
 }
 
 func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
+	defer log.Infoln("LiveSelect.Process", "END ✅", sessionID)
+
 	where := predicate.MustWhere(
 		"Data.SessionInGame.SessionID = :sessionID AND Type = :type",
 		map[predicate.BindValue]schema.Schema{
@@ -118,6 +120,7 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 						Key:  record.ID,
 						Data: l.fromUnTyped(record),
 					})
+					log.Infoln("LiveSelect.Process pushed", "change", change, "✅")
 					return nil
 				})
 			},
@@ -135,8 +138,10 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 		Merge(&projection.JoinHandler[schemaless.Record[tictactoemanage.State]]{
 			F: func(a, b schemaless.Record[tictactoemanage.State], returning func(schemaless.Record[tictactoemanage.State])) error {
 				if a.Version < b.Version {
+					log.Infoln("LiveSelect.Process", "version check ✅", b)
 					returning(b)
 				}
+				log.Infoln("LiveSelect.Process", "version check ❌", b)
 				return nil
 			},
 		}, projection.WithName("5. Merge (version)[Join [DB & Stream]]"))
@@ -160,13 +165,14 @@ func (l *LiveSelect) Process(ctx context.Context, sessionID string) error {
 	gameStatsBySession.
 		Map(&projection.MapHandler[tictactoemanage.SessionStatsResult, any]{
 			F: func(x tictactoemanage.SessionStatsResult, returning func(key string, value any)) error {
+				//log.Infoln("LiveSelect.Process", "WebSocket marshal", x)
 				var r tictactoemanage.QueryResult = &x
 				msg, err := schema.ToJSON(schema.FromGo(r))
 				if err != nil {
+					log.Errorln("LiveSelect.Process", "WebSocket marshal err", x)
 					return err
 				}
 
-				_ = msg
 				l.broadcast.BroadcastToSession(x.ID, msg)
 				return nil
 			},

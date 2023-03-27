@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"strings"
@@ -143,12 +144,21 @@ func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.S
 		return PageResult[Record[schema.Schema]]{}, err
 	}
 
+	log.Infof("\nfilterExpression: %#v \n", filterExpression)
+	for k, v := range paramsExpression {
+		log.Infof("paramsExpression[%s]: %#v \n", k, v)
+	}
+
+	for k, v := range expressionNames {
+		log.Infof("expressionNames[%s]: %#v \n", k, v)
+	}
+
 	scanInput := &dynamodb.ScanInput{
 		TableName:                 &d.tableName,
 		ExpressionAttributeNames:  expressionNames,
 		ExpressionAttributeValues: paramsExpression,
 		FilterExpression:          aws.String(filterExpression),
-		//ConsistentRead:            aws.Bool(true),
+		ConsistentRead:            aws.Bool(true),
 	}
 
 	if query.After != nil {

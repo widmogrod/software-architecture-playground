@@ -15,6 +15,7 @@ import * as kinesis from "aws-cdk-lib/aws-kinesis";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecsp from "aws-cdk-lib/aws-ecs-patterns";
+import * as logs from "aws-cdk-lib/aws-logs";
 
 
 export class WebsocketSqSStack extends cdk.Stack {
@@ -180,7 +181,7 @@ export class WebsocketSqSStack extends cdk.Stack {
         const dockerImageAsset = new ecr_assets.DockerImageAsset(this, 'LiveSelectDocker', {
             directory: './fargate/live-select/',
             platform: ecr_assets.Platform.LINUX_ARM64,
-            extraHash: '19',
+            extraHash: '34',
             invalidation: {
                 extraHash: true,
             }
@@ -199,18 +200,22 @@ export class WebsocketSqSStack extends cdk.Stack {
             image: ecs.ContainerImage.fromDockerImageAsset(dockerImageAsset),
             entryPoint: ['./main'],
             healthCheck: {
-                command: ['exit 0'],
-                // command: ['CMD-SHELL', 'curl -f localhost/health || exit 1'],
+                // command: ['CMD-SHELL', 'exit 0'],
+                command: ['CMD-SHELL', 'curl -f http://localhost:8080/ || exit 1'],
                 interval: cdk.Duration.seconds(10),
                 retries: 3,
                 timeout: cdk.Duration.seconds(2),
+                startPeriod: cdk.Duration.seconds(10),
             },
             portMappings: [{
-                containerPort: 80,
-                hostPort: 80,
+                containerPort: 8080,
+                hostPort: 8080,
             }],
             logging: new ecs.AwsLogDriver({
                 streamPrefix: 'LiveSelectContainer',
+                logGroup: new logs.LogGroup(this, 'LiveSelectContainerLogGroup', {
+                    logGroupName: '/ecs/live-select-container',
+                }),
             }),
             environment: {
                 TABLE_NAME: table.tableName,

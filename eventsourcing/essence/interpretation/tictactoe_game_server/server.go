@@ -231,16 +231,14 @@ func (g *Game) OnMessage(connectionID string, data []byte) error {
 			return tictactoemanage.MustMatchSubscription(
 				s,
 				func(x *tictactoemanage.SessionStatsSubscription) error {
-					log.Printf("OnMessage(subscription): SessionStatsSubscription %#v \n", *x)
+					log.Infof("OnMessage(subscription): SessionStatsSubscription %#v \n", *x)
 					ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
-					go func() {
-						err := g.liveSelect.Process(ctx, x.SessionID)
-						if err != nil {
-							log.Errorf("SessionStatsSubscription(): liveSelect.Process: %v", err)
-						}
-					}()
+					err := g.liveSelect.Process(ctx, x.SessionID)
+					if err != nil {
+						log.Errorf("SessionStatsSubscription(): liveSelect.Process: %v", err)
+					}
 
-					log.Printf("OnMessage(subscription) [return]: SessionStatsSubscription %#v \n", *x)
+					log.Infof("OnMessage(subscription) [return]: SessionStatsSubscription %#v \n", *x)
 					return nil
 				},
 			)

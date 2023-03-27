@@ -60,7 +60,7 @@ func (i *InMemoryBroadcaster) UnregisterConnectionID(connectionID string) error 
 func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string, sessionID string) {
 	record, err := i.repository.Get(connectionID, "connectionToSession")
 	if err != nil {
-		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession i.repository.Get() err:", err)
+		log.Errorln("InMemoryBroadcaster.AssociateConnectionWithSession i.repository.Get() err:", err)
 		return
 	}
 
@@ -68,13 +68,13 @@ func (i *InMemoryBroadcaster) AssociateConnectionWithSession(connectionID string
 
 	err = i.repository.UpdateRecords(schemaless.Save(record))
 	if err != nil {
-		log.Println("InMemoryBroadcaster.AssociateConnectionWithSession error:", err)
+		log.Errorln("InMemoryBroadcaster.AssociateConnectionWithSession error:", err)
 	}
 }
 
 func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
-	log.Debugln("BroadcastToSession sessionID [start]:", sessionID, "msg:", string(msg))
-	defer log.Debugln("BroadcastToSession sessionID [end]:", sessionID, "msg:", string(msg))
+	log.Infoln("InMemoryBroadcaster.BroadcastToSession sessionID [start]:", sessionID, "msg:", string(msg))
+	defer log.Infoln("InMemoryBroadcaster.BroadcastToSession sessionID [end]:", sessionID, "msg:", string(msg))
 
 	cursor := schemaless.FindingRecords[schemaless.Record[ConnectionToSession]]{
 		Where: predicate.MustWhere(
@@ -88,8 +88,10 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 
 	for {
 		result, err := i.repository.FindingRecords(cursor)
+		log.Infoln("InMemoryBroadcaster.BroadcastToSession FindingRecords result:", result, "err:", err)
 		if err != nil {
-			log.Warnln("InMemoryBroadcaster.BroadcastToSession FindingRecords error:", err)
+			log.Errorln("InMemoryBroadcaster.BroadcastToSession FindingRecords error:", err)
+			break
 		}
 
 		for _, item := range result.Items {
@@ -97,11 +99,12 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 			err = i.publisher.Publish(item.Data.ConnectionID, msg)
 			// TODO handle this differently
 			if err != nil {
-				log.Warnln("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
+				log.Errorln("InMemoryBroadcaster.BroadcastToSession Publish error:", err)
 			}
 		}
 
 		if !result.HasNext() {
+			log.Infoln("InMemoryBroadcaster.BroadcastToSession FindingRecords no more connections:")
 			break
 		}
 
@@ -112,11 +115,12 @@ func (i *InMemoryBroadcaster) BroadcastToSession(sessionID string, msg []byte) {
 func (i *InMemoryBroadcaster) SendBackToSender(connectionID string, msg []byte) {
 	item, err := i.repository.Get(connectionID, "connectionToSession")
 	if err != nil {
-		log.Warnln("InMemoryBroadcaster.SendBackToSender error:", err)
+		log.Errorln("InMemoryBroadcaster.SendBackToSender error:", err)
+		return
 	}
 
 	err = i.publisher.Publish(item.Data.ConnectionID, msg)
 	if err != nil {
-		log.Warnln("InMemoryBroadcaster.SendBackToSender error:", err)
+		log.Errorln("InMemoryBroadcaster.SendBackToSender error:", err)
 	}
 }

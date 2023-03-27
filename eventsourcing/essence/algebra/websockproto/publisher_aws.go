@@ -35,13 +35,14 @@ type AWSPublisher struct {
 }
 
 func (a *AWSPublisher) Publish(connectionID string, msg []byte) error {
-	log.Infoln("Publishing to connectionID:", connectionID, "msg:", string(msg))
+	log.Infoln("AWSPublisher: Publishing to connectionID:", connectionID, "msg:", string(msg))
 	_, err := a.client.PostToConnection(context.Background(), &apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: &connectionID,
 		Data:         msg,
 	})
 
 	if err != nil {
+		log.Errorln("AWSPublisher: Publishing to connectionID:", connectionID, "msg:", string(msg), "err:", err)
 		return err
 	}
 	return nil
