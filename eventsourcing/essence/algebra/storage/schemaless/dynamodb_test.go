@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestNewDynamoDBRepository2(t *testing.T) {
+func TestNewDynamoDBRepository(t *testing.T) {
 	//TODO inject name of the table!
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	assert.NoError(t, err)
@@ -38,15 +38,15 @@ func TestNewDynamoDBRepository2(t *testing.T) {
 			}),
 		Sort: []SortField{
 			{
-				Field:      "Data.Ctx",
-				Descending: true,
+				Field:      "Data.Name",
+				Descending: false,
 			},
 		},
 		Limit: 2,
 	})
 	assert.NoError(t, err, "while finding records")
 
-	foundRecords := []Record[schema.Schema]{}
+	var foundRecords []Record[schema.Schema]
 	for {
 		for _, item := range result.Items {
 			foundRecords = append(foundRecords, item)

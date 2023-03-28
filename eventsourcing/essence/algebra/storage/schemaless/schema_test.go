@@ -73,7 +73,7 @@ func TestNewRepository2WithSchema(t *testing.T) {
 		Sort: []SortField{
 			{
 				Field:      "Data.Name",
-				Descending: true,
+				Descending: false,
 			},
 		},
 		Limit: 2,

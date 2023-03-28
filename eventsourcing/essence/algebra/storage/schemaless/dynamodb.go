@@ -158,7 +158,7 @@ func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.S
 		ExpressionAttributeNames:  expressionNames,
 		ExpressionAttributeValues: paramsExpression,
 		FilterExpression:          aws.String(filterExpression),
-		ConsistentRead:            aws.Bool(true),
+		//ConsistentRead:            aws.Bool(true),
 	}
 
 	if query.After != nil {
@@ -245,7 +245,7 @@ func (d *DynamoDBRepository) fromTyped(record Record[schema.Schema]) *schema.Map
 func (d *DynamoDBRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
 	typed := Record[schema.Schema]{
 		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-type-corrupted"),
+		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-id-corrupted"),
 		Data:    schema.Get(record, "Data"),
 		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
 	}

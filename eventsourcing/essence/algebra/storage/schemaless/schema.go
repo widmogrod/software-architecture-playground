@@ -230,7 +230,7 @@ func sortRecords(records []schema.Schema, sortFields []SortField) []schema.Schem
 			fieldA := schema.Get(records[i], sortField.Field)
 			fieldB := schema.Get(records[j], sortField.Field)
 			cmp := schema.Compare(fieldA, fieldB)
-			if !sortField.Descending {
+			if sortField.Descending {
 				cmp = -cmp
 			}
 			if cmp != 0 {

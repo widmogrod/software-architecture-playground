@@ -25,7 +25,7 @@ func TestNewRepository2Typed(t *testing.T) {
 		Sort: []SortField{
 			{
 				Field:      "Data.Name",
-				Descending: true,
+				Descending: false,
 			},
 		},
 	})
