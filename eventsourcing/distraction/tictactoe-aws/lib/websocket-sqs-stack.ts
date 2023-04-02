@@ -2,10 +2,9 @@ import * as cdk from "aws-cdk-lib";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdanodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as apigatewayv2 from '@aws-cdk/aws-apigatewayv2-alpha';
 import * as apigatewayv2integrations from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
-import {SqsEventSource, DynamoEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
+import {DynamoEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as golang from '@aws-cdk/aws-lambda-go-alpha';
 import * as python from '@aws-cdk/aws-lambda-python-alpha';
 import * as opensearchservice from "aws-cdk-lib/aws-opensearchservice";
@@ -23,16 +22,10 @@ export class WebsocketSqSStack extends cdk.Stack {
     constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
 
-        const queue = new sqs.Queue(this, 'tic-tac-toe-queue-sqs', {
-            queueName: 'tictactoe-sqs-queue',
-            // visibilityTimeout: cdk.Duration.seconds(20),
-            // receiveMessageWaitTime: cdk.Duration.seconds(5),
-        })
-
         const stream = new kinesis.Stream(this, 'Stream', {
             streamName: 'tictactie',
             shardCount: 1,
-            retentionPeriod: cdk.Duration.hours(48),
+            retentionPeriod: cdk.Duration.hours(24),
         });
 
         const table = new dynamodb.Table(this, 'WebsocketSQSConnections', {
@@ -142,22 +135,18 @@ export class WebsocketSqSStack extends cdk.Stack {
         });
         table.grantReadWriteData(disconnectHandler);
 
-        // // define the default handler
-        // const defaultHandler = new lambda.Function(this, "DefaultHandler", {
-        //     runtime: lambda.Runtime.NODEJS_12_X,
-        //     handler: "default.handler",
-        //     code: lambda.Code.fromAsset("lambda"),
-        // });
-        // define the send message handler
-        const receiveHandler = new lambdanodejs.NodejsFunction(this, "SQSReceiveHandler", {
-            entry: 'lambda/recieveHandler.ts',
+        const goWebsocketOnMessageHandler = new golang.GoFunction(this, 'GoWebSocketOnMessage', {
+            entry: 'lambda/go-websocket-recieve',
             environment: {
                 TABLE_NAME: table.tableName,
-                QUEUE_URL: queue.queueUrl,
+                OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+                // KINESIS_STREAM_NAME: stream.streamName,
+                // LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName,
+                // DOMAIN_NAME: webSocketApi.apiEndpoint,
+                // STAGE_NAME: apiStage.stageName,
             },
         });
-        table.grantReadWriteData(receiveHandler)
-        queue.grantSendMessages(receiveHandler)
+
 
         // define the websocket API
         const webSocketApi = new apigatewayv2.WebSocketApi(this, "Tic", {
@@ -168,7 +157,7 @@ export class WebsocketSqSStack extends cdk.Stack {
                 integration: new apigatewayv2integrations.WebSocketLambdaIntegration('disconnect', disconnectHandler),
             },
             defaultRouteOptions: {
-                integration: new apigatewayv2integrations.WebSocketLambdaIntegration('default', receiveHandler),
+                integration: new apigatewayv2integrations.WebSocketLambdaIntegration('default', goWebsocketOnMessageHandler),
             },
         });
 
@@ -230,31 +219,30 @@ export class WebsocketSqSStack extends cdk.Stack {
             taskDefinition: taskDefinition,
             publicLoadBalancer: true,
         });
-        queue.grantConsumeMessages(taskDefinition.taskRole)
-        webSocketApi.grantManageConnections(taskDefinition.taskRole)
         table.grantReadWriteData(taskDefinition.taskRole)
         stream.grantReadWrite(taskDefinition.taskRole)
+        webSocketApi.grantManageConnections(taskDefinition.taskRole)
 
 
-        const queueHandler = new golang.GoFunction(this, 'SQSQueueHandlerGo', {
-            // entry: 'lambda/go-tic-reciver',
-            entry: 'lambda/go-tic-game-handler',
-            environment: {
-                TABLE_NAME: table.tableName,
-                OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
-                KINESIS_STREAM_NAME: stream.streamName,
-                LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName,
-                DOMAIN_NAME: webSocketApi.apiEndpoint,
-                STAGE_NAME: apiStage.stageName,
-            },
-        });
-        queueHandler.addEventSource(new SqsEventSource(queue, {
-            batchSize: 1,
-            maxBatchingWindow: cdk.Duration.seconds(0),
-        }))
-        queue.grantConsumeMessages(queueHandler)
-        webSocketApi.grantManageConnections(queueHandler)
-        table.grantReadWriteData(queueHandler)
+        // const goWebsocketOnMessageHandler = new golang.GoFunction(this, 'GoWebSocketOnMessage', {
+        //     entry: 'lambda/go-websocket-recieve',
+        //     environment: {
+        //         TABLE_NAME: table.tableName,
+        //         OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+        //         KINESIS_STREAM_NAME: stream.streamName,
+        //         LIVE_SELECT_SERVER_ENDPOINT: "http://" + fargateService.loadBalancer.loadBalancerDnsName,
+        //         DOMAIN_NAME: webSocketApi.apiEndpoint,
+        //         STAGE_NAME: apiStage.stageName,
+        //     },
+        // });
+        goWebsocketOnMessageHandler.addEnvironment('LIVE_SELECT_SERVER_ENDPOINT', "http://" + fargateService.loadBalancer.loadBalancerDnsName)
+        goWebsocketOnMessageHandler.addEnvironment('DOMAIN_NAME', webSocketApi.apiEndpoint)
+        goWebsocketOnMessageHandler.addEnvironment('STAGE_NAME', apiStage.stageName)
+        webSocketApi.grantManageConnections(goWebsocketOnMessageHandler)
+        table.grantReadWriteData(goWebsocketOnMessageHandler)
+        domain.grantReadWrite( goWebsocketOnMessageHandler);
+        domain.grantIndexReadWrite("*", goWebsocketOnMessageHandler);
+        domain.grantIndexReadWrite("lambda-index", goWebsocketOnMessageHandler);
 
 
         const liveSelectPush = new golang.GoFunction(this, 'LiveSelectPushGo', {
