@@ -10,6 +10,7 @@ import (
 
 func DefaultInMemoryInterpreter() *InMemoryInterpreter {
 	return &InMemoryInterpreter{
+		//pubsub: NewPubSubMultiChan[Node](),
 		pubsub:  NewPubSub[Node](),
 		byKeys:  make(map[Node]map[string]Item),
 		running: make(map[Node]struct{}),
@@ -30,9 +31,16 @@ var (
 	ErrInterpreterNotInNewState = fmt.Errorf("interpreter is not in new state")
 )
 
+type PubSubForInterpreter[T comparable] interface {
+	Register(key T) error
+	Publish(ctx context.Context, key T, msg Message) error
+	Finish(key T)
+	Subscribe(ctx context.Context, node T, fromOffset int, f func(Message) error) error
+}
+
 type InMemoryInterpreter struct {
 	lock    sync.Mutex
-	pubsub  *PubSub[Node]
+	pubsub  PubSubForInterpreter[Node]
 	byKeys  map[Node]map[string]Item
 	running map[Node]struct{}
 	status  ExecutionStatus
@@ -223,6 +231,8 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 					if _, ok := prev[msg.Key]; ok {
 						base := prev[msg.Key]
 
+						// TODO: retraction and aggregatoin don't happen in transactional way, even if message has both operations
+						// this is a problem, because if retraction fails, then aggregation will be lost
 						if msg.Retract != nil && x.Ctx.ShouldRetract() {
 							log.Debugln("❌retracting in merge", i.str(x))
 							retract := Item{
@@ -258,6 +268,9 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 
 								p := base
 								base = &item
+								// TODO: In feature, we should make better decision whenever send retractions or not.
+								// For now, we always send retractions, they don't have to be treated as retraction by the receiver.
+								// But, this has penalty related to throughput, and latency, and for some applications, it is not acceptable.
 								err := i.pubsub.Publish(ctx, x, Message{
 									Key:       msg.Key,
 									Aggregate: &item,

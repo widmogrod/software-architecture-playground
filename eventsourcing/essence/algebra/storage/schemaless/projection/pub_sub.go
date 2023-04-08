@@ -14,15 +14,15 @@ func NewPubSub[T comparable]() *PubSub[T] {
 		lock:      &lock,
 		cond:      sync.NewCond(lock.RLocker()),
 		publisher: make(map[T]*list.List),
-		finished:  make(map[T]bool),
 	}
 }
+
+var _ PubSubForInterpreter[any] = (*PubSub[any])(nil)
 
 type PubSub[T comparable] struct {
 	lock      *sync.RWMutex
 	cond      *sync.Cond
 	publisher map[T]*list.List
-	finished  map[T]bool
 }
 
 var (
@@ -37,15 +37,22 @@ func (p *PubSub[T]) Register(key T) error {
 	//log.Errorf("pubsub.Register(%s)\n", GetCtx(any(key).(Node)).name)
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	if _, ok := p.finished[key]; ok {
-		return fmt.Errorf("pubsub.Register: key=%#v %w", key, ErrFinished)
-	}
+	//if _, ok := p.finished[key]; ok {
+	//	return fmt.Errorf("pubsub.Register: key=%#v %w", key, ErrFinished)
+	//}
 
 	if _, ok := p.publisher[key]; !ok {
 		p.publisher[key] = list.New()
 	} else {
 		//log.Errorf("pubsub.Register(%s) ALREADY\n", GetCtx(any(key).(Node)).name)
 	}
+
+	if last := p.publisher[key].Back(); last != nil {
+		if last.Value.(Message).finished {
+			return fmt.Errorf("pubsub.Register: key=%#v %w", key, ErrFinished)
+		}
+	}
+
 	p.cond.Broadcast()
 
 	return nil
@@ -68,12 +75,18 @@ func (p *PubSub[T]) Publish(ctx context.Context, key T, msg Message) error {
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	if _, ok := p.finished[key]; ok {
-		return fmt.Errorf("pubsub.Publish: key=%#v %w", key, ErrFinished)
-	}
+	//if _, ok := p.finished[key]; ok {
+	//	return fmt.Errorf("pubsub.Publish: key=%#v %w", key, ErrFinished)
+	//}
 
 	if _, ok := p.publisher[key]; !ok {
 		p.publisher[key] = list.New()
+	}
+
+	if last := p.publisher[key].Back(); last != nil {
+		if last.Value.(Message).finished {
+			return fmt.Errorf("pubsub.Publish: key=%#v %w", key, ErrFinished)
+		}
 	}
 
 	msg.Offset = p.publisher[key].Len()
@@ -84,12 +97,15 @@ func (p *PubSub[T]) Publish(ctx context.Context, key T, msg Message) error {
 
 // Finish is called when a node won't publish any more messages
 func (p *PubSub[T]) Finish(key T) {
+	p.Publish(context.Background(), key, Message{
+		finished: true,
+	})
 	//log.Errorf("pubsub.Finish(%s)\n", GetCtx(any(key).(Node)).name)
-	p.lock.Lock()
-	p.finished[key] = true
-	p.lock.Unlock()
-
-	p.cond.Broadcast()
+	//p.lock.Lock()
+	//p.finished[key] = true
+	//p.lock.Unlock()
+	//
+	//p.cond.Broadcast()
 }
 
 //TODO: refactor PubSub and Kinesis to share as much as they can!
@@ -107,12 +123,8 @@ func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f fun
 
 	// Until, there is no messages, wait
 	p.cond.L.Lock()
-	for appendLog.Len() == 0 && !p.finished[node] {
+	for appendLog.Len() == 0 {
 		p.cond.Wait()
-	}
-	if appendLog.Len() == 0 && p.finished[node] {
-		p.cond.L.Unlock()
-		return nil
 	}
 
 	// Select the offset to start reading messages from
@@ -143,6 +155,10 @@ func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f fun
 
 		default:
 			msg := prev.Value.(Message)
+			if msg.finished {
+				//log.Errorf("pubsub.Subscribe END(%s)\n", GetCtx(any(node).(Node)).name)
+				return nil
+			}
 
 			//log.Errorf("pubsub.Subscribe CALL (%s)\n", GetCtx(any(node).(Node)).name)
 			err := f(msg)
@@ -152,13 +168,8 @@ func (p *PubSub[T]) Subscribe(ctx context.Context, node T, fromOffset int, f fun
 
 			// Wait for new changes to be available
 			p.cond.L.Lock()
-			for prev.Next() == nil && !p.finished[node] {
+			for prev.Next() == nil {
 				p.cond.Wait()
-			}
-			if prev.Next() == nil && p.finished[node] {
-				p.cond.L.Unlock()
-				//log.Errorf("pubsub.Subscribe END(%s)\n", GetCtx(any(node).(Node)).name)
-				return nil
 			}
 
 			prev = prev.Next()

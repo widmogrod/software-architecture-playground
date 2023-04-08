@@ -54,6 +54,20 @@ type Item struct {
 //	KV() KVStore
 //}
 
+//type Consumer interface {
+//	Consume(x Item) (hasNext bool)
+//}
+//
+//type Producer interface {
+//	Return(x Item)
+//	Finish()
+//}
+
+//type ProduceAdapter struct{}
+//
+//func (p *ProduceAdapter) Return(x Item) {}
+//func (p *ProduceAdapter) Finish()       {}
+
 type Handler interface {
 	//InputType() TypeDef
 	//OutputType() TypeDef
@@ -120,6 +134,8 @@ type Message struct {
 	Key       string
 	Aggregate *Item
 	Retract   *Item
+
+	finished bool
 }
 
 type Stats = map[string]int
