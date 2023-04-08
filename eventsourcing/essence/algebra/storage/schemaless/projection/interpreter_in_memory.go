@@ -34,7 +34,7 @@ var (
 type PubSubForInterpreter[T comparable] interface {
 	Register(key T) error
 	Publish(ctx context.Context, key T, msg Message) error
-	Finish(key T)
+	Finish(ctx context.Context, key T)
 	Subscribe(ctx context.Context, node T, fromOffset int, f func(Message) error) error
 }
 
@@ -207,7 +207,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 			}
 
 			log.Debugln("Map: Finish", i.str(x))
-			i.pubsub.Finish(x)
+			i.pubsub.Finish(ctx, x)
 
 			return nil
 		},
@@ -312,7 +312,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 			}
 
 			log.Debugln("Merge: Finish", i.str(x))
-			i.pubsub.Finish(x)
+			i.pubsub.Finish(ctx, x)
 
 			return nil
 		},
@@ -346,7 +346,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 			}
 
 			log.Debugln("Load: Finish", i.str(x))
-			i.pubsub.Finish(x)
+			i.pubsub.Finish(ctx, x)
 
 			return nil
 		},
@@ -393,7 +393,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 			}
 
 			log.Debugln("Join: Finish", i.str(x))
-			i.pubsub.Finish(x)
+			i.pubsub.Finish(ctx, x)
 
 			return nil
 		},

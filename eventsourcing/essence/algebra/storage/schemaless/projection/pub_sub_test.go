@@ -70,7 +70,7 @@ func TestPubSubTest_Subscribe(t *testing.T) {
 	}()
 
 	// but when we mark it as finished, it should return
-	pubsub.Finish(n)
+	pubsub.Finish(context.Background(), n)
 	err = pubsub.Publish(ctx, n, msg)
 	assert.Error(t, err, ErrFinished)
 	err = pubsub.Register(n)

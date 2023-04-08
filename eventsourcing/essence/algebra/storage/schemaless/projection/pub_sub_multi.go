@@ -79,7 +79,7 @@ func (p *PubSubMulti[T]) Publish(ctx context.Context, key T, msg Message) error 
 	return p.multi[key].Publish(msg)
 }
 
-func (p *PubSubMulti[T]) Finish(key T) {
+func (p *PubSubMulti[T]) Finish(ctx context.Context, key T) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.finished[key] = true

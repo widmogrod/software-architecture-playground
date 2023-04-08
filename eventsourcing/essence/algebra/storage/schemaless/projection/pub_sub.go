@@ -96,8 +96,8 @@ func (p *PubSub[T]) Publish(ctx context.Context, key T, msg Message) error {
 }
 
 // Finish is called when a node won't publish any more messages
-func (p *PubSub[T]) Finish(key T) {
-	p.Publish(context.Background(), key, Message{
+func (p *PubSub[T]) Finish(ctx context.Context, key T) {
+	p.Publish(ctx, key, Message{
 		finished: true,
 	})
 	//log.Errorf("pubsub.Finish(%s)\n", GetCtx(any(key).(Node)).name)
