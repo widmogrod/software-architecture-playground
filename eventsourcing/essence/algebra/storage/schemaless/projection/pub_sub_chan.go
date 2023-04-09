@@ -28,6 +28,13 @@ type PubSubChan[T any] struct {
 }
 
 func (s *PubSubChan[T]) Publish(msg T) error {
+	if msg2, ok := any(msg).(Message); ok {
+		if msg2.finished {
+			s.channel <- msg
+			return nil
+		}
+	}
+
 	if s.isClosed.Load() {
 		return fmt.Errorf("PubSubChan.Publish: channel is closed %w", ErrFinished)
 	}
@@ -37,9 +44,20 @@ func (s *PubSubChan[T]) Publish(msg T) error {
 
 func (s *PubSubChan[T]) Process() {
 	for result := range s.channel {
+		wg := &sync.WaitGroup{}
 		s.lock.RLock()
 		for _, sub := range s.subscribers {
+			wg.Add(1)
 			go func(sub subscriber[T]) {
+				defer wg.Done()
+
+				if msg, ok := any(result).(Message); ok {
+					if msg.finished {
+						log.Infof("PubSubChan.Process: finished from subscriber on message")
+						close(sub.done)
+						return
+					}
+				}
 				err := sub.f(result)
 				if err != nil {
 					log.Errorf("PubSubChan.Process: %s", err)
@@ -48,6 +66,15 @@ func (s *PubSubChan[T]) Process() {
 			}(sub)
 		}
 		s.lock.RUnlock()
+
+		wg.Wait()
+
+		if msg, ok := any(result).(Message); ok {
+			if msg.finished {
+				s.Close()
+				return
+			}
+		}
 	}
 
 	s.lock.RLock()

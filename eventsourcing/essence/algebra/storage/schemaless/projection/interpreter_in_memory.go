@@ -10,8 +10,8 @@ import (
 
 func DefaultInMemoryInterpreter() *InMemoryInterpreter {
 	return &InMemoryInterpreter{
-		//pubsub: NewPubSubMultiChan[Node](),
-		pubsub:  NewPubSub[Node](),
+		pubsub: NewPubSubMultiChan[Node](),
+		//pubsub:  NewPubSub[Node](),
 		byKeys:  make(map[Node]map[string]Item),
 		running: make(map[Node]struct{}),
 		stats:   NewStatsCollector(),
@@ -44,7 +44,7 @@ type InMemoryInterpreter struct {
 	byKeys  map[Node]map[string]Item
 	running map[Node]struct{}
 	status  ExecutionStatus
-	// what difference between process time and event time
+	// what differences between process time and event time
 	// should answers question
 	// - are there any events in the system, that a process should wait?
 	watermark int64

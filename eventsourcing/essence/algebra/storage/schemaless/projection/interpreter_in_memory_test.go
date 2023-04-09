@@ -2,12 +2,20 @@ package projection
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"testing"
 )
 
 func TestDefaultInMemoryInterpreter(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		TimestampFormat: "",
+		PadLevelText:    true,
+	})
+
 	dag := NewDAGBuilder()
 	_ = dag.
 		Load(&GenerateHandler{Load: func(push func(message Item)) error {
@@ -27,7 +35,11 @@ func TestDefaultInMemoryInterpreter(t *testing.T) {
 
 		err := interpreter.Run(context.Background(), dag.Build())
 		assert.NoError(t, err)
-
+		//DEBUG  [0000] Map:  map(DoSomething, r=false) true false
+		//DEBUG  [0000] ✉️: {Offset:0 Key:1 Aggregate:0x14000178d20 Retract:<nil> finished:false} map(DoSomething, r=false)
+		//DEBUG  [0000] √ map(DoSomething, r=false)
+		//DEBUG  [0000] Load: Finish Load(root.Load0, r=false)
+		//DEBUG  [0000] Map: Finish map(DoSomething, r=false)
 		stats := interpreter.StatsSnapshotAndReset()
 		assert.Equal(t, 1, stats["load[root.Load0].returning"])
 		assert.Equal(t, 1, stats["map[DoSomething].returning.aggregate"])
