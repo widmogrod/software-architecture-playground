@@ -53,7 +53,6 @@ func (s *PubSubChan[T]) Process() {
 
 				if msg, ok := any(result).(Message); ok {
 					if msg.finished {
-						log.Infof("PubSubChan.Process: finished from subscriber on message")
 						close(sub.done)
 						return
 					}

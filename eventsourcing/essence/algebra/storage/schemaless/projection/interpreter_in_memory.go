@@ -116,6 +116,10 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 		return nil
 	}
 
+	// TODO introduce parallelism for Item - key groups
+	// bounded to some number of goroutines, that can be configured
+	// and that can be used to limit memory usage
+
 	return MustMatchNode(
 		dag,
 		func(x *Map) error {
