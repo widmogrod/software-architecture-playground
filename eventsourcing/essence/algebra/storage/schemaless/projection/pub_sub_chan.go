@@ -8,27 +8,20 @@ import (
 )
 
 type subscriber[T any] struct {
-	f        func(T) error
-	done     chan error
-	isClosed atomic.Bool
+	f    func(T) error
+	done chan error
+	once sync.Once
 }
 
 func (s *subscriber[T]) Close() {
-	if s.isClosed.Load() {
-		return
-	}
-
-	s.isClosed.Store(true)
-	close(s.done)
+	s.CloseWithErr(nil)
 }
 
 func (s *subscriber[T]) CloseWithErr(err error) {
-	if s.isClosed.Load() {
-		return
-	}
-
-	s.done <- err
-	s.Close()
+	s.once.Do(func() {
+		s.done <- err
+		close(s.done)
+	})
 }
 
 func NewPubSubChan[T any]() *PubSubChan[T] {
@@ -42,8 +35,9 @@ func NewPubSubChan[T any]() *PubSubChan[T] {
 type PubSubChan[T any] struct {
 	lock        *sync.RWMutex
 	channel     chan T
-	subscribers []subscriber[T]
+	subscribers []*subscriber[T]
 	isClosed    atomic.Bool
+	once        sync.Once
 }
 
 func (s *PubSubChan[T]) Publish(msg T) error {
@@ -67,12 +61,12 @@ func (s *PubSubChan[T]) Process() {
 		s.lock.RLock()
 		for _, sub := range s.subscribers {
 			wg.Add(1)
-			go func(sub subscriber[T]) {
+			go func(sub *subscriber[T]) {
 				defer wg.Done()
 
 				if msg, ok := any(result).(Message); ok {
 					if msg.finished {
-						sub.Close()
+						//sub.Close()
 						return
 					}
 				}
@@ -84,13 +78,12 @@ func (s *PubSubChan[T]) Process() {
 			}(sub)
 		}
 		s.lock.RUnlock()
-
 		wg.Wait()
 
 		if msg, ok := any(result).(Message); ok {
 			if msg.finished {
 				s.Close()
-				return
+				break
 			}
 		}
 	}
@@ -107,16 +100,16 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 		return fmt.Errorf("PubSubChan.Subscribe: channel is closed %w", ErrFinished)
 	}
 
-	done := make(chan error)
+	sub := &subscriber[T]{
+		f:    f,
+		done: make(chan error),
+	}
 
 	s.lock.Lock()
-	s.subscribers = append(s.subscribers, subscriber[T]{
-		f:    f,
-		done: done,
-	})
+	s.subscribers = append(s.subscribers, sub)
 	s.lock.Unlock()
 
-	err := <-done
+	err := <-sub.done
 
 	//s.lock.Lock()
 	//for idx, sub := range s.subscribers {
@@ -131,10 +124,8 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 }
 
 func (s *PubSubChan[T]) Close() {
-	if s.isClosed.Load() {
-		return
-	}
-
-	s.isClosed.Store(true)
-	close(s.channel)
+	s.once.Do(func() {
+		s.isClosed.Store(true)
+		close(s.channel)
+	})
 }

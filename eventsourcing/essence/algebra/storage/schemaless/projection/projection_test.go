@@ -271,7 +271,7 @@ func TestLiveSelect(t *testing.T) {
 	//		From that few interesing patterns can happed, (some described in Data Architecture at Scale)
 	//		- Read-only Data Stores. Sharing read RDS, each team can gen a database that other team has,
 	//	      deployed to their account, and keep up to date by data system (layer)
-	//		  which means, each system, can do reads as much as they can with close proximity to data (different account can be in different geo regions)
+	//		  which means, each system, can do reads as much as they can with once proximity to data (different account can be in different geo regions)
 	//		  which means, each system, can share libraries that perform domain specific queries, and those libraries can use RDS in their account
 	//		  which means, that those libraries, can have also catching, and catch layer can be deployed on reader account,
 	//
