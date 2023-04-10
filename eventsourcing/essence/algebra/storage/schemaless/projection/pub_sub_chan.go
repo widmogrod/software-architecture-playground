@@ -8,9 +8,12 @@ import (
 )
 
 type subscriber[T any] struct {
-	f    func(T) error
-	done chan error
-	once sync.Once
+	inputs      chan T
+	f           func(T) error
+	done        chan error
+	once        sync.Once
+	processOnce sync.Once
+	finished    chan struct{}
 }
 
 func (s *subscriber[T]) Close() {
@@ -19,9 +22,38 @@ func (s *subscriber[T]) Close() {
 
 func (s *subscriber[T]) CloseWithErr(err error) {
 	s.once.Do(func() {
+		// close inputs channel to signal that no more messages will be sent
+		close(s.inputs)
+
+		// wait for all background invocations to finish
+		<-s.finished
+		close(s.finished)
+
+		// send potential error to done channel
 		s.done <- err
 		close(s.done)
 	})
+}
+
+func (s *subscriber[T]) Process() {
+	s.processOnce.Do(func() {
+		for msg := range s.inputs {
+			if s.Invoke(msg) {
+				break
+			}
+		}
+
+		s.finished <- struct{}{}
+	})
+}
+
+func (s *subscriber[T]) Invoke(msg T) bool {
+	err := s.f(msg)
+	if err != nil {
+		s.CloseWithErr(err)
+		return true
+	}
+	return false
 }
 
 func NewPubSubChan[T any]() *PubSubChan[T] {
@@ -29,6 +61,8 @@ func NewPubSubChan[T any]() *PubSubChan[T] {
 		lock:        &sync.RWMutex{},
 		channel:     make(chan T, 100),
 		subscribers: nil,
+
+		closed: make(chan struct{}),
 	}
 }
 
@@ -38,12 +72,14 @@ type PubSubChan[T any] struct {
 	subscribers []*subscriber[T]
 	isClosed    atomic.Bool
 	once        sync.Once
+
+	closed chan struct{}
 }
 
 func (s *PubSubChan[T]) Publish(msg T) error {
 	if msg2, ok := any(msg).(Message); ok {
 		if msg2.finished {
-			s.channel <- msg
+			s.Close()
 			return nil
 		}
 	}
@@ -56,43 +92,41 @@ func (s *PubSubChan[T]) Publish(msg T) error {
 }
 
 func (s *PubSubChan[T]) Process() {
-	for result := range s.channel {
-		wg := &sync.WaitGroup{}
+	var length int
+
+	defer func() {
 		s.lock.RLock()
 		for _, sub := range s.subscribers {
-			wg.Add(1)
-			go func(sub *subscriber[T]) {
-				defer wg.Done()
-
-				if msg, ok := any(result).(Message); ok {
-					if msg.finished {
-						//sub.Close()
-						return
-					}
-				}
-				err := sub.f(result)
-				if err != nil {
-					log.Errorf("PubSubChan.Process: %s", err)
-					sub.CloseWithErr(err)
-				}
-			}(sub)
+			sub.Close()
 		}
 		s.lock.RUnlock()
-		wg.Wait()
+	}()
 
-		if msg, ok := any(result).(Message); ok {
-			if msg.finished {
-				s.Close()
-				break
+	for {
+		select {
+		case <-s.closed:
+			return
+
+		case msg := <-s.channel:
+			s.lock.RLock()
+
+			length = len(s.subscribers)
+			switch length {
+			case 0:
+				log.Warn("PubSubChan.Process: no subscribers but get message: ",
+					length, ",", msg)
+
+			// optimisation, when there is only one subscriber, we can invoke it directly
+			case 1:
+				s.subscribers[0].Invoke(msg)
+			default:
+				for _, sub := range s.subscribers {
+					sub.inputs <- msg
+				}
 			}
+			s.lock.RUnlock()
 		}
 	}
-
-	s.lock.RLock()
-	for _, sub := range s.subscribers {
-		sub.Close()
-	}
-	s.lock.RUnlock()
 }
 
 func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
@@ -101,9 +135,13 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 	}
 
 	sub := &subscriber[T]{
-		f:    f,
-		done: make(chan error),
+		f:        f,
+		done:     make(chan error),
+		inputs:   make(chan T, 100),
+		finished: make(chan struct{}),
 	}
+
+	go sub.Process()
 
 	s.lock.Lock()
 	s.subscribers = append(s.subscribers, sub)
@@ -111,14 +149,15 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 
 	err := <-sub.done
 
-	//s.lock.Lock()
-	//for idx, sub := range s.subscribers {
-	//	if sub.done == done {
-	//		s.subscribers = append(s.subscribers[:idx], s.subscribers[idx+1:]...)
-	//		break
-	//	}
-	//}
-	//s.lock.Unlock()
+	s.lock.Lock()
+	newSubscribers := make([]*subscriber[T], 0, len(s.subscribers)-1)
+	for _, su := range s.subscribers {
+		if su != sub {
+			newSubscribers = append(newSubscribers, sub)
+		}
+	}
+	s.subscribers = newSubscribers
+	s.lock.Unlock()
 
 	return err
 }
@@ -126,6 +165,7 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 func (s *PubSubChan[T]) Close() {
 	s.once.Do(func() {
 		s.isClosed.Store(true)
+		s.closed <- struct{}{}
 		close(s.channel)
 	})
 }

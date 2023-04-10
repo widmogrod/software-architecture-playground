@@ -120,6 +120,24 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 	// bounded to some number of goroutines, that can be configured
 	// and that can be used to limit memory usage
 
+	/*
+
+			parallelize.Map().Merge().Log()
+			Parallelize by key groups
+			- group by key
+			- for each key group, run in parallel
+
+			i: (a, 1) (b, 2) (c, 3) (d, 4) (a, 5) (b, 6) (c, 7) (d, 8)
+		    Map(i, +1)
+			o: (a, 2) (b, 3) (c, 4) (d, 5) (a, 6) (b, 7) (c, 8) (d, 9)
+
+			(a, 1) (a, 5)
+			(b, 2) (b, 6)
+			(c, 3) (c, 7)
+			(d, 4) (d, 8)
+
+	*/
+
 	return MustMatchNode(
 		dag,
 		func(x *Map) error {
