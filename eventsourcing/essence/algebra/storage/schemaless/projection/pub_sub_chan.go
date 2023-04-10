@@ -8,14 +8,33 @@ import (
 )
 
 type subscriber[T any] struct {
-	f    func(T) error
-	done chan error
+	f        func(T) error
+	done     chan error
+	isClosed atomic.Bool
+}
+
+func (s *subscriber[T]) Close() {
+	if s.isClosed.Load() {
+		return
+	}
+
+	s.isClosed.Store(true)
+	close(s.done)
+}
+
+func (s *subscriber[T]) CloseWithErr(err error) {
+	if s.isClosed.Load() {
+		return
+	}
+
+	s.done <- err
+	s.Close()
 }
 
 func NewPubSubChan[T any]() *PubSubChan[T] {
 	return &PubSubChan[T]{
 		lock:        &sync.RWMutex{},
-		channel:     make(chan T),
+		channel:     make(chan T, 100),
 		subscribers: nil,
 	}
 }
@@ -53,14 +72,14 @@ func (s *PubSubChan[T]) Process() {
 
 				if msg, ok := any(result).(Message); ok {
 					if msg.finished {
-						close(sub.done)
+						sub.Close()
 						return
 					}
 				}
 				err := sub.f(result)
 				if err != nil {
 					log.Errorf("PubSubChan.Process: %s", err)
-					sub.done <- err
+					sub.CloseWithErr(err)
 				}
 			}(sub)
 		}
@@ -78,7 +97,7 @@ func (s *PubSubChan[T]) Process() {
 
 	s.lock.RLock()
 	for _, sub := range s.subscribers {
-		close(sub.done)
+		sub.Close()
 	}
 	s.lock.RUnlock()
 }
