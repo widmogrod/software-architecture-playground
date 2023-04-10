@@ -62,9 +62,8 @@ func (p *PubSubMulti[T]) Publish(ctx context.Context, key T, msg Message) error 
 	}
 
 	p.lock.RLock()
-	defer p.lock.RUnlock()
-
 	if _, ok := p.finished[key]; ok {
+		p.lock.RUnlock()
 		return fmt.Errorf("PubSubMulti.Publish: key=%#v %w", key, ErrFinished)
 	}
 
@@ -75,6 +74,7 @@ func (p *PubSubMulti[T]) Publish(ctx context.Context, key T, msg Message) error 
 	p.onces[key].Do(func() {
 		go p.multi[key].Process()
 	})
+	p.lock.RUnlock()
 
 	return p.multi[key].Publish(msg)
 }
@@ -95,11 +95,11 @@ func (p *PubSubMulti[T]) Subscribe(ctx context.Context, node T, fromOffset int, 
 	}
 
 	p.lock.RLock()
-	defer p.lock.RUnlock()
-
 	if _, ok := p.multi[node]; !ok {
+		p.lock.RUnlock()
 		return fmt.Errorf("PubSubMulti.Subscribe: key %T not registered", node)
 	}
+	p.lock.RUnlock()
 
 	return p.multi[node].Subscribe(f)
 }

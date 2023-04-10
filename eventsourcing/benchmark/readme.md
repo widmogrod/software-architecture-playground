@@ -28,6 +28,9 @@ time ./projectioncount   --input ./kinglear.txt --output kinglear.txt.projection
     channel based pubsub
      4952.98s user 758.25s system 25% cpu 6:14:12.08 total
 
+     with buffered channels 1000
+    4737.46s user 748.16s system 394% cpu 23:09.31 total
+
 -- native count
 
 go build -o nativecount native_count.go
@@ -36,3 +39,10 @@ time ./nativecount --input ./kinglear.txt --output kinglear.txt.native.out
 2,5GB file (2686219278)
 
     95.97s user 1.54s system 101% cpu 1:36.31 total
+
+-- native gorutines count
+
+go build -o native_gorutines native_gorutines.go
+time ./native_gorutines  --input ./kinglear.txt --output kinglear.txt.gorutimes.out
+
+     173.29s user 52.89s system 183% cpu 2:02.94 total

@@ -44,6 +44,19 @@ func main() {
 	//	log.Fatal("could not start CPU profile: ", err)
 	//}
 	//defer pprof.StopCPUProfile()
+	//
+	//f, err = os.Create("projection.mem.prof")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//if err := pprof.WriteHeapProfile(f); err != nil {
+	//	log.Fatal("could not write memory profile: ", err)
+	//}
+	//defer f.Close()
+
+	//go func() {
+	//	log.Println(http.ListenAndServe("localhost:6060", nil))
+	//}()
 
 	dag := projection.NewDAGBuilder()
 	lines := dag.Load(&projection.GenerateHandler{
