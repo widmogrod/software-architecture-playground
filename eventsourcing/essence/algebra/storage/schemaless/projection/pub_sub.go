@@ -97,9 +97,12 @@ func (p *PubSub[T]) Publish(ctx context.Context, key T, msg Message) error {
 
 // Finish is called when a node won't publish any more messages
 func (p *PubSub[T]) Finish(ctx context.Context, key T) {
-	p.Publish(ctx, key, Message{
+	err := p.Publish(ctx, key, Message{
 		finished: true,
 	})
+	if err != nil {
+		panic(err)
+	}
 	//log.Errorf("pubsub.Finish(%s)\n", GetCtx(any(key).(Node)).name)
 	//p.lock.Lock()
 	//p.finished[key] = true
