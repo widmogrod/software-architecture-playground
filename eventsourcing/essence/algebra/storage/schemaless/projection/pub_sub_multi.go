@@ -95,7 +95,7 @@ func (p *PubSubMulti[T]) Finish(ctx context.Context, key T) {
 	//p.multi[key].Close()
 }
 
-func (p *PubSubMulti[T]) Subscribe(ctx context.Context, node T, fromOffset int, f func(Message) error) error {
+func (p *PubSubMulti[T]) Subscribe(ctx context.Context, key T, fromOffset int, f func(Message) error) error {
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("PubSubMulti.Subscribe %s %w", ctx.Err(), ErrContextDone)
@@ -103,11 +103,18 @@ func (p *PubSubMulti[T]) Subscribe(ctx context.Context, node T, fromOffset int, 
 	}
 
 	p.lock.RLock()
-	if _, ok := p.multi[node]; !ok {
+	if _, ok := p.finished[key]; ok {
 		p.lock.RUnlock()
-		return fmt.Errorf("PubSubMulti.Subscribe: key %T not registered", node)
+		return fmt.Errorf("PubSubMulti.Subscribe: key=%#v %w", key, ErrFinished)
 	}
 	p.lock.RUnlock()
 
-	return p.multi[node].Subscribe(f)
+	p.lock.RLock()
+	if _, ok := p.multi[key]; !ok {
+		p.lock.RUnlock()
+		return fmt.Errorf("PubSubMulti.Subscribe: key %T not registered", key)
+	}
+	p.lock.RUnlock()
+
+	return p.multi[key].Subscribe(f)
 }
