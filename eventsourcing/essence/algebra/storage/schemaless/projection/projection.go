@@ -42,10 +42,23 @@ func GetCtx(node Node) *DefaultContext {
 	)
 }
 
+func NodeToString(node Node) string {
+	return MustMatchNode(
+		node,
+		func(node *Map) string { return "Map" },
+		func(node *Merge) string { return "Merge" },
+		func(node *Load) string { return "Load" },
+		func(node *Join) string { return "Join" },
+	)
+}
+
 type Item struct {
 	Key       string
 	Data      schema.Schema
 	EventTime int64
+	//Window    time.Duration
+
+	finished bool
 }
 
 //type TypeDef struct {}
