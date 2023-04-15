@@ -61,22 +61,14 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 	i.lock.Unlock()
 
 	ctx, cancel := context.WithCancel(ctx)
-	_ = cancel
 	group := &ExecutionGroup{
-		ctx: ctx,
-		//cancel: cancel,
+		ctx:    ctx,
+		cancel: cancel,
 	}
-
-	// TODO make order of nodesFromTo deterministic
-	// Loading noted should be at the end, so that subscribers can be start subscribing
 
 	// Registering new nodes makes sure that, in case of non-deterministic concurrency
 	// when goroutine want to subscribe to a node, it will be registered, even if it's not publishing yet
 	for _, node := range nodes {
-		//if node == nil {
-		//	continue
-		//}
-
 		err := i.pubsub.Register(node)
 		if err != nil {
 			i.lock.Lock()
@@ -88,10 +80,6 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 	}
 
 	for _, node := range nodes {
-		//if node == nil {
-		//	continue
-		//}
-
 		func(node Node) {
 			group.Go(func() (err error) {
 				return i.run(ctx, node)
@@ -123,6 +111,10 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 	// TODO introduce parallelism for Item - key groups
 	// bounded to some number of goroutines, that can be configured
 	// and that can be used to limit memory usage
+
+	// TODO introduce merge window triggers, and triggers in general so that
+	// - RepositorySink can be used with batches
+	// - LiveSelect in TicTacToe game, can show progress in game after reload, not through streaming updates, but by sending final state - debounce?
 
 	/*
 
