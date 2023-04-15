@@ -8,6 +8,7 @@ import (
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"testing"
+	"time"
 )
 
 func TestNewLiveSelect(t *testing.T) {
@@ -64,7 +65,13 @@ func TestNewLiveSelect(t *testing.T) {
 	stream.Close()
 
 	ctx := context.Background()
-	live := NewLiveSelect(typedStore, broadcast).UseStreamToPush(stream)
+	live := NewLiveSelect(typedStore, broadcast)
+
+	go func() {
+		<-time.After(1 * time.Second)
+		live.UseStreamToPush(stream)
+	}()
+
 	err = live.Process(ctx, "session-1")
 	assert.NoError(t, err)
 
