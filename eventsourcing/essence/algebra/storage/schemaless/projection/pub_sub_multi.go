@@ -3,6 +3,7 @@ package projection
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -45,11 +46,14 @@ func (p *PubSubMulti[T]) Register(key T) error {
 	}
 
 	p.multi[key] = p.new()
+	//go p.multi[key].Process()
 	p.onces[key] = &sync.Once{}
+
 	return nil
 }
 
 func (p *PubSubMulti[T]) Publish(ctx context.Context, key T, msg Message) error {
+	log.Debugf("PublishMulti: key=%v msg=%v", key, msg)
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("PubSubMulti.Publish: key=%#v ctx=%s %w", key, ctx.Err(), ErrContextDone)
@@ -66,24 +70,28 @@ func (p *PubSubMulti[T]) Publish(ctx context.Context, key T, msg Message) error 
 		p.lock.RUnlock()
 		return fmt.Errorf("PubSubMulti.Publish: key=%#v %w", key, ErrFinished)
 	}
+	p.lock.RUnlock()
 
-	//if _, ok := p.multi[key]; !ok {
-	//	return fmt.Errorf("PubSubMulti.Publish: key %s not registered", key)
-	//}
+	if _, ok := p.multi[key]; !ok {
+		return fmt.Errorf("PubSubMulti.Publish: key=%#v not registered", key)
+	}
 
 	p.onces[key].Do(func() {
 		go p.multi[key].Process()
 	})
-	p.lock.RUnlock()
 
 	return p.multi[key].Publish(msg)
 }
 
 func (p *PubSubMulti[T]) Finish(ctx context.Context, key T) {
-	p.Publish(ctx, key, Message{finished: true})
-	//p.lock.Lock()
-	//defer p.lock.Unlock()
-	//p.finished[key] = true
+	err := p.Publish(ctx, key, Message{finished: true})
+	if err != nil {
+		panic(err)
+	}
+	p.lock.Lock()
+	p.finished[key] = true
+	p.lock.Unlock()
+
 	//p.multi[key].Close()
 }
 
