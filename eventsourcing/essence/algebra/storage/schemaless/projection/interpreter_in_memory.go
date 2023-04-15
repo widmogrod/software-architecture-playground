@@ -61,17 +61,21 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 	i.lock.Unlock()
 
 	ctx, cancel := context.WithCancel(ctx)
+	_ = cancel
 	group := &ExecutionGroup{
-		ctx:    ctx,
-		cancel: cancel,
+		ctx: ctx,
+		//cancel: cancel,
 	}
+
+	// TODO make order of nodesFromTo deterministic
+	// Loading noted should be at the end, so that subscribers can be start subscribing
 
 	// Registering new nodes makes sure that, in case of non-deterministic concurrency
 	// when goroutine want to subscribe to a node, it will be registered, even if it's not publishing yet
 	for _, node := range nodes {
-		if node == nil {
-			continue
-		}
+		//if node == nil {
+		//	continue
+		//}
 
 		err := i.pubsub.Register(node)
 		if err != nil {
@@ -84,9 +88,9 @@ func (i *InMemoryInterpreter) Run(ctx context.Context, nodes []Node) error {
 	}
 
 	for _, node := range nodes {
-		if node == nil {
-			continue
-		}
+		//if node == nil {
+		//	continue
+		//}
 
 		func(node Node) {
 			group.Go(func() (err error) {
@@ -141,6 +145,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 	return MustMatchNode(
 		dag,
 		func(x *Map) error {
+			log.Debugln("Map: Start ", i.str(x))
 			var lastOffset int = 0
 
 			err := i.pubsub.Subscribe(
@@ -333,6 +338,16 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 				return fmt.Errorf("interpreter.Merge(1) %w", err)
 			}
 
+			//for _, item := range prev {
+			//	err := i.pubsub.Publish(ctx, x, Message{
+			//		Key:       item.Key,
+			//		Aggregate: item,
+			//	})
+			//	if err != nil {
+			//		return fmt.Errorf("interpreter.Merge(2) %w", err)
+			//	}
+			//}
+
 			log.Debugln("Merge: Finish", i.str(x))
 			i.pubsub.Finish(ctx, x)
 
@@ -340,6 +355,7 @@ func (i *InMemoryInterpreter) run(ctx context.Context, dag Node) error {
 		},
 		func(x *Load) error {
 			var err error
+			log.Debugln("Load: Start", i.str(x))
 			err = x.OnLoad.Process(Item{}, func(item Item) {
 				if err != nil {
 					return
@@ -477,11 +493,15 @@ type ExecutionGroup struct {
 
 func (g *ExecutionGroup) Go(f func() error) {
 	g.wg.Add(1)
+
+	started := make(chan struct{})
 	go func() {
 		defer g.wg.Done()
 
 		select {
 		case <-g.ctx.Done():
+			// signal that goroutine has started
+			close(started)
 			if err := g.ctx.Err(); err != nil {
 				g.once.Do(func() {
 					g.err = err
@@ -492,6 +512,8 @@ func (g *ExecutionGroup) Go(f func() error) {
 			}
 
 		default:
+			// signal that goroutine has started
+			close(started)
 			err := f()
 			if err != nil {
 				g.once.Do(func() {
@@ -503,6 +525,8 @@ func (g *ExecutionGroup) Go(f func() error) {
 			}
 		}
 	}()
+
+	<-started
 }
 
 func (g *ExecutionGroup) Wait() error {
