@@ -1,5 +1,11 @@
 # Benchmark word count example
 
+## 
+- PubSubChan speed up whole process, and make it so that on 2,5GB file, beam runner swaps like crazy, and just cannot finish, but projection completes
+- Quite x/schema ser-de with reflection is quite big bottleneck, but when change to static definition, finish only 2-3x slower than native implementation, which is 30x improvement
+- 
+## Some notes on different runs
+
 go install github.com/apache/beam/sdks/v2/go/examples/wordcount
 
 curl https://raw.githubusercontent.com/apache/beam/master/sdks/go/data/shakespeare/kinglear.txt > kinglear.txt
@@ -46,3 +52,27 @@ go build -o native_gorutines native_gorutines.go
 time ./native_gorutines  --input ./kinglear.txt --output kinglear.txt.gorutimes.out
 
      173.29s user 52.89s system 183% cpu 2:02.94 total
+
+
+###
+(software-architecture-playground) ➜  benchmark git:(feature/february-2) ✗ ./run.sh native_count
+
+real    1m36.972s
+user    1m36.566s
+sys     0m1.814s
+(software-architecture-playground) ➜  benchmark git:(feature/february-2) ✗ ./run.sh native_gorutines
+
+real    2m2.860s
+user    2m55.523s
+sys     0m53.721s
+(software-architecture-playground) ➜  benchmark git:(feature/february-2) ✗ ./run.sh native_gorutines_pubsub
+
+real    2m29.568s
+user    3m44.729s
+sys     0m52.278s
+
+(software-architecture-playground) ➜  benchmark git:(feature/february-2) ✗  ./run.sh projection
+
+real    13m24.520s
+user    41m22.943s
+sys     8m43.810s

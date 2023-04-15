@@ -8,6 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/projection"
+	"sync"
+
 	//_ "net/http/pprof"
 	"os"
 	"regexp"
@@ -107,6 +109,7 @@ func main() {
 	})
 
 	var bufferedLines map[string]string = make(map[string]string)
+	var lock = &sync.Mutex{}
 
 	formatted.Map(&MapHandler{
 		F: func(x projection.Item, returning func(value projection.Item)) error {
@@ -114,7 +117,10 @@ func main() {
 			if !ok {
 				return fmt.Errorf("failed to cast data to string. %#v", x.Data)
 			}
+			lock.Lock()
 			bufferedLines[x.Key] = line
+			lock.Unlock()
+
 			return nil
 		},
 	})

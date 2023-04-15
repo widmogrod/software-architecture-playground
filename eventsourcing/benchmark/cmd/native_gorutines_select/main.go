@@ -49,36 +49,57 @@ func main() {
 	var bufferedWords map[string]int = make(map[string]int)
 	var bufferedLines map[string]string = make(map[string]string)
 
-	var linesChannel = make(chan string, 10000)
+	var linesChannel = make(chan string, 100)
 	var wordsCountChannel = make(chan wc, 100)
 
 	wg := sync.WaitGroup{}
 	wglines := sync.WaitGroup{}
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 3; i++ {
 		wg.Add(1)
 		wglines.Add(1)
 		go func() {
 			defer wglines.Done()
 			defer wg.Done()
-			for line := range linesChannel {
-				for _, word := range wordRE.FindAllString(line, -1) {
-					wordsCountChannel <- wc{word, 1}
+			for {
+				select {
+				case line, ok := <-linesChannel:
+					if !ok {
+						return
+					}
+
+					for _, word := range wordRE.FindAllString(line, -1) {
+						wordsCountChannel <- wc{word, 1}
+					}
 				}
 			}
+			//for line := range linesChannel {
+			//	for _, word := range wordRE.FindAllString(line, -1) {
+			//		wordsCountChannel <- wc{word, 1}
+			//	}
+			//}
 		}()
 	}
 
-	//lock := sync.Mutex{}
+	lock := sync.Mutex{}
 	for i := 0; i < 1; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for wc := range wordsCountChannel {
-				//lock.Lock()
-				bufferedWords[wc.word] += wc.count
-				//lock.Unlock()
+			for {
+				select {
+				case wc, ok := <-wordsCountChannel:
+					if !ok {
+						return
+					}
+					lock.Lock()
+					bufferedWords[wc.word] += wc.count
+					lock.Unlock()
+				}
 			}
+			//for wc := range wordsCountChannel {
+			//	bufferedWords[wc.word] += wc.count
+			//}
 		}()
 	}
 
