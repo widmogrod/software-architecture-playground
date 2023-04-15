@@ -59,7 +59,7 @@ func (s *subscriber[T]) Invoke(msg T) bool {
 func NewPubSubChan[T any]() *PubSubChan[T] {
 	return &PubSubChan[T]{
 		lock:        &sync.RWMutex{},
-		channel:     make(chan T, 100),
+		channel:     make(chan T, 1000),
 		subscribers: nil,
 
 		closed: make(chan struct{}),
@@ -100,32 +100,28 @@ func (s *PubSubChan[T]) Process() {
 			sub.Close()
 		}
 		s.lock.RUnlock()
+
+		s.closed <- struct{}{}
 	}()
 
-	for {
-		select {
-		case <-s.closed:
-			return
+	for msg := range s.channel {
+		s.lock.RLock()
 
-		case msg := <-s.channel:
-			s.lock.RLock()
+		length = len(s.subscribers)
+		switch length {
+		case 0:
+			log.Warn("PubSubChan.Process: no subscribers but get message: ",
+				length, ",", msg)
 
-			length = len(s.subscribers)
-			switch length {
-			case 0:
-				log.Warn("PubSubChan.Process: no subscribers but get message: ",
-					length, ",", msg)
-
-			// optimisation, when there is only one subscriber, we can invoke it directly
-			case 1:
-				s.subscribers[0].Invoke(msg)
-			default:
-				for _, sub := range s.subscribers {
-					sub.inputs <- msg
-				}
+		// optimisation, when there is only one subscriber, we can invoke it directly
+		case 1:
+			s.subscribers[0].Invoke(msg)
+		default:
+			for _, sub := range s.subscribers {
+				sub.inputs <- msg
 			}
-			s.lock.RUnlock()
 		}
+		s.lock.RUnlock()
 	}
 }
 
@@ -137,7 +133,7 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 	sub := &subscriber[T]{
 		f:        f,
 		done:     make(chan error),
-		inputs:   make(chan T, 100),
+		inputs:   make(chan T, 1000),
 		finished: make(chan struct{}),
 	}
 
@@ -165,7 +161,7 @@ func (s *PubSubChan[T]) Subscribe(f func(T) error) error {
 func (s *PubSubChan[T]) Close() {
 	s.once.Do(func() {
 		s.isClosed.Store(true)
-		s.closed <- struct{}{}
 		close(s.channel)
+		<-s.closed
 	})
 }
