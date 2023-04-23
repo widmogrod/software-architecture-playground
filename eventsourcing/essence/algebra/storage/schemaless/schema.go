@@ -76,18 +76,22 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 
 	for _, record := range x.Saving {
 		var err error
-		var before Record[schema.Schema]
+		var before *Record[schema.Schema]
 		if _, ok := s.store[s.toKey(record)]; ok {
-			before, err = s.toTyped(s.store[s.toKey(record)])
+			before, err = schema.ToGoG[*Record[schema.Schema]](s.store[s.toKey(record)], WithOnlyRecordSchemaOptions)
 			if err != nil {
 				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: to typed failed %s %w", err, ErrInternalError))
 			}
 		}
 
 		record.Version += 1
-		s.store[s.toKey(record)] = s.fromTyped(record)
+		s.store[s.toKey(record)] = schema.FromGo(record)
 
-		err = newLog.Change(before, record)
+		if before == nil {
+			err = newLog.Change(Record[schema.Schema]{}, record)
+		} else {
+			err = newLog.Change(*before, record)
+		}
 		if err != nil {
 			panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: append log failed (1) %s %w", err, ErrInternalError))
 		}
@@ -95,11 +99,11 @@ func (s *InMemoryRepository) UpdateRecords(x UpdateRecords[Record[schema.Schema]
 
 	for _, record := range x.Deleting {
 		if _, ok := s.store[s.toKey(record)]; ok {
-			before, err := s.toTyped(s.store[s.toKey(record)])
+			before, err := schema.ToGoG[*Record[schema.Schema]](s.store[s.toKey(record)], WithOnlyRecordSchemaOptions)
 			if err != nil {
 				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: to typed failed %s %w", err, ErrInternalError))
 			}
-			err = newLog.Delete(before)
+			err = newLog.Delete(*before)
 			if err != nil {
 				panic(fmt.Errorf("store.InMemoryRepository.UpdateRecords: append log failed (2) %s %w", err, ErrInternalError))
 			}
@@ -166,11 +170,11 @@ func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.S
 
 	typedRecords := make([]Record[schema.Schema], 0)
 	for _, record := range records {
-		typed, err := s.toTyped(record)
+		typed, err := schema.ToGoG[*Record[schema.Schema]](record, WithOnlyRecordSchemaOptions)
 		if err != nil {
 			return PageResult[Record[schema.Schema]]{}, err
 		}
-		typedRecords = append(typedRecords, typed)
+		typedRecords = append(typedRecords, *typed)
 	}
 
 	// Use limit to reduce number of records
@@ -194,30 +198,6 @@ func (s *InMemoryRepository) FindingRecords(query FindingRecords[Record[schema.S
 	}
 
 	return result, nil
-}
-
-func (s *InMemoryRepository) fromTyped(record Record[schema.Schema]) *schema.Map {
-	return schema.MkMap(
-		schema.MkField("ID", schema.MkString(record.ID)),
-		schema.MkField("Type", schema.MkString(record.Type)),
-		schema.MkField("Data", record.Data),
-		schema.MkField("Version", schema.MkInt(int(record.Version))),
-	)
-}
-
-func (s *InMemoryRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
-	typed := Record[schema.Schema]{
-		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-id-corrupted"),
-		Data:    schema.Get(record, "Data"),
-		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
-	}
-	if typed.Type == "record-id-corrupted" &&
-		typed.ID == "record-id-corrupted" &&
-		typed.Version == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("store.InMemoryRepository.FindingRecords corrupted record: %v", record)
-	}
-	return typed, nil
 }
 
 func (s *InMemoryRepository) AppendLog() *AppendLog[schema.Schema] {

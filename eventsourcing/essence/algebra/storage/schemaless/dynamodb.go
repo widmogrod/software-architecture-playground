@@ -58,12 +58,12 @@ func (d *DynamoDBRepository) Get(key, recordType string) (Record[schema.Schema],
 		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get schema conversion error=%s. %w", err, ErrInternalError)
 	}
 
-	typed, err := d.toTyped(schemed)
+	typed, err := schema.ToGoG[*Record[schema.Schema]](schemed, WithOnlyRecordSchemaOptions)
 	if err != nil {
 		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get type conversion error=%s. %w", err, ErrInvalidType)
 	}
 
-	return typed, nil
+	return *typed, nil
 }
 
 func (d *DynamoDBRepository) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
@@ -75,7 +75,7 @@ func (d *DynamoDBRepository) UpdateRecords(command UpdateRecords[Record[schema.S
 	for _, value := range command.Saving {
 		originalVersion := value.Version
 		value.Version++
-		sch := d.fromTyped(value)
+		sch := schema.FromGo(value)
 		item := schema.ToDynamoDB(sch)
 		if _, ok := item.(*types.AttributeValueMemberM); !ok {
 			return fmt.Errorf("DynamoDBRepository.UpdateRecords: unsupported type: %T", item)
@@ -202,11 +202,11 @@ func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.S
 			return PageResult[Record[schema.Schema]]{}, err
 		}
 
-		typed, err := d.toTyped(schemed)
+		typed, err := schema.ToGoG[*Record[schema.Schema]](schemed, WithOnlyRecordSchemaOptions)
 		if err != nil {
 			return PageResult[Record[schema.Schema]]{}, err
 		}
-		result.Items = append(result.Items, typed)
+		result.Items = append(result.Items, *typed)
 	}
 
 	if items.LastEvaluatedKey != nil {
@@ -231,30 +231,6 @@ func (d *DynamoDBRepository) FindingRecords(query FindingRecords[Record[schema.S
 	}
 
 	return result, nil
-}
-
-func (d *DynamoDBRepository) fromTyped(record Record[schema.Schema]) *schema.Map {
-	return schema.MkMap(
-		schema.MkField("ID", schema.MkString(record.ID)),
-		schema.MkField("Type", schema.MkString(record.Type)),
-		schema.MkField("Data", record.Data),
-		schema.MkField("Version", schema.MkInt(int(record.Version))),
-	)
-}
-
-func (d *DynamoDBRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
-	typed := Record[schema.Schema]{
-		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-id-corrupted"),
-		Data:    schema.Get(record, "Data"),
-		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
-	}
-	if typed.Type == "record-id-corrupted" &&
-		typed.ID == "record-id-corrupted" &&
-		typed.Version == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("store.DynamoDBRepository.FindingRecords corrupted record: %v", record)
-	}
-	return typed, nil
 }
 
 func (d *DynamoDBRepository) buildFilterExpression(query FindingRecords[Record[schema.Schema]]) (string, map[string]types.AttributeValue, map[string]string, error) {

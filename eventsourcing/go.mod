@@ -24,7 +24,7 @@ require (
 	github.com/segmentio/ksuid v1.0.3
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.8.1
-	github.com/widmogrod/mkunion v1.12.1
+	github.com/widmogrod/mkunion v1.13.0
 	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1

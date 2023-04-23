@@ -44,17 +44,17 @@ func (os *OpenSearchRepository) Get(recordID string, recordType RecordType) (Rec
 		return Record[schema.Schema]{}, err
 	}
 
-	typed, err := os.toTyped(schema.Get(schemed, "_source"))
+	typed, err := schema.ToGoG[*Record[schema.Schema]](schema.Get(schemed, "_source"), WithOnlyRecordSchemaOptions)
 	if err != nil {
 		return Record[schema.Schema]{}, fmt.Errorf("DynamoDBRepository.Get type conversion error=%s. %w", err, ErrInvalidType)
 	}
 
-	return typed, nil
+	return *typed, nil
 }
 
 func (os *OpenSearchRepository) UpdateRecords(command UpdateRecords[Record[schema.Schema]]) error {
 	for _, record := range command.Saving {
-		data, err := schema.ToJSON(os.fromTyped(record))
+		data, err := schema.ToJSON(schema.FromGo(record))
 		if err != nil {
 			panic(err)
 		}
@@ -158,11 +158,11 @@ func (os *OpenSearchRepository) FindingRecords(query FindingRecords[Record[schem
 		hists,
 		[]Record[schema.Schema]{},
 		func(s schema.Schema, result []Record[schema.Schema]) []Record[schema.Schema] {
-			typed, err := os.toTyped(schema.Get(s, "_source"))
+			typed, err := schema.ToGoG[*Record[schema.Schema]](schema.Get(s, "_source"), WithOnlyRecordSchemaOptions)
 			if err != nil {
 				panic(err)
 			}
-			result = append(result, typed)
+			result = append(result, *typed)
 
 			lastSort = schema.Get(s, "sort")
 
@@ -190,30 +190,6 @@ func (os *OpenSearchRepository) FindingRecords(query FindingRecords[Record[schem
 		Items: items,
 		Next:  nil,
 	}, nil
-}
-
-func (os *OpenSearchRepository) fromTyped(record Record[schema.Schema]) *schema.Map {
-	return schema.MkMap(
-		schema.MkField("ID", schema.MkString(record.ID)),
-		schema.MkField("Type", schema.MkString(record.Type)),
-		schema.MkField("Data", record.Data),
-		schema.MkField("Version", schema.MkInt(int(record.Version))),
-	)
-}
-
-func (os *OpenSearchRepository) toTyped(record schema.Schema) (Record[schema.Schema], error) {
-	typed := Record[schema.Schema]{
-		ID:      schema.AsDefault[string](schema.Get(record, "ID"), "record-id-corrupted"),
-		Type:    schema.AsDefault[string](schema.Get(record, "Type"), "record-id-corrupted"),
-		Data:    schema.Get(record, "Data"),
-		Version: schema.AsDefault[uint16](schema.Get(record, "Version"), 0),
-	}
-	if typed.Type == "record-id-corrupted" &&
-		typed.ID == "record-id-corrupted" &&
-		typed.Version == 0 {
-		return Record[schema.Schema]{}, fmt.Errorf("store.DynamoDBRepository.FindingRecords corrupted record: %v", record)
-	}
-	return typed, nil
 }
 
 func (os *OpenSearchRepository) toDocumentID(record Record[schema.Schema]) string {
