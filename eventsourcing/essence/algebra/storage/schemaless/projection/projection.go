@@ -63,6 +63,16 @@ type Item struct {
 	//finished bool
 }
 
+type ItemGroupedByKey struct {
+	Key  string
+	Data []Item
+}
+type ItemGroupedByWindow struct {
+	Key    string
+	Data   *schema.List
+	Window *Window
+}
+
 type Window struct {
 	Start int64
 	End   int64
