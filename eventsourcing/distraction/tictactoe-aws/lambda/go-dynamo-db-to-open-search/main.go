@@ -92,22 +92,15 @@ func toTyped(record schema.Schema) (schemaless.Record[schema.Schema], error) {
 	normalised, err := schema.UnwrapDynamoDB(record)
 	if err != nil {
 		data, err := schema.ToJSON(record)
-		log.Errorln("🗺store.KinesisStream corrupted record:", string(data), err)
-		return schemaless.Record[schema.Schema]{}, fmt.Errorf("store.KinesisStream unwrap DynamoDB record: %v", record)
+		log.Errorln("lambda to open search.toTyped: corrupted record:", string(data), err)
+		return schemaless.Record[schema.Schema]{}, fmt.Errorf("lambda to open search.toTyped: unwrap DynamoDB record: %v", record)
 	}
 
-	typed := schemaless.Record[schema.Schema]{
-		ID:      schema.AsDefault[string](schema.Get(normalised, "ID"), "record-id-corrupted"),
-		Type:    schema.AsDefault[string](schema.Get(normalised, "Type"), "record-id-corrupted"),
-		Data:    schema.Get(normalised, "Data"),
-		Version: schema.AsDefault[uint16](schema.Get(normalised, "Version"), 0),
-	}
-	if typed.Type == "record-id-corrupted" &&
-		typed.ID == "record-id-corrupted" &&
-		typed.Version == 0 {
+	typed, err := schema.ToGoG[*schemaless.Record[schema.Schema]](normalised, schemaless.WithOnlyRecordSchemaOptions)
+	if err != nil {
 		data, err := schema.ToJSON(normalised)
-		log.Errorln("🗺store.KinesisStream corrupted record:", string(data), err)
-		return schemaless.Record[schema.Schema]{}, fmt.Errorf("store.KinesisStream corrupted record: %v", normalised)
+		log.Errorln("lambda to open search.toTyped: corrupted record:", string(data), err)
+		return schemaless.Record[schema.Schema]{}, fmt.Errorf("lambda to open search.toTyped: corrupted record: %v", normalised)
 	}
-	return typed, nil
+	return *typed, nil
 }

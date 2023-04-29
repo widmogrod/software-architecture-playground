@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/opensearch-project/opensearch-go"
-	"github.com/opensearch-project/opensearch-go/opensearchapi"
+	"github.com/opensearch-project/opensearch-go/v2"
+	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	log "github.com/sirupsen/logrus"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
@@ -319,26 +319,3 @@ func (os *OpenSearchRepository) ToSorters(sort []SortField) []any {
 
 	return sorters
 }
-
-//func (os *OpenSearchRepository) Query(query tictactoemanage.SessionStatsQuery) (*tictactoemanage.SessionStatsResult, error) {
-//	response, err := os.client.Search(func(request *opensearchapi.SearchRequest) {
-//		request.Timeout = 100 * time.Microsecond
-//		request.Pretty = false
-//		request.Index = []string{os.indexName}
-//		request.Body = strings.NewReader(fmt.Sprintf(queryTemplate, query.SessionID))
-//	})
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	result, err := io.ReadAll(response.Body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	data, err := schema.FromJSON(result)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//}

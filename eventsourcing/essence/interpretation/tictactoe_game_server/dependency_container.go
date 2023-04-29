@@ -2,15 +2,19 @@ package tictactoe_game_server
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	"github.com/opensearch-project/opensearch-go/v2"
+	requestsigner "github.com/opensearch-project/opensearch-go/v2/signer/awsv2"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/schemaless/typedful"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/websockproto"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
+	"net/http"
 	"net/url"
 	"os"
 	"sync"
@@ -174,12 +178,12 @@ func (di *DI) GetBroadcaster() *websockproto.InMemoryBroadcaster {
 func (di *DI) GetTicTacToeManageStateRepository() *typedful.TypedRepoWithAggregator[tictactoemanage.State, any] {
 	return di.keyCache.Get("tictactoemanage-state-repo", func() any {
 		return typedful.NewTypedRepository[tictactoemanage.State](di.GetStore())
-		//return typedful.NewTypedRepoWithAggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult](
-		//	store,
-		//	func() schemaless.Aggregator[tictactoemanage.State, tictactoemanage.SessionStatsResult] {
-		//		return NewTictactoeManageStateAggregate(store)
-		//	},
-		//)
+	}).(*typedful.TypedRepoWithAggregator[tictactoemanage.State, any])
+}
+
+func (di *DI) GetTicTacToeManageStateRepositoryRO() *typedful.TypedRepoWithAggregator[tictactoemanage.State, any] {
+	return di.keyCache.Get("tictactoemanage-state-repo-ro", func() any {
+		return typedful.NewTypedRepository[tictactoemanage.State](di.GetOpenQueryStorage())
 	}).(*typedful.TypedRepoWithAggregator[tictactoemanage.State, any])
 }
 
@@ -200,7 +204,7 @@ func (di *DI) GetLiveSelect() *LiveSelect {
 
 		case RunAWS:
 			return NewLiveSelect(
-				di.GetTicTacToeManageStateRepository(),
+				di.GetTicTacToeManageStateRepositoryRO(),
 				di.GetBroadcaster(),
 			)
 		}
@@ -276,4 +280,67 @@ func (di *DI) GetGolangWebSocketGameServer() *websockproto.InMemoryProtocol {
 		wshandler.OnDisconnect = game.OnDisconnect
 		return wshandler
 	}).(*websockproto.InMemoryProtocol)
+}
+
+func (di *DI) GetOpenQueryStorage() *schemaless.OpenSearchRepository {
+	return di.keyCache.Get("open-query-storage", func() any {
+		return schemaless.NewOpenSearchRepository(
+			di.GetOpenSearchClient(),
+			di.GetOpenSearchIndex(),
+		)
+	}).(*schemaless.OpenSearchRepository)
+}
+
+func (di *DI) GetOpenSearchClient() *opensearch.Client {
+	return di.keyCache.Get("open-search-client", func() any {
+		c := opensearch.Config{
+			Addresses: []string{
+				di.GetOpenSearchEndpoint(),
+			},
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+
+		switch di.mode {
+		case RunLocalAWS:
+			c.Username = "admin"
+			c.Password = "nile!DISLODGE5clause"
+
+		case RunAWS:
+			signer, err := requestsigner.NewSigner(di.MustAWSConfig())
+			if err != nil {
+				panic(err)
+			}
+			c.Signer = signer
+		}
+
+		client, err := opensearch.NewClient(c)
+		if err != nil {
+			panic(err)
+		}
+		return client
+	}).(*opensearch.Client)
+}
+
+func (di *DI) GetOpenSearchIndex() string {
+	return di.keyCache.Get("open-search-index", func() any {
+		indexName := os.Getenv("OPENSEARCH_INDEX")
+		if indexName == "" {
+			indexName = "local"
+		}
+		return indexName
+	}).(string)
+}
+
+func (di *DI) GetOpenSearchEndpoint() string {
+	return di.keyCache.Get("open-search-endpoint", func() any {
+		endpoint := os.Getenv("OPENSEARCH_HOST")
+		if endpoint == "" {
+			endpoint = "localhost:9200"
+		}
+		return endpoint
+	}).(string)
 }
