@@ -52,13 +52,20 @@ func NodeToString(node Node) string {
 	)
 }
 
+type EventTime = int64
+
 type Item struct {
 	Key       string
 	Data      schema.Schema
-	EventTime int64
-	//Window    time.Duration
+	EventTime EventTime
+	Window    *Window
 
-	finished bool
+	//finished bool
+}
+
+type Window struct {
+	Start int64
+	End   int64
 }
 
 //type TypeDef struct {}
