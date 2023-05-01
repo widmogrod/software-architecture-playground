@@ -38,14 +38,6 @@ func TestWindowing(t *testing.T) {
 			},
 		}
 
-		//rules := WindowBuilder{}
-		//rules.Trigger(&AtPeriod{Duration: 1 * time.Second})
-		//
-		//result := Process(list, rules)
-		//expected := []Item{
-		//	{"a", nil, 0, 0},
-		//}
-
 		assert.Equal(t, expected, result)
 	})
 	t.Run("assign sliding windows", func(t *testing.T) {
@@ -75,6 +67,24 @@ func TestWindowing(t *testing.T) {
 		}
 
 		assert.Len(t, result, 2)
+		assert.Equal(t, expected, result)
+	})
+	t.Run("assign fixed windows", func(t *testing.T) {
+		result := AssignWindows(list, &FixedWindow{
+			Width: 30 * time.Minute,
+		})
+		expected := []Item{
+			{
+				Key:       "a",
+				Data:      nil,
+				EventTime: withTime(10, 2),
+				Window: &Window{
+					Start: withTime(10, 0),
+					End:   withTime(10, 30),
+				},
+			},
+		}
+
 		assert.Equal(t, expected, result)
 	})
 }
@@ -238,7 +248,6 @@ func TestMergeWindows(t *testing.T) {
 	list5 := MergeWindows(list4, &SessionWindow{
 		GapDuration: 30 * time.Minute,
 	})
-
 	assert.Equal(t, []ItemGroupedByKey{
 		{
 			Key: "k1",
@@ -346,5 +355,261 @@ func TestMergeWindows(t *testing.T) {
 			},
 		},
 	}, list7)
+}
 
+func TestWindowMerginOnly(t *testing.T) {
+	list := []ItemGroupedByKey{
+		{
+			Key: "k1",
+			Data: []Item{
+				{
+					Key:       "k1",
+					Data:      schema.MkString("v1"),
+					EventTime: withTime(13, 2),
+				},
+				{
+					Key:       "k1",
+					Data:      schema.MkString("v3"),
+					EventTime: withTime(13, 57),
+				},
+				{
+					Key:       "k1",
+					Data:      schema.MkString("v4"),
+					EventTime: withTime(13, 20),
+				},
+			},
+		},
+		{
+			Key: "k2",
+			Data: []Item{
+				{
+					Key:       "k2",
+					Data:      schema.MkString("v2"),
+					EventTime: withTime(13, 14),
+				},
+			},
+		},
+	}
+
+	t.Run("merge session windows", func(t *testing.T) {
+		window := &SessionWindow{
+			GapDuration: 30 * time.Minute,
+		}
+		var list2 []ItemGroupedByKey
+		for _, item := range list {
+			list2 = append(list2, ItemGroupedByKey{
+				Key:  item.Key,
+				Data: AssignWindows(item.Data, window),
+			})
+		}
+		result := MergeWindows(list2, window)
+		assert.Equal(t, []ItemGroupedByKey{
+			{
+				Key: "k1",
+				Data: []Item{
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v1"),
+						EventTime: withTime(13, 2),
+						Window: &Window{
+							Start: withTime(13, 2),
+							End:   withTime(13, 50),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v3"),
+						EventTime: withTime(13, 57),
+						Window: &Window{
+							Start: withTime(13, 57),
+							End:   withTime(14, 27),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v4"),
+						EventTime: withTime(13, 20),
+						Window: &Window{
+							Start: withTime(13, 2),
+							End:   withTime(13, 50),
+						},
+					},
+				},
+			},
+			{
+				Key: "k2",
+				Data: []Item{
+					{
+						Key:       "k2",
+						Data:      schema.MkString("v2"),
+						EventTime: withTime(13, 14),
+						Window: &Window{
+							Start: withTime(13, 14),
+							End:   withTime(13, 44),
+						},
+					},
+				},
+			},
+		}, result, "MergeWindows")
+	})
+	t.Run("merge sliding windows", func(t *testing.T) {
+		window := &SlidingWindow{
+			Width:  2 * time.Minute,
+			Period: 1 * time.Minute,
+		}
+		var list2 []ItemGroupedByKey
+		for _, item := range list {
+			list2 = append(list2, ItemGroupedByKey{
+				Key:  item.Key,
+				Data: AssignWindows(item.Data, window),
+			})
+		}
+
+		result := MergeWindows(list2, window)
+		assert.Equal(t, []ItemGroupedByKey{
+			{
+				Key: "k1",
+				Data: []Item{
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v1"),
+						EventTime: withTime(13, 2),
+						Window: &Window{
+							Start: withTime(13, 1),
+							End:   withTime(13, 3),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v1"),
+						EventTime: withTime(13, 2),
+						Window: &Window{
+							Start: withTime(13, 2),
+							End:   withTime(13, 4),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v3"),
+						EventTime: withTime(13, 57),
+						Window: &Window{
+							Start: withTime(13, 56),
+							End:   withTime(13, 58),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v3"),
+						EventTime: withTime(13, 57),
+						Window: &Window{
+							Start: withTime(13, 57),
+							End:   withTime(13, 59),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v4"),
+						EventTime: withTime(13, 20),
+						Window: &Window{
+							Start: withTime(13, 19),
+							End:   withTime(13, 21),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v4"),
+						EventTime: withTime(13, 20),
+						Window: &Window{
+							Start: withTime(13, 20),
+							End:   withTime(13, 22),
+						},
+					},
+				},
+			},
+			{
+				Key: "k2",
+				Data: []Item{
+					{
+						Key:       "k2",
+						Data:      schema.MkString("v2"),
+						EventTime: withTime(13, 14),
+						Window: &Window{
+							Start: withTime(13, 13),
+							End:   withTime(13, 15),
+						},
+					},
+					{
+						Key:       "k2",
+						Data:      schema.MkString("v2"),
+						EventTime: withTime(13, 14),
+						Window: &Window{
+							Start: withTime(13, 14),
+							End:   withTime(13, 16),
+						},
+					},
+				},
+			},
+		}, result, "MergeWindows")
+	})
+	t.Run("merge fixed windows", func(t *testing.T) {
+		window := &FixedWindow{
+			Width: 30 * time.Minute,
+		}
+		var list2 []ItemGroupedByKey
+		for _, item := range list {
+			list2 = append(list2, ItemGroupedByKey{
+				Key:  item.Key,
+				Data: AssignWindows(item.Data, window),
+			})
+		}
+		result := MergeWindows(list2, window)
+		assert.Equal(t, []ItemGroupedByKey{
+			{
+				Key: "k1",
+				Data: []Item{
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v1"),
+						EventTime: withTime(13, 2),
+						Window: &Window{
+							Start: withTime(13, 0),
+							End:   withTime(13, 30),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v3"),
+						EventTime: withTime(13, 57),
+						Window: &Window{
+							Start: withTime(13, 30),
+							End:   withTime(14, 0),
+						},
+					},
+					{
+						Key:       "k1",
+						Data:      schema.MkString("v4"),
+						EventTime: withTime(13, 20),
+						Window: &Window{
+							Start: withTime(13, 0),
+							End:   withTime(13, 30),
+						},
+					},
+				},
+			},
+			{
+				Key: "k2",
+				Data: []Item{
+					{
+						Key:       "k2",
+						Data:      schema.MkString("v2"),
+						EventTime: withTime(13, 14),
+						Window: &Window{
+							Start: withTime(13, 0),
+							End:   withTime(13, 30),
+						},
+					},
+				},
+			},
+		}, result, "MergeWindows")
+	})
 }

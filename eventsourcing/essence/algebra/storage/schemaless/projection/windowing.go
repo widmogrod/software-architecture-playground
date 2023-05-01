@@ -15,7 +15,28 @@ func AssignWindows(x []Item, wd WindowDescription) []Item {
 		func(wd *SlidingWindow) []Item {
 			return assignSlidingWindows(x, wd)
 		},
+		func(wd *FixedWindow) []Item {
+			return assignFixedWindows(x, wd)
+		},
 	)
+}
+
+func assignFixedWindows(x []Item, wd *FixedWindow) []Item {
+	result := make([]Item, 0, len(x))
+	for _, item := range x {
+		start := item.EventTime - item.EventTime%wd.Width.Nanoseconds()
+		end := start + wd.Width.Nanoseconds()
+		result = append(result, Item{
+			Key:       item.Key,
+			Data:      item.Data,
+			EventTime: item.EventTime,
+			Window: &Window{
+				Start: start,
+				End:   end,
+			},
+		})
+	}
+	return result
 }
 
 func assignSlidingWindows(x []Item, wd *SlidingWindow) []Item {
@@ -63,7 +84,18 @@ func MergeWindows(x []ItemGroupedByKey, wd WindowDescription) []ItemGroupedByKey
 			return mergeSessionWindows(x, wd)
 		},
 		func(wd *SlidingWindow) []ItemGroupedByKey {
-			return mergeSlidingWindows(x, wd)
+			// assumption here is that before calling MergeWindows,
+			// items got assigned window using the same WindowDefinition,
+			// so we can assume that all items in the group have the same value for sliding & fixed windows
+			// that don't need to be adjusted, like in session windows
+			return x
+		},
+		func(wd *FixedWindow) []ItemGroupedByKey {
+			// assumption here is that before calling MergeWindows,
+			// items got assigned window using the same WindowDefinition,
+			// so we can assume that all items in the group have the same value for sliding & fixed windows
+			// that don't need to be adjusted, like in session windows
+			return x
 		},
 	)
 }
@@ -85,7 +117,7 @@ func mergeSessionWindows(x []ItemGroupedByKey, wd *SessionWindow) []ItemGroupedB
 		window := map[int64]*Window{}
 		for _, item := range group.Data {
 			// detect where in which session window item belongs
-			// if in window session there are no items, then leave elemetn as is
+			// if in window session there are no items, then leave element as is
 			// when there are items, then merge them and set window to the min start and max end of elements in this window
 
 			windowNo := winNo(item.Window, min, wd)
@@ -133,10 +165,6 @@ func printWindow(w *Window) {
 		time.Unix(0, w.Start).Format("15:04"),
 		time.Unix(0, w.End).Format("15:04"),
 	)
-}
-
-func mergeSlidingWindows(x []ItemGroupedByKey, mwd *SlidingWindow) []ItemGroupedByKey {
-	panic("implement me")
 }
 
 func DropTimestamps(x []Item) []Item {
@@ -235,21 +263,7 @@ type (
 		Width  time.Duration
 		Period time.Duration
 	}
-	//FixedWindow struct{}
-)
-
-//go:generate mkunion -name=TriggerDescription
-type (
-	AtPeriod struct {
-		Duration time.Duration
+	FixedWindow struct {
+		Width time.Duration
 	}
-	AtCount     struct{}
-	AtWatermark struct{}
-
-	SequenceOf  struct{}
-	RepeatUntil struct{}
 )
-
-type WindowBuilder struct{}
-
-func (WindowBuilder) Trigger(td TriggerDescription) {}

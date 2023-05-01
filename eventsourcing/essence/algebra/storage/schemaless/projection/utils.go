@@ -5,6 +5,7 @@ import (
 	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
 	"testing"
+	"time"
 )
 
 func Each(x schema.Schema, f func(value schema.Schema)) {
@@ -40,6 +41,26 @@ func Each(x schema.Schema, f func(value schema.Schema)) {
 			return nil
 		},
 	)
+}
+
+func GenerateItemsEvery(start int64, size int, every time.Duration) chan Item {
+	ch := make(chan Item)
+	t := time.Unix(0, start)
+
+	go func() {
+		defer close(ch)
+		for i := 0; i < size; i++ {
+			ch <- Item{
+				//Key:       "key-" + strconv.Itoa(i),
+				Key:       "key",
+				Data:      schema.MkInt(i),
+				EventTime: t.UnixNano(),
+			}
+			t = t.Add(every)
+			time.Sleep(every)
+		}
+	}()
+	return ch
 }
 
 func NewDual() *Dual {
