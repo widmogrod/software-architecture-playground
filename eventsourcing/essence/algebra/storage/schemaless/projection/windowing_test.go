@@ -1,6 +1,7 @@
 package projection
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"testing"
@@ -13,12 +14,24 @@ func withTime(hour, minute int) int64 {
 		UnixNano()
 }
 
+func printWindow(w *Window) {
+	fmt.Printf("Window(%s, %s)\n",
+		time.Unix(0, w.Start).Format("15:04"),
+		time.Unix(0, w.End).Format("15:04"),
+	)
+}
+
 func TestWindowing(t *testing.T) {
 	list := []Item{
 		{
 			Key:       "a",
 			Data:      nil,
 			EventTime: withTime(10, 2),
+		},
+		{
+			Key:       "a",
+			Data:      nil,
+			EventTime: withTime(10, 28),
 		},
 	}
 
@@ -34,6 +47,15 @@ func TestWindowing(t *testing.T) {
 				Window: &Window{
 					Start: withTime(10, 2),
 					End:   withTime(10, 32),
+				},
+			},
+			{
+				Key:       "a",
+				Data:      nil,
+				EventTime: withTime(10, 28),
+				Window: &Window{
+					Start: withTime(10, 28),
+					End:   withTime(10, 58),
 				},
 			},
 		}
@@ -64,10 +86,33 @@ func TestWindowing(t *testing.T) {
 					End:   withTime(10, 4),
 				},
 			},
+			{
+				Key:       "a",
+				Data:      nil,
+				EventTime: withTime(10, 28),
+				Window: &Window{
+					Start: withTime(10, 27),
+					End:   withTime(10, 29),
+				},
+			},
+			{
+				Key:       "a",
+				Data:      nil,
+				EventTime: withTime(10, 28),
+				Window: &Window{
+					Start: withTime(10, 28),
+					End:   withTime(10, 30),
+				},
+			},
 		}
 
-		assert.Len(t, result, 2)
-		assert.Equal(t, expected, result)
+		assert.Len(t, result, 4)
+		if !assert.Equal(t, expected, result) {
+			for idx := range result {
+				printWindow(result[idx].Window)
+				printWindow(expected[idx].Window)
+			}
+		}
 	})
 	t.Run("assign fixed windows", func(t *testing.T) {
 		result := AssignWindows(list, &FixedWindow{
@@ -78,6 +123,15 @@ func TestWindowing(t *testing.T) {
 				Key:       "a",
 				Data:      nil,
 				EventTime: withTime(10, 2),
+				Window: &Window{
+					Start: withTime(10, 0),
+					End:   withTime(10, 30),
+				},
+			},
+			{
+				Key:       "a",
+				Data:      nil,
+				EventTime: withTime(10, 28),
 				Window: &Window{
 					Start: withTime(10, 0),
 					End:   withTime(10, 30),
@@ -611,5 +665,34 @@ func TestWindowMerginOnly(t *testing.T) {
 				},
 			},
 		}, result, "MergeWindows")
+
+		byWindow := GroupAlsoByWindow(result)
+
+		assert.Equal(t, []ItemGroupedByWindow{
+			{
+				Key:  "k1",
+				Data: schema.MkList(schema.MkString("v1"), schema.MkString("v4")),
+				Window: &Window{
+					Start: withTime(13, 0),
+					End:   withTime(13, 30),
+				},
+			},
+			{
+				Key:  "k1",
+				Data: schema.MkList(schema.MkString("v3")),
+				Window: &Window{
+					Start: withTime(13, 30),
+					End:   withTime(14, 0),
+				},
+			},
+			{
+				Key:  "k2",
+				Data: schema.MkList(schema.MkString("v2")),
+				Window: &Window{
+					Start: withTime(13, 0),
+					End:   withTime(13, 30),
+				},
+			},
+		}, byWindow, "MergeWindows")
 	})
 }

@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+//go:generate mkunion -name=WindowDescription
+type (
+	SessionWindow struct {
+		GapDuration time.Duration
+	}
+	SlidingWindow struct {
+		Width  time.Duration
+		Period time.Duration
+	}
+	FixedWindow struct {
+		Width time.Duration
+	}
+)
+
 func AssignWindows(x []Item, wd WindowDescription) []Item {
 	return MustMatchWindowDescription(
 		wd,
@@ -160,13 +174,6 @@ func mergeSessionWindows(x []ItemGroupedByKey, wd *SessionWindow) []ItemGroupedB
 	return result
 }
 
-func printWindow(w *Window) {
-	fmt.Printf("Window(%s, %s)\n",
-		time.Unix(0, w.Start).Format("15:04"),
-		time.Unix(0, w.End).Format("15:04"),
-	)
-}
-
 func DropTimestamps(x []Item) []Item {
 	result := make([]Item, 0, len(x))
 	for _, item := range x {
@@ -244,26 +251,225 @@ func GroupAlsoByWindow(x []ItemGroupedByKey) []ItemGroupedByWindow {
 func ExpandToElements(x []ItemGroupedByWindow) []Item {
 	result := make([]Item, 0, len(x))
 	for _, group := range x {
-		result = append(result, Item{
-			Key:       group.Key,
-			Data:      group.Data,
-			EventTime: group.Window.End,
-			Window:    group.Window,
-		})
+		result = append(result, ToElement(&group))
 	}
 	return result
 }
 
-//go:generate mkunion -name=WindowDescription
-type (
-	SessionWindow struct {
-		GapDuration time.Duration
+func ToElement(group *ItemGroupedByWindow) Item {
+	return Item{
+		Key:       group.Key,
+		Data:      group.Data,
+		EventTime: group.Window.End,
+		Window:    group.Window,
 	}
-	SlidingWindow struct {
-		Width  time.Duration
-		Period time.Duration
+}
+
+func WindowKey(window *Window) string {
+	return fmt.Sprintf("%d.%d", window.Start, window.End)
+}
+
+func ItemKeyWindow(x Item) string {
+	return fmt.Sprintf("%s:%s", x.Key, WindowKey(x.Window))
+}
+
+func NewWindowBuffer(wd WindowDescription) *WindowBuffer {
+	return &WindowBuffer{
+		wd: wd,
+
+		windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
 	}
-	FixedWindow struct {
-		Width time.Duration
+}
+
+type WindowBuffer struct {
+	wd WindowDescription
+	fm WindowFlushMode
+
+	// Windows groups that haven't been flushed yet
+	windowGroups map[int64]map[int64]*ItemGroupedByWindow
+	// Window groups that have been flushed, and because flush mode is accumulating or accumulatingAndRetracting
+	//windowGroupsLast map[int64]map[int64]*ItemGroupedByWindow
+}
+
+func (w *WindowBuffer) Append(x Item) {
+	list1 := AssignWindows([]Item{x}, w.wd)
+	list2 := DropTimestamps(list1)
+	list3 := GroupByKey(list2)
+	list4 := MergeWindows(list3, w.wd)
+	w.GroupAlsoByWindow(list4)
+}
+
+// FlushItemGroupedByWindow makes sure that windows that needs to be flushed are delivered to the function f.
+//
+// Some operations that require aggregate or aggregateAndRetract are not expressed by window buffer,
+// but by the function f that is responsible for grouping windows and knowing whenever value of window was calculated,
+// and aggregation can add previous value, or retract previous value.
+//
+// Snapshotting process works as follows:
+// - store information about last message that was successfully processed
+// - store outbox of windows that were successfully processed and need to be flushed
+//
+// When process is restarted, it will:
+// - restore information about last message that was successfully processed, and ask runtime to continue sending messages from that point
+// - start emptying outbox
+//
+// Flush process works as follows:
+// - for each window in outbox, call flush function, that function needs to return OK or error
+// - if flush function returns OK, remove window from outbox
+// - if flush function returns error, stop flushing, and retry on next flush
+//
+// Because each of the processes is independent by key, we can retry flushing only for windows that failed to flush.
+// Because each of outbox pattern, we have order of windows guaranteed.
+// _
+// Because we make failure first class citizen, client can define failure stream and decide that after N retries,
+// message should be sent to dead letter queue, or other error handling mechanism.
+//
+// Because we can model backfilling as a failure, we can use same mechanism to backfill windows that failed to flush,
+// in the same way as we would backfill normal messages from time window
+//
+// Backfill is the same as using already existing DAG, but only with different input.
+//func (w *WindowBuffer) FlushItemGroupedByWindow(shouldFlush func(group *ItemGroupedByWindow) bool, returning func(Item)) {
+//	for _, windowGroups := range w.windowGroups {
+//		for _, group := range windowGroups {
+//			// flushing depends on type of window flush mode:
+//			// - aggregate - computes the result of the window reusing the previous result
+//			// - discard - discards the previous result and computes the result of the window from scratch
+//			// - aggregate and retract - computes the result of the window reusing the previous result and removes the previous result from the state
+//			MustMatchWindowFlushModeR0(
+//				w.fm,
+//				func(x *Accumulate) {
+//					// if it's first flush, create map
+//					//if _, ok := w.windowGroupsLast[group.Window.Start]; !ok {
+//					//	w.windowGroupsLast[group.Window.Start] = map[int64]*ItemGroupedByWindow{}
+//					//}
+//					//
+//					//// create last group, or merge results with previous group
+//					//lastGroup, ok := w.windowGroupsLast[group.Window.Start][group.Window.End]
+//					//if !ok {
+//					//	lastGroup = &ItemGroupedByWindow{
+//					//		Key:    group.Key,
+//					//		Window: group.Window,
+//					//		Data: &schema.List{
+//					//			Items: group.Data.Items,
+//					//		},
+//					//	}
+//					//} else {
+//					//	lastGroup.Data.Items = append(
+//					//		lastGroup.Data.Items,
+//					//		group.Data.Items...,
+//					//	)
+//					//}
+//
+//					if !shouldFlush(group) {
+//						return
+//					}
+//
+//					returning(ToElement(*group))
+//
+//					// set last group
+//					//w.windowGroupsLast[group.Window.Start][group.Window.End] = lastGroup
+//
+//					// since we have the last group, we can remove current group
+//					// this will be useful, when late arrivals will pass grace period
+//					w.RemoveItemGropedByWindow(group)
+//				},
+//				func(x *Discard) {
+//					if !shouldFlush(group) {
+//						return
+//					}
+//					returning(ToElement(*group))
+//					w.RemoveItemGropedByWindow(group)
+//				},
+//				func(x *AccumulatingAndRetracting) {
+//					// if it's first flush, create map
+//					//if _, ok := w.windowGroupsLast[group.Window.Start]; !ok {
+//					//	w.windowGroupsLast[group.Window.Start] = map[int64]*ItemGroupedByWindow{}
+//					//}
+//					//
+//					//if !shouldFlush(group) {
+//					//	return
+//					//}
+//					//
+//					//// retract previous result
+//					//if lastGroup, ok := w.windowGroupsLast[group.Window.Start][group.Window.End]; ok {
+//					//	returning(ToElement(*lastGroup))
+//					//}
+//					//
+//					//// set last group
+//					//w.windowGroupsLast[group.Window.Start][group.Window.End] = &ItemGroupedByWindow{
+//					//	Key:    group.Key,
+//					//	Window: group.Window,
+//					//	Data: &schema.List{
+//					//		Items: group.Data.Items,
+//					//	},
+//					//}
+//
+//					// flush current result
+//					returning(ToElement(*group))
+//
+//					// since we have the last group, we can remove current group
+//					// this will be useful, when late arrivals will pass grace period
+//					w.RemoveItemGropedByWindow(group)
+//				},
+//			)
+//		}
+//	}
+//}
+
+func (w *WindowBuffer) EachItemGroupedByWindow(f func(group *ItemGroupedByWindow)) {
+	for _, windowGroups := range w.windowGroups {
+		for _, group := range windowGroups {
+			f(group)
+		}
 	}
-)
+}
+
+func (w *WindowBuffer) RemoveItemGropedByWindow(window *ItemGroupedByWindow) {
+	delete(w.windowGroups[window.Window.Start], window.Window.End)
+	delete(w.windowGroups, window.Window.Start)
+}
+
+//func (w *WindowBuffer) GroupByKey(x []Item) {
+//	for _, item := range x {
+//		group, ok := w._keyGroups[item.Key]
+//		if !ok {
+//			group = &ItemGroupedByKey{Key: item.Key}
+//			w._keyGroups[item.Key] = group
+//		}
+//		group.Data = append(group.Data, item)
+//	}
+//}
+
+func (w *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
+	for _, group := range x {
+		for _, item := range group.Data {
+			if _, ok := w.windowGroups[item.Window.Start]; !ok {
+				w.windowGroups[item.Window.Start] = map[int64]*ItemGroupedByWindow{}
+			}
+			if _, ok := w.windowGroups[item.Window.Start][item.Window.End]; !ok {
+				w.windowGroups[item.Window.Start][item.Window.End] = &ItemGroupedByWindow{
+					Key:    group.Key,
+					Data:   &schema.List{},
+					Window: item.Window,
+				}
+			}
+
+			w.windowGroups[item.Window.Start][item.Window.End].Data.Items =
+				append(w.windowGroups[item.Window.Start][item.Window.End].Data.Items, item.Data)
+		}
+
+		//// because golang maps are not ordered,
+		//// to create ordered result we need to iterate over data again in order to get ordered result
+		//for _, item := range group.Data {
+		//	if _, ok := w.windowGroups[item.Window.Start]; !ok {
+		//		continue
+		//	}
+		//	if _, ok := w.windowGroups[item.Window.Start][item.Window.End]; !ok {
+		//		continue
+		//	}
+		//
+		//	result = append(result, *w.windowGroups[item.Window.Start][item.Window.End])
+		//	delete(w.windowGroups[item.Window.Start], item.Window.End)
+		//}
+	}
+}
