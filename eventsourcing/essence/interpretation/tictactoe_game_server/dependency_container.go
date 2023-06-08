@@ -104,7 +104,7 @@ func (di *DI) GetKinesisStreamName() string {
 	return di.keyCache.Get("kinesis-stream-name", func() any {
 		streamName := os.Getenv("KINESIS_STREAM_NAME")
 		if streamName == "" {
-			streamName = "test-record-stram"
+			streamName = "test-record-stream"
 		}
 		return streamName
 	}).(string)
