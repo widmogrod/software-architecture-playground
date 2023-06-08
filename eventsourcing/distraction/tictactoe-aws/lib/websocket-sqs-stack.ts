@@ -24,8 +24,9 @@ export class WebsocketSqSStack extends cdk.Stack {
 
         const stream = new kinesis.Stream(this, 'Stream', {
             streamName: 'tictactie',
-            shardCount: 1,
             retentionPeriod: cdk.Duration.hours(24),
+            streamMode: kinesis.StreamMode.ON_DEMAND,
+            encryption: kinesis.StreamEncryption.UNENCRYPTED,
         });
 
         const table = new dynamodb.Table(this, 'WebsocketSQSConnections', {
@@ -45,13 +46,13 @@ export class WebsocketSqSStack extends cdk.Stack {
         });
 
         const domain = new opensearchservice.Domain(this, 'DynamoDBProjection', {
-            domainName: 'dynamodb-projection',
+            domainName: 'dynamodb-projection-v2',
             removalPolicy: cdk.RemovalPolicy.DESTROY,
             version: opensearchservice.EngineVersion.OPENSEARCH_1_3,
-            fineGrainedAccessControl: {
-                masterUserName: 'admin',
-                masterUserPassword: cdk.SecretValue.unsafePlainText('nile!DISLODGE5clause')
-            },
+            // fineGrainedAccessControl: {
+            //     masterUserName: 'admin',
+            //     masterUserPassword: cdk.SecretValue.unsafePlainText('nile!DISLODGE5clause')
+            // },
             capacity: {
                 masterNodes: 0,
                 dataNodes: 1,
@@ -77,22 +78,20 @@ export class WebsocketSqSStack extends cdk.Stack {
             nodeToNodeEncryption: true,
         });
 
-        domain.addAccessPolicies(
-            new iam.PolicyStatement({
-                actions: ['es:*'],
-                effect: iam.Effect.ALLOW,
-                principals: [new iam.AnyPrincipal],
-                resources: [`${domain.domainArn}/*`],
-            })
-        );
+        // domain.addAccessPolicies(
+        //     new iam.PolicyStatement({
+        //         actions: ['es:*'],
+        //         effect: iam.Effect.ALLOW,
+        //         principals: [new iam.AnyPrincipal],
+        //         resources: [`${domain.domainArn}/*`],
+        //     })
+        // );
 
-        const openSearchSync = new python.PythonFunction(this, 'DynamoDB2OpenSearch', {
-            entry: './lambda/dynamo-db-to-open-search/',
-            runtime: lambda.Runtime.PYTHON_3_8,
-            index: 'main.py',
-            handler: 'handler',
+        const openSearchSync = new golang.GoFunction(this, 'DynamoDB2OpenSearch', {
+            entry: 'lambda/go-dynamo-db-to-open-search',
             environment: {
                 OPENSEARCH_HOST: "https://" + domain.domainEndpoint,
+                OPENSEARCH_INDEX: "schemaless-lambda-index",
             },
             timeout: cdk.Duration.minutes(1)
         });
@@ -203,7 +202,7 @@ export class WebsocketSqSStack extends cdk.Stack {
             logging: new ecs.AwsLogDriver({
                 streamPrefix: 'LiveSelectContainer',
                 logGroup: new logs.LogGroup(this, 'LiveSelectContainerLogGroup', {
-                    logGroupName: '/ecs/live-select-container',
+                    logGroupName: '/ecs/live-select-container-v3',
                 }),
             }),
             environment: {
