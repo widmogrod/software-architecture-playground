@@ -45,8 +45,10 @@ func (h *MergeHandler[A]) Process(x Item, returning func(Item)) error {
 	}
 
 	returning(Item{
-		Key:  x.Key,
-		Data: schema.FromGo(result),
+		Key:       x.Key,
+		Data:      schema.FromGo(result),
+		EventTime: x.EventTime,
+		Window:    x.Window,
 	})
 
 	return nil
@@ -85,8 +87,10 @@ func (h *MergeHandler[A]) Retract(x Item, returning func(Item)) error {
 	}
 
 	returning(Item{
-		Key:  x.Key,
-		Data: schema.FromGo(result),
+		Key:       x.Key,
+		Data:      schema.FromGo(result),
+		EventTime: x.EventTime,
+		Window:    x.Window,
 	})
 
 	return nil
