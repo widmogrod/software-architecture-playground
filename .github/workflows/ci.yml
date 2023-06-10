@@ -37,13 +37,14 @@ jobs:
       - run: docker compose -f "eventsourcing/essence/compose.yaml" up -d --build
       - run: go install github.com/widmogrod/mkunion/cmd/mkunion@v1
       - run: go install github.com/matryer/moq@latest
-      - run: cd eventsourcing; go get -v -t -d ./...
-      - run: cd eventsourcing; go generate ./...
+
+      - run: cat eventsourcing/essence/.envrc
       - run: source eventsourcing/essence/.envrc
       - run: |
           echo "a=$AWS_ENDPOINT_URL"
 
-      - run: cat eventsourcing/essence/.envrc
+      - run: cd eventsourcing; go get -v -t -d ./...
+      - run: cd eventsourcing; go generate ./...
       - run: cd eventsourcing; go test -v ./...
 
   test-cdk:
