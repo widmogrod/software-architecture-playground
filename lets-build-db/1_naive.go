@@ -377,7 +377,7 @@ func (state *NaiveDBState) Restore(stream io.Reader) error {
 	}
 
 	// Because snapshot point can be old,
-	// to catch up to the newest updates Restore can ask for updates from other notes
+	// to catch up to the newest updates Restore can ask for updates from other nodes
 	// this function is much simpler, and focus on restoring state
 	// Mark database as ready to accept connections
 	return nil

@@ -1,8 +1,0 @@
--- CreateTable
-CREATE TABLE "Comment" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "content" TEXT NOT NULL,
-    "postID" TEXT NOT NULL,
-    CONSTRAINT "Comment_postID_fkey" FOREIGN KEY ("postID") REFERENCES "Post" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);

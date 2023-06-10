@@ -3,6 +3,7 @@ package lets_build_db
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 func NewDbValueSchema() *DBValueSchema {
@@ -24,6 +25,19 @@ type (
 		Identifier() string
 		Deserialize([]byte) (Identifiable, error)
 	}
+
+	Predicate2 struct {
+		Path  []string
+		Value Value
+	}
+	Value struct {
+		Eq interface{}
+		//And *PredicateBool
+	}
+	//PredicateBool struct {
+	//	Left  Predicate2
+	//	Right Predicate2
+	//}
 )
 
 func (s *DBValueSchema) Insert(record Serializable) error {
@@ -35,15 +49,20 @@ func (s *DBValueSchema) Insert(record Serializable) error {
 	s.appendLog = Set(s.appendLog, KVSortedSet{
 		{key, val},
 	})
+
+	// TODO index creation
+
 	return nil
 }
 
-func (s *DBValueSchema) Select(result Deserializable, p Predicate) (Identifiable, error) {
+// Rename Select to lookup
+// Create DSL that search only on indexed fields
+func (s *DBValueSchema) Select(result Deserializable, p Predicate2) (Identifiable, error) {
 	res := Find(s.appendLog, func(kv KV) bool {
-		if p.Eq != nil {
+		if p.Path[0] == "@id" {
 			key := kv[KEY]
 			// Magic key ahead, consider doing it differently
-			return p.Eq.Field == "@id" && key == p.Eq.Value
+			return key == p.Value.Eq
 		}
 		return false
 	}, 1)
@@ -89,4 +108,25 @@ type Person struct {
 
 func (p *Person) Identifier() string {
 	return p.Id
+}
+
+// function that adds two numbers
+func Add(a, b int) int {
+	return a + b
+}
+
+// test Add function from above
+func TestAdd() {
+	fmt.Println(Add(1, 2))
+}
+
+// function that read buffer and maps values by key
+func Map(buf []byte, fn func(string, string) string) string {
+	var m map[string]string
+	json.Unmarshal(buf, &m)
+	for k, v := range m {
+		m[k] = fn(k, v)
+	}
+	res, _ := json.Marshal(m)
+	return string(res)
 }

@@ -81,3 +81,16 @@ something happen with connection, then process may not be able to communicate
 but what if we would emply idenpotency of request, consisten caching and state of operation
 would be capure by ie eventsourcing aggregate?
 
+
+## TicTacToe mkunion and others ideas 
+- [ ] Keyed Aggregate to support Deletion (with versioning)
+- [ ] storage.RepositoryWithAggregator to support index building
+- [ ] DataProcessing in Golang
+  - with support of versioning? 
+  - with information about grouping keys?
+  - with description of process rather than compiled variant of Keyed Aggregate?
+- [ ] Subscription on queries
+  - should solve problem with eventual consistency between storage systems
+    - do it using data processing framework?
+    - do it by OpenSearch percolator?
+    - do it by ___?

@@ -91,7 +91,7 @@ type InMemInterpreter struct {
 }
 
 func (i *InMemInterpreter) Create(ast CreateAST) CreateRes {
-	fmt.Printf("call Create(%v)\n", ast)
+	fmt.Printf("call Set(%v)\n", ast)
 
 	return CreateRes{
 		Success: "dom:user:666",

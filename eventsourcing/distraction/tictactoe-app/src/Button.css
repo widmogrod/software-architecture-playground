@@ -1,0 +1,128 @@
+.button-action, .button-second {
+    align-items: center;
+    appearance: none;
+    cursor: pointer;
+    display: inline-flex;
+    font-family: "JetBrains Mono", monospace;
+    height: 48px;
+    padding-left: 16px;
+    padding-right: 16px;
+    position: relative;
+    font-size: 18px;
+    touch-action: manipulation;
+    border-radius: .5rem;
+    box-sizing: border-box;
+}
+
+.button-action {
+    background-image: radial-gradient(100% 100% at 100% 0, #5adaff 0, #5468ff 100%);
+    border: 0;
+    box-shadow: rgba(45, 35, 66, .4) 0 2px 4px, rgba(45, 35, 66, .3) 0 7px 13px -3px, rgba(58, 65, 111, .5) 0 -3px 0 inset;
+    color: #fff;
+    justify-content: center;
+    line-height: 1;
+    list-style: none;
+    overflow: hidden;
+    text-align: left;
+    text-decoration: none;
+    transition: box-shadow .15s, transform .15s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    white-space: nowrap;
+    will-change: box-shadow, transform;
+}
+
+.button-action:focus {
+    box-shadow: #3c4fe0 0 0 0 1.5px inset, rgba(45, 35, 66, .4) 0 2px 4px, rgba(45, 35, 66, .3) 0 7px 13px -3px, #3c4fe0 0 -3px 0 inset;
+}
+
+.button-action:hover {
+    box-shadow: rgba(45, 35, 66, .4) 0 4px 8px, rgba(45, 35, 66, .3) 0 7px 13px -3px, #3c4fe0 0 -3px 0 inset;
+    transform: translateY(-2px);
+}
+
+.button-action:active {
+    box-shadow: #3c4fe0 0 3px 7px inset;
+    transform: translateY(2px);
+}
+
+.button-text {
+    font-size: 18px;
+    line-height: 24px;
+    margin: 0 0 24px;
+    appearance: none;
+    cursor: pointer;
+    display: inline-flex;
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px rgba(75, 73, 73, 0.3) dashed;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    color: #3c4fe0;
+
+}
+
+.button-text:hover {
+    outline: none;
+    color: #2b3aad;
+}
+
+/* CSS */
+.button-second {
+    background-color: #FFFFFF;
+    border: 1px solid rgb(209, 213, 219);
+    color: #111827;
+    font-weight: 100;
+    text-decoration: none #D1D5DB solid;
+    text-decoration-thickness: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+.button-second:hover {
+    background-color: rgb(249, 250, 251);
+}
+
+.button-second:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+.button-second:focus-visible {
+    box-shadow: none;
+}
+
+.button-close {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    opacity: 0.3;
+    position: relative;
+    overflow: hidden;
+    border: none;
+    background-color: transparent;
+}
+
+.button-close:hover {
+    opacity: 1;
+}
+
+.button-close:before, .button-close:after {
+    position: absolute;
+    left: 16px;
+    content: ' ';
+    height: 32px;
+    width: 2px;
+    background-color: #1e1d1d;
+}
+
+.button-close:before {
+    transform: rotate(45deg);
+}
+
+.button-close:after {
+    transform: rotate(-45deg);
+}

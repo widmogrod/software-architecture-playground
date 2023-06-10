@@ -1,0 +1,16 @@
+[package]
+name = "wasm"
+version = "1.0.0"
+description = "Package description for wasm"
+license = "ISC"
+readme = "README.md"
+
+[dependencies]
+"rustpython/rustpython" = "0.1.3"
+
+[[module]]
+name = "entry"
+source = "entry.wasm"
+
+[fs]
+"python/main.py" = "python/main.py"
