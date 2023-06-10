@@ -1,14 +1,12 @@
 package tictactoe_game_server
 
 import (
-	"crypto/tls"
 	"fmt"
 	opensearch "github.com/opensearch-project/opensearch-go"
 	"github.com/opensearch-project/opensearch-go/opensearchapi"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/usecase/tictactoemanage"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -17,13 +15,6 @@ func NewQuery(endpoint, index string) (*OpenSearchStorage, error) {
 	client, err := opensearch.NewClient(opensearch.Config{
 		Addresses: []string{
 			endpoint,
-		},
-		Username: "admin",
-		Password: "nile!DISLODGE5clause",
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
 		},
 	})
 	if err != nil {

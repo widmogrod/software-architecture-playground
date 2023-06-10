@@ -1,26 +1,17 @@
 package schemaless
 
 import (
-	"crypto/tls"
 	"github.com/opensearch-project/opensearch-go/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
-	"net/http"
 	"testing"
 )
 
 func TestNewOpenSearchRepository(t *testing.T) {
 	client, err := opensearch.NewClient(opensearch.Config{
 		Addresses: []string{
-			"https://search-dynamodb-projection-vggyq7lvwooliwe65oddc5gyse.eu-west-1.es.amazonaws.com/",
-		},
-		Username: "admin",
-		Password: "nile!DISLODGE5clause",
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+			"http://localhost:9200",
 		},
 	})
 

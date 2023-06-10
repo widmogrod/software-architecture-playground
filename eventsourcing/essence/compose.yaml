@@ -11,6 +11,32 @@ services:
       - DEBUG=${DEBUG-}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - SERVICES=${SERVICES:-dynamodb,s3,kinesis,elasticsearch}
+      - OPENSEARCH_CUSTOM_BACKEND=http://opensearch:9200
     volumes:
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+    depends_on:
+     - opensearch
+
+  opensearch:
+    container_name: opensearch
+    image: opensearchproject/opensearch:1.2.0
+    environment:
+      - node.name=opensearch
+      - cluster.name=opensearch-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/opensearch/data
+
+volumes:
+  data01:
+    driver: local

@@ -2,23 +2,26 @@ package schemaless
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
+	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/awsutils"
 	"github.com/widmogrod/software-architecture-playground/eventsourcing/essence/algebra/storage/predicate"
 	"testing"
 )
 
 func TestNewDynamoDBRepository(t *testing.T) {
-	//TODO inject name of the table!
-	cfg, err := config.LoadDefaultConfig(context.Background())
-	assert.NoError(t, err)
+	tableName := "test-repo-record"
 
+	cfg, err := awsutils.LoadLocalStackAwsConfig(context.Background())
 	d := dynamodb.NewFromConfig(cfg)
 
-	repo := NewDynamoDBRepository(d, "test-repo-record")
+	err = setupDynamoDB(d, tableName)
+	assert.NoError(t, err, "while setting up dynamodb")
 
+	repo := NewDynamoDBRepository(d, tableName)
 	// clean database
 	err = repo.UpdateRecords(UpdateRecords[Record[schema.Schema]]{
 		Deleting: exampleUpdateRecords.Saving,
@@ -72,4 +75,38 @@ func TestNewDynamoDBRepository(t *testing.T) {
 			}
 		}
 	}
+}
+
+func setupDynamoDB(d *dynamodb.Client, tableName string) error {
+	// clean database, if exists
+	_, _ = d.DeleteTable(context.TODO(), &dynamodb.DeleteTableInput{
+		TableName: &tableName,
+	})
+
+	_, err := d.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{
+				AttributeName: aws.String("ID"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("Type"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+		},
+		KeySchema: []types.KeySchemaElement{
+			{
+				AttributeName: aws.String("ID"),
+				KeyType:       types.KeyTypeHash,
+			},
+			{
+				AttributeName: aws.String("Type"),
+				KeyType:       types.KeyTypeRange,
+			},
+		},
+		BillingMode: types.BillingModePayPerRequest,
+		TableName:   &tableName,
+	})
+
+	return err
 }

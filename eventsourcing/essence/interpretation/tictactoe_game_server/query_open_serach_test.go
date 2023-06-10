@@ -8,8 +8,9 @@ import (
 
 func TestQuery(t *testing.T) {
 	q, err := NewQuery(
-		"https://search-dynamodb-projection-vggyq7lvwooliwe65oddc5gyse.eu-west-1.es.amazonaws.com/",
-		"lambda-index")
+		"http://localhost:9200",
+		"lambda-index",
+	)
 	assert.NoError(t, err)
 
 	result, err := q.Query(tictactoemanage.SessionStatsQuery{SessionID: "605e54ac-1d84-4ccf-9004-df4a21c98d5f"})
