@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// go:generate moq -out live_select_broadcaster_moq_test.go . Broadcaster
+//go:generate moq -out live_select_broadcaster_moq_test.go . Broadcaster
 
 type Broadcaster interface {
 	BroadcastToSession(sessionID string, msg []byte)
