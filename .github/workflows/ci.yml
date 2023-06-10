@@ -25,8 +25,8 @@ jobs:
       - run: cd continuations; go get -v -t -d ./...
       - run: cd continuations; go test -v ./...
 
-  test-eventsoucing:
-    name: Test Eventsourcing
+  test-eventsourcing:
+    name: Test EventSourcing
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -37,16 +37,6 @@ jobs:
       - run: docker compose -f "eventsourcing/essence/compose.yaml" up -d --build
       - run: go install github.com/widmogrod/mkunion/cmd/mkunion@v1
       - run: go install github.com/matryer/moq@latest
-
-      - run: cat eventsourcing/essence/.envrc
-      - run: source eventsourcing/essence/.envrc
-      - run: |
-          echo "a=$AWS_ENDPOINT_URL"
-        env:
-          AWS_ACCESS_KEY_ID: test
-          AWS_SECRET_ACCESS_KEY: test
-          AWS_REGION: eu-west-1
-          AWS_ENDPOINT_URL: http://localhost:4566
 
       - run: cd eventsourcing; go get -v -t -d ./...
       - run: cd eventsourcing; go generate ./...
@@ -76,6 +66,7 @@ jobs:
     needs:
       - test-go
       - test-cdk
+      - test-eventsourcing
     steps:
       - uses: actions/github-script@v3
         #        if: ${{ success() }}
