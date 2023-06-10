@@ -42,10 +42,20 @@ jobs:
       - run: source eventsourcing/essence/.envrc
       - run: |
           echo "a=$AWS_ENDPOINT_URL"
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: eu-west-1
+          AWS_ENDPOINT_URL: http://localhost:4566
 
       - run: cd eventsourcing; go get -v -t -d ./...
       - run: cd eventsourcing; go generate ./...
       - run: cd eventsourcing; go test -v ./...
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: eu-west-1
+          AWS_ENDPOINT_URL: http://localhost:4566
 
   test-cdk:
     name: Test infrastructure in CDK
@@ -68,7 +78,7 @@ jobs:
       - test-cdk
     steps:
       - uses: actions/github-script@v3
-#        if: ${{ success() }}
+        #        if: ${{ success() }}
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
