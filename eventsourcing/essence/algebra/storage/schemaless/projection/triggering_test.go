@@ -1,7 +1,6 @@
 package projection
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
 	"testing"
@@ -16,9 +15,9 @@ func TestTriggers(t *testing.T) {
 		expected []Item
 	}{
 		"should trigger window emitting once at period 100ms, and 10 items arrives as 1 item": {
-			td: &Repeat{&AtPeriod{
+			td: &AtPeriod{
 				Duration: 100 * time.Millisecond,
-			}},
+			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
 			},
@@ -99,7 +98,6 @@ func TestTriggers(t *testing.T) {
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
 			handler := &TriggerHandler{
 				td: uc.td,
 				wd: uc.wd,
@@ -109,23 +107,31 @@ func TestTriggers(t *testing.T) {
 					fm:           uc.fm,
 					windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
 				},
-				tc: TriggerContext{
-					Durations: map[time.Duration]struct{}{},
-				},
-				signals: make(chan signal),
-				tickers: make(map[TriggerDescription]*time.Ticker),
+				wts: NewInMemoryBagOf[*WindowTrigger](),
 			}
 
 			returning := &ListAssert{t: t}
-			go handler.Background(ctx, returning.Returning)
+
+			tickers := NewTriggersManager()
+			defer tickers.Unregister(uc.td)
+			tickers.Register(uc.td, func(triggerType TriggerType) {
+				// propagate trigger to handler
+				err := handler.Triggered(triggerType, returning.Returning)
+				assert.NoError(t, err)
+			})
 
 			for item := range GenerateItemsEvery(withTime(10, 0), 20, 10*time.Millisecond) {
 				err := handler.Process(item, returning.Returning)
 				assert.NoError(t, err)
+
+				// simulate watermark
+				err = handler.Triggered(&AtWatermark{
+					Timestamp: item.EventTime,
+				}, returning.Returning)
+				assert.NoError(t, err)
 			}
 
 			time.Sleep(100 * time.Millisecond)
-			//assert.Empty(t, handler.buffer)
 			for i, expected := range uc.expected {
 				returning.AssertAt(i, expected)
 			}
@@ -142,10 +148,10 @@ func TestAggregate(t *testing.T) {
 		fm       WindowFlushMode
 		expected []Item
 	}{
-		"should trigger window emitting once at period 100ms, and 10 items arrives as 1 item, late arrivals are new aggregations": {
-			td: &Repeat{&AtPeriod{
+		"should trigger window emitting evey period 100ms, and 10 items arrives as 1 item, late arrivals are new aggregations": {
+			td: &AtPeriod{
 				Duration: 100 * time.Millisecond,
-			}},
+			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
 			},
@@ -171,10 +177,10 @@ func TestAggregate(t *testing.T) {
 				},
 			},
 		},
-		"should trigger window emitting once at period 100ms, and 10 items arrives as 1 item, late arrivals use past aggregation as base": {
-			td: &Repeat{&AtPeriod{
+		"should trigger window emitting evey period 100ms, and 10 items arrives as 1 item, late arrivals use past aggregation as base": {
+			td: &AtPeriod{
 				Duration: 100 * time.Millisecond,
-			}},
+			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
 			},
@@ -211,10 +217,10 @@ func TestAggregate(t *testing.T) {
 				},
 			},
 		},
-		"should trigger window emitting once at period 100ms, and 10 items arrives as 1 item, late arrivals use past aggregation as base, and retract last change": {
-			td: &Repeat{&AtPeriod{
+		"should trigger window emitting every period 100ms, and 10 items arrives as 1 item, late arrivals use past aggregation as base, and retract last change": {
+			td: &AtPeriod{
 				Duration: 100 * time.Millisecond,
-			}},
+			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
 			},
@@ -228,6 +234,7 @@ func TestAggregate(t *testing.T) {
 						Start: withTime(10, 0),
 						End:   withTime(10, 0) + (100 * int64(time.Millisecond)),
 					},
+					Type: ItemAggregation,
 				},
 				// this window is incomplete, and will be remitted
 				{
@@ -238,33 +245,27 @@ func TestAggregate(t *testing.T) {
 						Start: withTime(10, 0) + (100 * int64(time.Millisecond)),
 						End:   withTime(10, 0) + (200 * int64(time.Millisecond)),
 					},
+					Type: ItemAggregation,
 				},
-				// here is retraction in effect.
+				// here is retracting and aggregate in effect.
 				{
-					Key:       "key",
-					Data:      schema.MkInt(126), // arithmetic sum of series 10..19
+					Key: "key",
+					Data: schema.MkList(
+						schema.MkInt(126), // retract previous
+						schema.MkInt(145), // aggregate new
+					),
 					EventTime: withTime(10, 0) + (200 * int64(time.Millisecond)),
 					Window: &Window{
 						Start: withTime(10, 0) + (100 * int64(time.Millisecond)),
 						End:   withTime(10, 0) + (200 * int64(time.Millisecond)),
 					},
-				},
-				// here is complete aggregation in effect.
-				{
-					Key:       "key",
-					Data:      schema.MkInt(145), // arithmetic sum of series 10..19
-					EventTime: withTime(10, 0) + (200 * int64(time.Millisecond)),
-					Window: &Window{
-						Start: withTime(10, 0) + (100 * int64(time.Millisecond)),
-						End:   withTime(10, 0) + (200 * int64(time.Millisecond)),
-					},
+					Type: ItemRetractAndAggregate,
 				},
 			},
 		},
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
 			handler := &TriggerHandler{
 				td: uc.td,
 				wd: uc.wd,
@@ -274,11 +275,7 @@ func TestAggregate(t *testing.T) {
 					fm:           uc.fm,
 					windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
 				},
-				tc: TriggerContext{
-					Durations: map[time.Duration]struct{}{},
-				},
-				signals: make(chan signal),
-				tickers: make(map[TriggerDescription]*time.Ticker),
+				wts: NewInMemoryBagOf[*WindowTrigger](),
 			}
 
 			handler2 := &AccumulateDiscardRetractHandler{
@@ -312,16 +309,27 @@ func TestAggregate(t *testing.T) {
 			}
 
 			returning := &ListAssert{t: t}
-
 			returning2 := func(item Item) {
 				err := handler2.Process(item, returning.Returning)
 				assert.NoError(t, err)
 			}
 
-			go handler.Background(ctx, returning2)
+			tickers := NewTriggersManager()
+			defer tickers.Unregister(uc.td)
+			tickers.Register(uc.td, func(triggerType TriggerType) {
+				// propagate trigger to handler
+				err := handler.Triggered(triggerType, returning2)
+				assert.NoError(t, err)
+			})
 
 			for item := range GenerateItemsEvery(withTime(10, 0), 20, 10*time.Millisecond) {
 				err := handler.Process(item, returning2)
+				assert.NoError(t, err)
+
+				// simulate watermark
+				err = handler.Triggered(&AtWatermark{
+					Timestamp: item.EventTime,
+				}, returning2)
 				assert.NoError(t, err)
 			}
 

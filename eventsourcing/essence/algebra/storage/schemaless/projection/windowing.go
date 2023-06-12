@@ -328,93 +328,6 @@ func (w *WindowBuffer) Append(x Item) {
 // in the same way as we would backfill normal messages from time window
 //
 // Backfill is the same as using already existing DAG, but only with different input.
-//func (w *WindowBuffer) FlushItemGroupedByWindow(shouldFlush func(group *ItemGroupedByWindow) bool, returning func(Item)) {
-//	for _, windowGroups := range w.windowGroups {
-//		for _, group := range windowGroups {
-//			// flushing depends on type of window flush mode:
-//			// - aggregate - computes the result of the window reusing the previous result
-//			// - discard - discards the previous result and computes the result of the window from scratch
-//			// - aggregate and retract - computes the result of the window reusing the previous result and removes the previous result from the state
-//			MustMatchWindowFlushModeR0(
-//				w.fm,
-//				func(x *Accumulate) {
-//					// if it's first flush, create map
-//					//if _, ok := w.windowGroupsLast[group.Window.Start]; !ok {
-//					//	w.windowGroupsLast[group.Window.Start] = map[int64]*ItemGroupedByWindow{}
-//					//}
-//					//
-//					//// create last group, or merge results with previous group
-//					//lastGroup, ok := w.windowGroupsLast[group.Window.Start][group.Window.End]
-//					//if !ok {
-//					//	lastGroup = &ItemGroupedByWindow{
-//					//		Key:    group.Key,
-//					//		Window: group.Window,
-//					//		Data: &schema.List{
-//					//			Items: group.Data.Items,
-//					//		},
-//					//	}
-//					//} else {
-//					//	lastGroup.Data.Items = append(
-//					//		lastGroup.Data.Items,
-//					//		group.Data.Items...,
-//					//	)
-//					//}
-//
-//					if !shouldFlush(group) {
-//						return
-//					}
-//
-//					returning(ToElement(*group))
-//
-//					// set last group
-//					//w.windowGroupsLast[group.Window.Start][group.Window.End] = lastGroup
-//
-//					// since we have the last group, we can remove current group
-//					// this will be useful, when late arrivals will pass grace period
-//					w.RemoveItemGropedByWindow(group)
-//				},
-//				func(x *Discard) {
-//					if !shouldFlush(group) {
-//						return
-//					}
-//					returning(ToElement(*group))
-//					w.RemoveItemGropedByWindow(group)
-//				},
-//				func(x *AccumulatingAndRetracting) {
-//					// if it's first flush, create map
-//					//if _, ok := w.windowGroupsLast[group.Window.Start]; !ok {
-//					//	w.windowGroupsLast[group.Window.Start] = map[int64]*ItemGroupedByWindow{}
-//					//}
-//					//
-//					//if !shouldFlush(group) {
-//					//	return
-//					//}
-//					//
-//					//// retract previous result
-//					//if lastGroup, ok := w.windowGroupsLast[group.Window.Start][group.Window.End]; ok {
-//					//	returning(ToElement(*lastGroup))
-//					//}
-//					//
-//					//// set last group
-//					//w.windowGroupsLast[group.Window.Start][group.Window.End] = &ItemGroupedByWindow{
-//					//	Key:    group.Key,
-//					//	Window: group.Window,
-//					//	Data: &schema.List{
-//					//		Items: group.Data.Items,
-//					//	},
-//					//}
-//
-//					// flush current result
-//					returning(ToElement(*group))
-//
-//					// since we have the last group, we can remove current group
-//					// this will be useful, when late arrivals will pass grace period
-//					w.RemoveItemGropedByWindow(group)
-//				},
-//			)
-//		}
-//	}
-//}
 
 func (w *WindowBuffer) EachItemGroupedByWindow(f func(group *ItemGroupedByWindow)) {
 	for _, windowGroups := range w.windowGroups {
@@ -428,17 +341,6 @@ func (w *WindowBuffer) RemoveItemGropedByWindow(window *ItemGroupedByWindow) {
 	delete(w.windowGroups[window.Window.Start], window.Window.End)
 	delete(w.windowGroups, window.Window.Start)
 }
-
-//func (w *WindowBuffer) GroupByKey(x []Item) {
-//	for _, item := range x {
-//		group, ok := w._keyGroups[item.Key]
-//		if !ok {
-//			group = &ItemGroupedByKey{Key: item.Key}
-//			w._keyGroups[item.Key] = group
-//		}
-//		group.Data = append(group.Data, item)
-//	}
-//}
 
 func (w *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
 	for _, group := range x {
@@ -457,19 +359,172 @@ func (w *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
 			w.windowGroups[item.Window.Start][item.Window.End].Data.Items =
 				append(w.windowGroups[item.Window.Start][item.Window.End].Data.Items, item.Data)
 		}
-
-		//// because golang maps are not ordered,
-		//// to create ordered result we need to iterate over data again in order to get ordered result
-		//for _, item := range group.Data {
-		//	if _, ok := w.windowGroups[item.Window.Start]; !ok {
-		//		continue
-		//	}
-		//	if _, ok := w.windowGroups[item.Window.Start][item.Window.End]; !ok {
-		//		continue
-		//	}
-		//
-		//	result = append(result, *w.windowGroups[item.Window.Start][item.Window.End])
-		//	delete(w.windowGroups[item.Window.Start], item.Window.End)
-		//}
 	}
+}
+
+// Problem with tests that use period based tirggers
+// result in windows that due to internal latency, may not have all events at the time of trigger
+// but watermark could say, hey wait with this trigger, because I see event that will land in this window
+// so trigger at the arrival of watermark
+
+func NewWindowTrigger(w *Window, td TriggerDescription) *WindowTrigger {
+	wt := &WindowTrigger{
+		w:  w,
+		td: td,
+	}
+	wt.init()
+
+	return wt
+}
+
+type WindowTrigger struct {
+	w             *Window
+	td            TriggerDescription
+	ts            *TriggerState
+	shouldTrigger bool
+}
+
+func (wt *WindowTrigger) init() {
+	if wt.ts != nil {
+		return
+	}
+
+	wt.ts = wt.initState(wt.td)
+}
+
+func Bool(b bool) *bool {
+	return &b
+}
+
+func (wt *WindowTrigger) initState(td TriggerDescription) *TriggerState {
+	return MustMatchTriggerDescription(
+		td,
+		func(x *AtPeriod) *TriggerState {
+			return &TriggerState{
+				desc: td,
+			}
+		},
+		func(x *AtCount) *TriggerState {
+			return &TriggerState{
+				desc: td,
+			}
+		},
+		func(x *AtWatermark) *TriggerState {
+			return &TriggerState{
+				desc: &AtWatermark{
+					Timestamp: wt.w.End,
+				},
+			}
+		},
+		func(x *AnyOf) *TriggerState {
+			result := &TriggerState{
+				desc: td,
+			}
+
+			for _, desc := range x.Triggers {
+				result.nexts = append(result.nexts, wt.initState(desc))
+			}
+
+			return result
+		},
+		func(x *AllOf) *TriggerState {
+			result := &TriggerState{
+				desc: td,
+			}
+
+			for _, desc := range x.Triggers {
+				result.nexts = append(result.nexts, wt.initState(desc))
+			}
+
+			return result
+		},
+	)
+}
+
+func (wt *WindowTrigger) ReceiveEvent(triggerType TriggerType) {
+	// continue evaluation until state is true
+	// but when it's true, we don't need to evaluate
+	// conditions for window flush
+	if !wt.ts.isTrue() {
+		result := wt.ts.evaluate(triggerType, 0)
+		wt.ts.result = &result
+	}
+
+	wt.shouldTrigger = wt.ts.isTrue()
+}
+
+func (wt *WindowTrigger) ShouldTrigger() bool {
+	return wt.shouldTrigger
+}
+
+//go:generate mkunion match -name=EvaluateTrigger
+type EvaluateTrigger[T0 TriggerDescription, T1 TriggerType] interface {
+	MatchPeriod(*AtPeriod, *AtPeriod)
+	MatchCount(*AtCount, *AtCount)
+	MatchWatermark(*AtWatermark, *AtWatermark)
+	MatchAnyOfAny(*AnyOf, TriggerType)
+	MatchAllOfAny(*AllOf, TriggerType)
+	MatchDefault(T0, T1)
+}
+
+type TriggerState struct {
+	desc   TriggerDescription
+	nexts  []*TriggerState
+	result *bool
+}
+
+func (ts *TriggerState) isTrue() bool {
+	return ts.result != nil && *ts.result
+}
+
+func (ts *TriggerState) evaluate(triggerType TriggerType, depth int) bool {
+	return EvaluateTriggerR1(
+		ts.desc, triggerType,
+		func(x0 *AtPeriod, x1 *AtPeriod) bool {
+			return x0.Duration == x1.Duration
+		},
+		func(x0 *AtCount, x1 *AtCount) bool {
+			return x0.Number == x1.Number
+		},
+		func(x0 *AtWatermark, x1 *AtWatermark) bool {
+			return x0.Timestamp <= x1.Timestamp
+		},
+		func(x0 *AnyOf, x1 TriggerType) bool {
+			found := false
+			for _, state := range ts.nexts {
+				if !state.isTrue() {
+					matched := state.evaluate(triggerType, depth+1)
+					if matched {
+						state.result = Bool(true)
+					}
+				}
+
+				// be exhaustive, and allow other triggers to be evaluated
+				// that way, with different triggers an complete state can be build
+				found = found || state.isTrue()
+			}
+
+			return found
+		},
+		func(x0 *AllOf, x1 TriggerType) bool {
+			found := true
+			for _, state := range ts.nexts {
+				if !state.isTrue() {
+					result := state.evaluate(triggerType, depth+1)
+					if result {
+						state.result = Bool(true)
+					}
+				}
+
+				// be exhaustive, and allow other triggers to be evaluated
+				// that way, with different triggers an complete state can be build
+				found = found && state.isTrue()
+			}
+
+			return found
+		},
+		func(x0 TriggerDescription, x1 TriggerType) bool {
+			return false
+		},
+	)
 }

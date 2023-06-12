@@ -696,3 +696,188 @@ func TestWindowMerginOnly(t *testing.T) {
 		}, byWindow, "MergeWindows")
 	})
 }
+
+type triggerCase struct {
+	trigger       TriggerType
+	shouldTrigger bool
+}
+
+func TestWindowTrigger(t *testing.T) {
+	useCases := map[string]struct {
+		w      *Window
+		td     TriggerDescription
+		events []triggerCase
+	}{
+		"should trigger aways at correct AtPeriod": {
+			w: &Window{
+				Start: withTime(13, 0),
+				End:   withTime(13, 30),
+			},
+			td: &AtPeriod{
+				Duration: 10 * time.Minute,
+			},
+			events: []triggerCase{
+				{
+					trigger: &AtPeriod{
+						Duration: 1 * time.Minute,
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+				// at this point, we know that we see all triggers
+				// that window need to be flushed
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 1 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+			},
+		},
+		"should trigger when all conditions are true": {
+			w: &Window{
+				Start: withTime(13, 0),
+				End:   withTime(13, 30),
+			},
+			td: &AllOf{
+				Triggers: []TriggerDescription{
+					&AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					&AtPeriod{
+						Duration: 1 * time.Minute,
+					},
+				},
+			},
+			events: []triggerCase{
+				{
+					trigger: &AtPeriod{
+						Duration: 1 * time.Minute,
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 3 * time.Minute,
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+			},
+		},
+		"should trigger when any conditions are true": {
+			w: &Window{
+				Start: withTime(13, 0),
+				End:   withTime(13, 30),
+			},
+			td: &AnyOf{
+				Triggers: []TriggerDescription{
+					&AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					&AtCount{
+						Number: 2,
+					},
+				},
+			},
+			events: []triggerCase{
+				{
+					trigger: &AtCount{
+						Number: 1,
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: true,
+				},
+			},
+		},
+		"should trigger window flush after timeout, but if watermark says that there are events that will fall under this window, then let's wait": {
+			w: &Window{
+				Start: withTime(13, 0),
+				End:   withTime(13, 30),
+			},
+			td: &AnyOf{
+				Triggers: []TriggerDescription{
+					// when watermark says that there most likely won't be any older events
+					// so that we can flush this window
+					&AtWatermark{},
+					// or we are at flush period, but watermark haven't reached this window yet
+					// so wait, and flush imminently, when watermark will reach this window
+					&AllOf{
+						Triggers: []TriggerDescription{
+							&AtWatermark{},
+							&AtPeriod{
+								Duration: 10 * time.Minute,
+							},
+						},
+					},
+					// for very low latency granularity, we can flush window on every event
+					&AtCount{
+						Number: 1,
+					},
+				},
+			},
+			events: []triggerCase{
+				{
+					trigger: &AtPeriod{
+						Duration: 10 * time.Minute,
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtWatermark{
+						// watermark is at 13:00, so we should wait, since window ends at 13:30
+						Timestamp: withTime(13, 0),
+					},
+					shouldTrigger: false,
+				},
+				{
+					trigger: &AtWatermark{
+						Timestamp: withTime(13, 30),
+					},
+					shouldTrigger: true,
+				},
+			},
+		},
+	}
+	for name, uc := range useCases {
+		t.Run(name, func(t *testing.T) {
+			wt := NewWindowTrigger(uc.w, uc.td)
+			for idx, event := range uc.events {
+				wt.ReceiveEvent(event.trigger)
+
+				if event.shouldTrigger {
+					assert.Truef(t, wt.ShouldTrigger(), "should flush on trigger but didn't; idx=%d", idx)
+				} else {
+					assert.Falsef(t, wt.ShouldTrigger(), "should NOT flush on trigger but did; idx=%d", idx)
+				}
+			}
+		})
+	}
+}

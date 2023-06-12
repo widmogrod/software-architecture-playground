@@ -1,7 +1,6 @@
 package projection
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/widmogrod/mkunion/x/schema"
@@ -19,15 +18,13 @@ type (
 	AtCount struct {
 		Number int
 	}
-	AtWatermark struct{}
-
-	SequenceOf struct {
+	AtWatermark struct {
+		Timestamp int64
+	}
+	AnyOf struct {
 		Triggers []TriggerDescription
 	}
-	Repeat struct {
-		Trigger TriggerDescription
-	}
-	RepeatUntil struct {
+	AllOf struct {
 		Triggers []TriggerDescription
 	}
 )
@@ -43,33 +40,16 @@ type (
 	}
 )
 
-type signal struct {
-	kind     signalType
-	duration time.Duration
-}
-
-type signalType int
-
-const (
-	signalCount signalType = iota
-	signalPeriod
-	signalWatermark
-)
-
 type TriggerHandler struct {
 	wd WindowDescription
 	fm WindowFlushMode
 	td TriggerDescription
-	tc TriggerContext
 
 	wb *WindowBuffer
 
-	lock sync.Mutex
-	//buffer  []Item
-	signals chan signal
+	wts BagOf[*WindowTrigger]
 
-	groups  map[string]*ItemGroupedByKey
-	tickers map[TriggerDescription]*time.Ticker
+	lock sync.Mutex
 }
 
 var _ Handler = (*TriggerHandler)(nil)
@@ -78,14 +58,14 @@ func printTrigger(triggerType TriggerType) {
 	MustMatchTriggerTypeR0(
 		triggerType,
 		func(x *AtPeriod) {
-			fmt.Printf("AtPeriod(%v) \n", x.Duration)
+			fmt.Printf("AtPeriod(%v)", x.Duration)
 
 		},
 		func(x *AtCount) {
-			fmt.Printf("AtCount(%v) \n", x.Number)
+			fmt.Printf("AtCount(%v)", x.Number)
 		},
 		func(x *AtWatermark) {
-			fmt.Printf("AtWatermark() \n")
+			fmt.Printf("AtWatermark()")
 		})
 }
 
@@ -93,208 +73,44 @@ func (tm *TriggerHandler) Triggered(trigger TriggerType, returning func(Item)) e
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
-	//printTrigger(trigger)
+	tm.wb.EachItemGroupedByWindow(func(group *ItemGroupedByWindow) {
+		wt, err := tm.wts.Get(WindowKey(group.Window))
+		isError := err != nil && err != NotFound
+		isFound := err == nil
 
-	MustMatchTriggerTypeR0(
-		trigger,
-		func(x *AtPeriod) {
-			tm.wb.EachItemGroupedByWindow(func(group *ItemGroupedByWindow) {
-				returning(ToElement(group))
-				tm.wb.RemoveItemGropedByWindow(group)
-			})
-		},
-		func(x *AtCount) {
-			tm.wb.EachItemGroupedByWindow(func(group *ItemGroupedByWindow) {
-				returning(ToElement(group))
-				tm.wb.RemoveItemGropedByWindow(group)
-			})
-		},
-		func(x *AtWatermark) {
-			tm.wb.EachItemGroupedByWindow(func(group *ItemGroupedByWindow) {
-				returning(ToElement(group))
-				if group.Window.End < tm.tc.Watermark {
-					returning(ToElement(group))
-					tm.wb.RemoveItemGropedByWindow(group)
-				}
-			})
-		},
-	)
+		if isError {
+			panic(err)
+		}
+
+		if !isFound {
+			wt = NewWindowTrigger(group.Window, tm.td)
+			err = tm.wts.Set(WindowKey(group.Window), wt)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		wt.ReceiveEvent(trigger)
+		wt.ReceiveEvent(&AtCount{Number: len(group.Data.Items)})
+
+		if wt.ShouldTrigger() {
+			returning(ToElement(group))
+			tm.wb.RemoveItemGropedByWindow(group)
+		}
+	})
 
 	return nil
 }
 
 func (tm *TriggerHandler) Process(x Item, returning func(Item)) error {
-	// buffer data until trigger fires
 	tm.lock.Lock()
 	tm.wb.Append(x)
-
-	//tm.buffer = append(tm.buffer, x)
-	tm.tc.Count++
 	tm.lock.Unlock()
-
-	if tm.tc.Watermark < x.EventTime {
-		tm.lock.Lock()
-		tm.tc.Watermark = x.EventTime
-		tm.lock.Unlock()
-
-		tm.signals <- signal{
-			kind: signalWatermark,
-		}
-	}
-
-	tm.signals <- signal{
-		kind: signalCount,
-	}
-
-	return nil
+	return tm.Triggered(&AtCount{Number: 0}, returning)
 }
 
 func (tm *TriggerHandler) Retract(x Item, returning func(Item)) error {
 	panic("implement me")
-}
-
-func (tm *TriggerHandler) Background(ctx context.Context, returning func(Item)) {
-	// start ticker for each trigger
-	tm.register(tm.td)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case sig := <-tm.signals:
-			switch sig.kind {
-			case signalPeriod:
-				tm.tc.Durations[sig.duration] = struct{}{}
-			}
-
-			if found := tm.evaluate(tm.td, tm.tc, false); found != nil {
-				err := tm.Triggered(found, returning)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-	}
-}
-
-func (tm *TriggerHandler) evaluate(td TriggerDescription, tc TriggerContext, shouldRepeat bool) TriggerType {
-	return MustMatchTriggerDescription(
-		td,
-		func(x *AtPeriod) TriggerType {
-			// was any of the durations reached?
-			for durations := range tc.Durations {
-				if durations == x.Duration {
-					if shouldRepeat {
-						delete(tm.tc.Durations, x.Duration)
-					} else {
-						delete(tm.tc.Durations, x.Duration)
-						tm.unregister(x)
-					}
-
-					return x
-				}
-			}
-			return nil
-		},
-		func(x *AtCount) TriggerType {
-			// was item counts reached?
-			if tc.Count%x.Number == 0 {
-				if shouldRepeat {
-					tc.Count = 0
-				} else {
-					tm.unregister(x)
-				}
-
-				return x
-			}
-
-			return nil
-		},
-		func(x *AtWatermark) TriggerType {
-			return x
-		},
-		func(x *SequenceOf) TriggerType {
-			// was sequence of triggers reached?
-			for _, trigger := range x.Triggers {
-				if found := tm.evaluate(trigger, tc, shouldRepeat); found != nil {
-					return found
-				}
-			}
-
-			return nil
-		},
-		func(x *Repeat) TriggerType {
-			return tm.evaluate(x.Trigger, tc, true)
-		},
-		func(x *RepeatUntil) TriggerType {
-			for _, trigger := range x.Triggers {
-				if found := tm.evaluate(trigger, tc, shouldRepeat); found != nil {
-					// unregister all triggers
-					tm.unregister(x)
-					return found
-				}
-			}
-			return nil
-		},
-	)
-}
-
-func (tm *TriggerHandler) register(td TriggerDescription) {
-	MustMatchTriggerDescriptionR0(
-		td,
-		func(x *AtPeriod) {
-			tm.tickers[x] = time.NewTicker(x.Duration)
-			go func() {
-				for range tm.tickers[x].C {
-					tm.signals <- signal{
-						kind:     signalPeriod,
-						duration: x.Duration,
-					}
-				}
-			}()
-
-		},
-		func(x *AtCount) {},
-		func(x *AtWatermark) {},
-		func(x *SequenceOf) {},
-		func(x *Repeat) {
-			tm.register(x.Trigger)
-		},
-		func(x *RepeatUntil) {},
-	)
-}
-
-func (tm *TriggerHandler) unregister(x TriggerDescription) {
-	MustMatchTriggerDescriptionR0(
-		x,
-		func(y *AtPeriod) {
-			if tm.tickers[y] == nil {
-				return
-			}
-
-			tm.tickers[y].Stop()
-			delete(tm.tickers, y)
-
-		},
-		func(y *AtCount) {},
-		func(y *AtWatermark) {},
-		func(y *SequenceOf) {},
-		func(y *Repeat) {
-			tm.unregister(y.Trigger)
-		},
-		func(y *RepeatUntil) {
-			for _, trigger := range y.Triggers {
-				tm.unregister(trigger)
-			}
-		},
-	)
-}
-
-type TriggerContext struct {
-	Count     int
-	Durations map[time.Duration]struct{}
-	Watermark int64
 }
 
 var NotFound = errors.New("not found")
@@ -423,8 +239,18 @@ func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) 
 							panic(err)
 						}
 
-						returning(previous)     // retract previous
-						returning(newAggregate) // emit new aggregate
+						// operation is in one messages, as one or nothing principle
+						// which will help in transactional systems.
+						returning(Item{
+							Key: newAggregate.Key,
+							Data: PackRetractAndAggregate(
+								previous.Data,
+								newAggregate.Data,
+							),
+							EventTime: newAggregate.EventTime,
+							Window:    newAggregate.Window,
+							Type:      ItemRetractAndAggregate,
+						})
 					})
 					if err != nil {
 						panic(err)
@@ -446,4 +272,66 @@ func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) 
 func (a *AccumulateDiscardRetractHandler) Retract(x Item, returning func(Item)) error {
 	//TODO implement me
 	panic("implement me")
+}
+
+func NewTriggersManager() *TriggersManager {
+	return &TriggersManager{
+		tickers: map[TriggerDescription]*time.Ticker{},
+	}
+}
+
+type TriggersManager struct {
+	tickers map[TriggerDescription]*time.Ticker
+}
+
+func (tm *TriggersManager) Register(td TriggerDescription, onTrigger func(triggerType TriggerType)) {
+	MustMatchTriggerDescriptionR0(
+		td,
+		func(x *AtPeriod) {
+			go func() {
+				tm.tickers[td] = time.NewTicker(x.Duration)
+				for range tm.tickers[td].C {
+					onTrigger(&AtPeriod{
+						Duration: x.Duration,
+					})
+				}
+			}()
+		},
+		func(x *AtCount) {},
+		func(x *AtWatermark) {},
+		func(x *AnyOf) {
+			for _, td := range x.Triggers {
+				tm.Register(td, onTrigger)
+			}
+		},
+		func(x *AllOf) {
+			for _, td := range x.Triggers {
+				tm.Register(td, onTrigger)
+			}
+		},
+	)
+}
+
+func (tm *TriggersManager) Unregister(td TriggerDescription) {
+	MustMatchTriggerDescriptionR0(
+		td,
+		func(x *AtPeriod) {
+			if ticker, ok := tm.tickers[td]; ok {
+				ticker.Stop()
+				delete(tm.tickers, td)
+			}
+		},
+		func(x *AtCount) {},
+		func(x *AtWatermark) {},
+		func(x *AnyOf) {
+			for _, td := range x.Triggers {
+				tm.Unregister(td)
+			}
+		},
+		func(x *AllOf) {
+			for _, td := range x.Triggers {
+				tm.Unregister(td)
+			}
+		},
+	)
 }
