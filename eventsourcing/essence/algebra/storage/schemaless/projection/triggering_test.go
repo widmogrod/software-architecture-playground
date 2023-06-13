@@ -3,6 +3,7 @@ package projection
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/widmogrod/mkunion/x/schema"
+	"math"
 	"testing"
 	"time"
 )
@@ -15,8 +16,13 @@ func TestTriggers(t *testing.T) {
 		expected []Item
 	}{
 		"should trigger window emitting once at period 100ms, and 10 items arrives as 1 item": {
-			td: &AtPeriod{
-				Duration: 100 * time.Millisecond,
+			td: &AllOf{
+				Triggers: []TriggerDescription{
+					&AtPeriod{
+						Duration: 100 * time.Millisecond,
+					},
+					&AtWatermark{},
+				},
 			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
@@ -42,7 +48,7 @@ func TestTriggers(t *testing.T) {
 						schema.MkInt(15), schema.MkInt(16), schema.MkInt(17), schema.MkInt(18),
 						// it should fit in 100ms window, but due timeouts being part of process time, not event time,
 						// it's not guaranteed that when system will receive event at 10.1s, it will be processed at 10.2s
-						// schema.MkInt(19),
+						schema.MkInt(19),
 					),
 					EventTime: withTime(10, 0) + (200 * int64(time.Millisecond)),
 					Window: &Window{
@@ -52,9 +58,9 @@ func TestTriggers(t *testing.T) {
 				},
 			},
 		},
-		"should trigger window emitting first item arrives 1 item, and don't emmit when there are more events": {
-			td: &AtCount{
-				Number: 1,
+		"should trigger window emitting when window size reach 2 item": {
+			td: &AtWindowItemSize{
+				Number: 2,
 			},
 			wd: &FixedWindow{
 				Width: 100 * time.Millisecond,
@@ -64,7 +70,29 @@ func TestTriggers(t *testing.T) {
 				{
 					Key: "key",
 					Data: schema.MkList(
-						schema.MkInt(0),
+						schema.MkInt(0), schema.MkInt(1),
+					),
+					EventTime: withTime(10, 0) + (100 * int64(time.Millisecond)),
+					Window: &Window{
+						Start: withTime(10, 0),
+						End:   withTime(10, 0) + (100 * int64(time.Millisecond)),
+					},
+				},
+				{
+					Key: "key",
+					Data: schema.MkList(
+						schema.MkInt(2), schema.MkInt(3),
+					),
+					EventTime: withTime(10, 0) + (100 * int64(time.Millisecond)),
+					Window: &Window{
+						Start: withTime(10, 0),
+						End:   withTime(10, 0) + (100 * int64(time.Millisecond)),
+					},
+				},
+				{
+					Key: "key",
+					Data: schema.MkList(
+						schema.MkInt(4), schema.MkInt(5),
 					),
 					EventTime: withTime(10, 0) + (100 * int64(time.Millisecond)),
 					Window: &Window{
@@ -99,14 +127,10 @@ func TestTriggers(t *testing.T) {
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			handler := &TriggerHandler{
-				td: uc.td,
-				wd: uc.wd,
-				fm: uc.fm,
-				wb: &WindowBuffer{
-					wd:           uc.wd,
-					fm:           uc.fm,
-					windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
-				},
+				td:  uc.td,
+				wd:  uc.wd,
+				fm:  uc.fm,
+				wb:  NewWindowBuffer(uc.wd),
 				wts: NewInMemoryBagOf[*WindowTrigger](),
 			}
 
@@ -130,6 +154,12 @@ func TestTriggers(t *testing.T) {
 				}, returning.Returning)
 				assert.NoError(t, err)
 			}
+
+			// trigger watermark that there won't be any more events
+			err := handler.Triggered(&AtWatermark{
+				Timestamp: math.MaxInt64,
+			}, returning.Returning)
+			assert.NoError(t, err)
 
 			time.Sleep(100 * time.Millisecond)
 			for i, expected := range uc.expected {
@@ -267,14 +297,10 @@ func TestAggregate(t *testing.T) {
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
 			handler := &TriggerHandler{
-				td: uc.td,
-				wd: uc.wd,
-				fm: uc.fm,
-				wb: &WindowBuffer{
-					wd:           uc.wd,
-					fm:           uc.fm,
-					windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
-				},
+				td:  uc.td,
+				wd:  uc.wd,
+				fm:  uc.fm,
+				wb:  NewWindowBuffer(uc.wd),
 				wts: NewInMemoryBagOf[*WindowTrigger](),
 			}
 
@@ -332,6 +358,12 @@ func TestAggregate(t *testing.T) {
 				}, returning2)
 				assert.NoError(t, err)
 			}
+
+			// trigger watermark that there won't be any more events
+			err := handler.Triggered(&AtWatermark{
+				Timestamp: math.MaxInt64,
+			}, returning.Returning)
+			assert.NoError(t, err)
 
 			time.Sleep(100 * time.Millisecond)
 			for i, expected := range uc.expected {

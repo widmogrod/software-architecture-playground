@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-//go:generate mkunion -name=TriggerType -variants=AtPeriod,AtCount,AtWatermark
+//go:generate mkunion -name=TriggerType -variants=AtPeriod,AtWindowItemSize,AtWatermark
 
 //go:generate mkunion -name=TriggerDescription
 type (
 	AtPeriod struct {
 		Duration time.Duration
 	}
-	AtCount struct {
+	AtWindowItemSize struct {
 		Number int
 	}
 	AtWatermark struct {
@@ -61,8 +61,8 @@ func printTrigger(triggerType TriggerType) {
 			fmt.Printf("AtPeriod(%v)", x.Duration)
 
 		},
-		func(x *AtCount) {
-			fmt.Printf("AtCount(%v)", x.Number)
+		func(x *AtWindowItemSize) {
+			fmt.Printf("AtWindowItemSize(%v)", x.Number)
 		},
 		func(x *AtWatermark) {
 			fmt.Printf("AtWatermark()")
@@ -91,11 +91,12 @@ func (tm *TriggerHandler) Triggered(trigger TriggerType, returning func(Item)) e
 		}
 
 		wt.ReceiveEvent(trigger)
-		wt.ReceiveEvent(&AtCount{Number: len(group.Data.Items)})
+		wt.ReceiveEvent(&AtWindowItemSize{Number: len(group.Data.Items)})
 
 		if wt.ShouldTrigger() {
 			returning(ToElement(group))
 			tm.wb.RemoveItemGropedByWindow(group)
+			wt.Reset()
 		}
 	})
 
@@ -106,7 +107,7 @@ func (tm *TriggerHandler) Process(x Item, returning func(Item)) error {
 	tm.lock.Lock()
 	tm.wb.Append(x)
 	tm.lock.Unlock()
-	return tm.Triggered(&AtCount{Number: 0}, returning)
+	return tm.Triggered(&AtWindowItemSize{Number: -1}, returning)
 }
 
 func (tm *TriggerHandler) Retract(x Item, returning func(Item)) error {
@@ -297,7 +298,7 @@ func (tm *TriggersManager) Register(td TriggerDescription, onTrigger func(trigge
 				}
 			}()
 		},
-		func(x *AtCount) {},
+		func(x *AtWindowItemSize) {},
 		func(x *AtWatermark) {},
 		func(x *AnyOf) {
 			for _, td := range x.Triggers {
@@ -321,7 +322,7 @@ func (tm *TriggersManager) Unregister(td TriggerDescription) {
 				delete(tm.tickers, td)
 			}
 		},
-		func(x *AtCount) {},
+		func(x *AtWindowItemSize) {},
 		func(x *AtWatermark) {},
 		func(x *AnyOf) {
 			for _, td := range x.Triggers {

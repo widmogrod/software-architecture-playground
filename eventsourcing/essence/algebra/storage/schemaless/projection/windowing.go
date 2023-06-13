@@ -275,20 +275,14 @@ func ItemKeyWindow(x Item) string {
 
 func NewWindowBuffer(wd WindowDescription) *WindowBuffer {
 	return &WindowBuffer{
-		wd: wd,
-
-		windowGroups: map[int64]map[int64]*ItemGroupedByWindow{},
+		wd:           wd,
+		windowGroups: map[string]*ItemGroupedByWindow{},
 	}
 }
 
 type WindowBuffer struct {
-	wd WindowDescription
-	fm WindowFlushMode
-
-	// Windows groups that haven't been flushed yet
-	windowGroups map[int64]map[int64]*ItemGroupedByWindow
-	// Window groups that have been flushed, and because flush mode is accumulating or accumulatingAndRetracting
-	//windowGroupsLast map[int64]map[int64]*ItemGroupedByWindow
+	wd           WindowDescription
+	windowGroups map[string]*ItemGroupedByWindow
 }
 
 func (w *WindowBuffer) Append(x Item) {
@@ -330,34 +324,29 @@ func (w *WindowBuffer) Append(x Item) {
 // Backfill is the same as using already existing DAG, but only with different input.
 
 func (w *WindowBuffer) EachItemGroupedByWindow(f func(group *ItemGroupedByWindow)) {
-	for _, windowGroups := range w.windowGroups {
-		for _, group := range windowGroups {
-			f(group)
-		}
+	for _, group := range w.windowGroups {
+		f(group)
 	}
 }
 
 func (w *WindowBuffer) RemoveItemGropedByWindow(window *ItemGroupedByWindow) {
-	delete(w.windowGroups[window.Window.Start], window.Window.End)
-	delete(w.windowGroups, window.Window.Start)
+	delete(w.windowGroups, WindowKey(window.Window))
 }
 
 func (w *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
 	for _, group := range x {
 		for _, item := range group.Data {
-			if _, ok := w.windowGroups[item.Window.Start]; !ok {
-				w.windowGroups[item.Window.Start] = map[int64]*ItemGroupedByWindow{}
-			}
-			if _, ok := w.windowGroups[item.Window.Start][item.Window.End]; !ok {
-				w.windowGroups[item.Window.Start][item.Window.End] = &ItemGroupedByWindow{
+			key := WindowKey(item.Window)
+			if _, ok := w.windowGroups[key]; !ok {
+				w.windowGroups[key] = &ItemGroupedByWindow{
 					Key:    group.Key,
 					Data:   &schema.List{},
 					Window: item.Window,
 				}
 			}
 
-			w.windowGroups[item.Window.Start][item.Window.End].Data.Items =
-				append(w.windowGroups[item.Window.Start][item.Window.End].Data.Items, item.Data)
+			w.windowGroups[key].Data.Items =
+				append(w.windowGroups[key].Data.Items, item.Data)
 		}
 	}
 }
@@ -404,7 +393,7 @@ func (wt *WindowTrigger) initState(td TriggerDescription) *TriggerState {
 				desc: td,
 			}
 		},
-		func(x *AtCount) *TriggerState {
+		func(x *AtWindowItemSize) *TriggerState {
 			return &TriggerState{
 				desc: td,
 			}
@@ -457,10 +446,15 @@ func (wt *WindowTrigger) ShouldTrigger() bool {
 	return wt.shouldTrigger
 }
 
+func (wt *WindowTrigger) Reset() {
+	wt.shouldTrigger = false
+	wt.ts = wt.initState(wt.td)
+}
+
 //go:generate mkunion match -name=EvaluateTrigger
 type EvaluateTrigger[T0 TriggerDescription, T1 TriggerType] interface {
 	MatchPeriod(*AtPeriod, *AtPeriod)
-	MatchCount(*AtCount, *AtCount)
+	MatchCount(*AtWindowItemSize, *AtWindowItemSize)
 	MatchWatermark(*AtWatermark, *AtWatermark)
 	MatchAnyOfAny(*AnyOf, TriggerType)
 	MatchAllOfAny(*AllOf, TriggerType)
@@ -483,7 +477,7 @@ func (ts *TriggerState) evaluate(triggerType TriggerType, depth int) bool {
 		func(x0 *AtPeriod, x1 *AtPeriod) bool {
 			return x0.Duration == x1.Duration
 		},
-		func(x0 *AtCount, x1 *AtCount) bool {
+		func(x0 *AtWindowItemSize, x1 *AtWindowItemSize) bool {
 			return x0.Number == x1.Number
 		},
 		func(x0 *AtWatermark, x1 *AtWatermark) bool {

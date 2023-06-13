@@ -797,14 +797,14 @@ func TestWindowTrigger(t *testing.T) {
 					&AtPeriod{
 						Duration: 10 * time.Minute,
 					},
-					&AtCount{
+					&AtWindowItemSize{
 						Number: 2,
 					},
 				},
 			},
 			events: []triggerCase{
 				{
-					trigger: &AtCount{
+					trigger: &AtWindowItemSize{
 						Number: 1,
 					},
 					shouldTrigger: false,
@@ -838,7 +838,7 @@ func TestWindowTrigger(t *testing.T) {
 						},
 					},
 					// for very low latency granularity, we can flush window on every event
-					&AtCount{
+					&AtWindowItemSize{
 						Number: 1,
 					},
 				},
