@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestDabBuilderTest(t *testing.T) {
-
 	dag := NewDAGBuilder()
 	found, err := dag.GetByName("a")
 	assert.ErrorIs(t, err, ErrNotFound)
@@ -18,17 +18,17 @@ func TestDabBuilderTest(t *testing.T) {
 	//assert.Equal(t, dag, found)
 
 	log := &LogHandler{}
-	m := &LogHandler{}
+	//m := &LogHandler{}
 
 	/*
 		mermaid
 		graph TD
-			a[Load]
-			b[Map]
-			c[Load]
-			d[Map]
-			e[Join]
-			f[Map]
+			a[DoLoad]
+			b[Window]
+			c[DoLoad]
+			d[Window]
+			e[DoJoin]
+			f[Window]
 			a --> b
 			c --> d
 			b --> e
@@ -37,23 +37,23 @@ func TestDabBuilderTest(t *testing.T) {
 	*/
 	mapped1 := dag.
 		Load(log, WithName("a")).
-		Map(m, WithName("b"))
+		Window(WithName("b"))
 
 	mapped2 := dag.
 		Load(log, WithName("c")).
-		Map(m, WithName("d"))
+		Window(WithName("d"))
 
 	dag.
 		Join(mapped1, mapped2, WithName("e")).
-		Map(m, WithName("f"))
+		Window(WithName("f"))
 
 	found, err = dag.GetByName("a")
 	assert.NoError(t, err)
-	assert.Equal(t, log, found.dag.(*Load).OnLoad)
+	assert.Equal(t, log, found.dag.(*DoLoad).OnLoad)
 
 	found, err = dag.GetByName("b")
 	assert.NoError(t, err)
-	assert.Equal(t, m, found.dag.(*Map).OnMap)
+	//assert.Equal(t, m, found.dag.(*DoWindow).OnMap)
 
 	nodes := dag.Build()
 	assert.Equal(t, 6, len(nodes))
@@ -64,4 +64,48 @@ func TestDabBuilderTest(t *testing.T) {
 	fmt.Println(ToMermaidGraph(dag))
 
 	fmt.Println(ToMermaidGraphWithOrder(dag, ReverseSort(Sort(dag))))
+}
+
+func TestNewContextBuilder(t *testing.T) {
+	useCases := map[string]struct {
+		in  *DefaultContext
+		out *DefaultContext
+	}{
+		"should set default values": {
+			in: NewContextBuilder(),
+			out: &DefaultContext{
+				wd: &FixedWindow{
+					// infinite window,
+					Width: 0,
+				},
+				td: &AtWatermark{},
+				fm: &Discard{},
+			},
+		},
+		"should set window duration": {
+			in: NewContextBuilder(
+				WithFixedWindow(100*time.Millisecond),
+				WithTriggers(&AtPeriod{Duration: 10 * time.Millisecond}, &AtWatermark{}),
+				WithAccumulatingAndRetracting(),
+			),
+			out: &DefaultContext{
+				wd: &FixedWindow{
+					Width: 100 * time.Millisecond,
+				},
+				td: &AllOf{
+					Triggers: []TriggerDescription{
+						&AtPeriod{Duration: 10 * time.Millisecond},
+						&AtWatermark{},
+					},
+				},
+				fm: &AccumulatingAndRetracting{},
+			},
+		},
+	}
+	for name, uc := range useCases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, uc.out, uc.in)
+		})
+	}
+
 }

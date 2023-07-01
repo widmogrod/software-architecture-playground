@@ -6,7 +6,7 @@ type GenerateHandler struct {
 	Load func(push func(message Item)) error
 }
 
-func (h *GenerateHandler) Process(_ Item, returning func(Item)) error {
+func (h *GenerateHandler) Process(x Item, returning func(Item)) error {
 	return h.Load(returning)
 }
 

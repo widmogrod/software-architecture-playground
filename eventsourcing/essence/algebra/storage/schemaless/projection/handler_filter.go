@@ -11,13 +11,16 @@ type FilterHandler struct {
 }
 
 func (f *FilterHandler) Process(x Item, returning func(Item)) error {
-	if f.Where.Evaluate(x.Data) {
-		returning(x)
-	}
+	panic("not implemented")
+	//if f.Where.Evaluate(x.Data) {
+	//	returning(x)
+	//}
 
 	return nil
 }
 
 func (f *FilterHandler) Retract(x Item, returning func(Item)) error {
-	return f.Process(x, returning)
+	panic("not implemented")
+	//return f.Process(x, returning)
+	return nil
 }

@@ -34,22 +34,22 @@ var (
 )
 
 func (p *PubSub[T]) Register(key T) error {
-	//log.Errorf("pubsub.Register(%s)\n", GetCtx(any(key).(Node)).name)
+	//log.Errorf("pubsub.registerRec(%s)\n", GetCtx(any(key).(Node)).name)
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	//if _, ok := p.finished[key]; ok {
-	//	return fmt.Errorf("pubsub.Register: key=%#v %w", key, ErrFinished)
+	//	return fmt.Errorf("pubsub.registerRec: key=%#v %w", key, ErrFinished)
 	//}
 
 	if _, ok := p.publisher[key]; !ok {
 		p.publisher[key] = list.New()
 	} else {
-		//log.Errorf("pubsub.Register(%s) ALREADY\n", GetCtx(any(key).(Node)).name)
+		//log.Errorf("pubsub.registerRec(%s) ALREADY\n", GetCtx(any(key).(Node)).name)
 	}
 
 	if last := p.publisher[key].Back(); last != nil {
 		if last.Value.(Message).finished {
-			return fmt.Errorf("pubsub.Register: key=%#v %w", key, ErrFinished)
+			return fmt.Errorf("pubsub.registerRec: key=%#v %w", key, ErrFinished)
 		}
 	}
 

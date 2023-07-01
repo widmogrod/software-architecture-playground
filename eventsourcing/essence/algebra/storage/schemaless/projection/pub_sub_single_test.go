@@ -11,7 +11,7 @@ func TestPusSubSingle(t *testing.T) {
 	pss := NewPubSubSingle()
 	err := pss.Publish(context.Background(), Message{
 		Key: "foo",
-		Aggregate: &Item{
+		Item: &Item{
 			Key:       "foo",
 			Data:      schema.FromGo("foo"),
 			EventTime: 0,

@@ -41,8 +41,7 @@ type (
 )
 
 type TriggerHandler struct {
-	wd WindowDescription
-	fm WindowFlushMode
+	//wd WindowDescription
 	td TriggerDescription
 
 	wb *WindowBuffer
@@ -119,7 +118,11 @@ var NotFound = errors.New("not found")
 type BagOf[A any] interface {
 	Set(key string, value A) error
 	Get(key string) (A, error)
+	Del(key string) error
+	Range(f func(key string, item A))
 }
+
+var _ BagOf[any] = (*InMemoryBagOf[any])(nil)
 
 type InMemoryBagOf[A any] struct {
 	m map[string]A
@@ -145,8 +148,19 @@ func (b *InMemoryBagOf[A]) Get(key string) (A, error) {
 	return a, NotFound
 }
 
+func (b *InMemoryBagOf[A]) Del(key string) error {
+	delete(b.m, key)
+	return nil
+}
+
+func (b *InMemoryBagOf[A]) Range(f func(key string, item A)) {
+	for k, v := range b.m {
+		f(k, v)
+	}
+}
+
 type AccumulateDiscardRetractHandler struct {
-	wf     WindowFlushMode
+	fm     WindowFlushMode
 	mapf   Handler
 	mergef Handler
 
@@ -162,9 +176,9 @@ func printItem(x Item, sx ...string) {
 
 func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) error {
 	return MustMatchWindowFlushMode(
-		a.wf,
+		a.fm,
 		func(y *Accumulate) error {
-			key := ItemKeyWindow(x)
+			key := KeyedWindowKey(ToKeyedWindowFromItem(&x))
 			previous, err := a.bag.Get(key)
 
 			isError := err != nil && err != NotFound
@@ -174,8 +188,6 @@ func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) 
 			}
 
 			if isFound {
-				//printItem(previous, "previous")
-				//printItem(x, "x")
 				return a.mapf.Process(x, func(item Item) {
 					z := Item{
 						Key:    item.Key,
@@ -203,7 +215,6 @@ func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) 
 
 			return a.mapf.Process(x, func(item Item) {
 				err := a.bag.Set(key, item)
-				//printItem(item, "set")
 				if err != nil {
 					panic(err)
 				}
@@ -214,7 +225,7 @@ func (a *AccumulateDiscardRetractHandler) Process(x Item, returning func(Item)) 
 			return a.mapf.Process(x, returning)
 		},
 		func(y *AccumulatingAndRetracting) error {
-			key := ItemKeyWindow(x)
+			key := KeyedWindowKey(ToKeyedWindowFromItem(&x))
 			previous, err := a.bag.Get(key)
 			isError := err != nil && err != NotFound
 			isFound := err == nil
@@ -275,26 +286,140 @@ func (a *AccumulateDiscardRetractHandler) Retract(x Item, returning func(Item)) 
 	panic("implement me")
 }
 
-func NewTriggersManager() *TriggersManager {
-	return &TriggersManager{
+type (
+	WindowBufferSignaler interface {
+		SignalWindowCreated(kw *KeyedWindow)
+		SignalWindowDeleted(kw *KeyedWindow)
+		SignalWindowSizeReached(kw *KeyedWindow, size int)
+	}
+
+	WatermarkSignaler interface {
+		SignalWatermark(timestamp int64)
+	}
+
+	TimeSignaler interface {
+		SignalDuration(duration time.Duration)
+	}
+)
+
+func NewTriggerManager(td TriggerDescription) *TriggerManager {
+	tm := &TriggerManager{
+		td:             td,
+		windowTriggers: NewInMemoryBagOf[*WindowTrigger](),
+		keyedWindows:   NewInMemoryBagOf[*KeyedWindow](),
+	}
+
+	return tm
+}
+
+type TriggerManager struct {
+	td TriggerDescription
+
+	windowTriggers BagOf[*WindowTrigger]
+	keyedWindows   BagOf[*KeyedWindow]
+
+	triggerWindow func(w *KeyedWindow)
+}
+
+var _ WindowBufferSignaler = (*TriggerManager)(nil)
+var _ WatermarkSignaler = (*TriggerManager)(nil)
+var _ TimeSignaler = (*TriggerManager)(nil)
+
+func (tm *TriggerManager) SignalWindowCreated(kw *KeyedWindow) {
+	err := tm.windowTriggers.Set(KeyedWindowKey(kw), NewWindowTrigger(kw.Window, tm.td))
+	if err != nil {
+		panic(err)
+	}
+	err = tm.keyedWindows.Set(KeyedWindowKey(kw), kw)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (tm *TriggerManager) SignalWindowDeleted(kw *KeyedWindow) {
+	err := tm.windowTriggers.Del(KeyedWindowKey(kw))
+	if err != nil {
+		panic(err)
+	}
+	err = tm.keyedWindows.Del(KeyedWindowKey(kw))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (tm *TriggerManager) SignalWindowSizeReached(kw *KeyedWindow, size int) {
+	wt, err := tm.windowTriggers.Get(KeyedWindowKey(kw))
+	if err != nil {
+		panic(err)
+	}
+
+	wt.ReceiveEvent(&AtWindowItemSize{
+		Number: size,
+	})
+	if wt.ShouldTrigger() {
+		tm.triggerWindow(kw)
+		wt.Reset()
+	}
+}
+
+func (tm *TriggerManager) WhenTrigger(f func(w *KeyedWindow)) {
+	if tm.triggerWindow != nil {
+		panic("trigger window already set")
+	}
+
+	tm.triggerWindow = f
+}
+
+func (tm *TriggerManager) SignalDuration(duration time.Duration) {
+	tm.windowTriggers.Range(func(key string, wt *WindowTrigger) {
+		wt.ReceiveEvent(&AtPeriod{
+			Duration: duration,
+		})
+		if wt.ShouldTrigger() {
+			kw, err := tm.keyedWindows.Get(key)
+			if err != nil {
+				panic(err)
+			}
+			tm.triggerWindow(kw)
+			wt.Reset()
+		}
+	})
+}
+
+func (tm *TriggerManager) SignalWatermark(timestamp int64) {
+	tm.windowTriggers.Range(func(key string, wt *WindowTrigger) {
+		wt.ReceiveEvent(&AtWatermark{
+			Timestamp: timestamp,
+		})
+		if wt.ShouldTrigger() {
+			kw, err := tm.keyedWindows.Get(key)
+			if err != nil {
+				panic(err)
+			}
+			tm.triggerWindow(kw)
+			wt.Reset()
+		}
+	})
+}
+
+func NewTimeTicker() *Tickers {
+	return &Tickers{
 		tickers: map[TriggerDescription]*time.Ticker{},
 	}
 }
 
-type TriggersManager struct {
+type Tickers struct {
 	tickers map[TriggerDescription]*time.Ticker
 }
 
-func (tm *TriggersManager) Register(td TriggerDescription, onTrigger func(triggerType TriggerType)) {
+func (t *Tickers) Register(td TriggerDescription, ts TimeSignaler) {
 	MustMatchTriggerDescriptionR0(
 		td,
 		func(x *AtPeriod) {
 			go func() {
-				tm.tickers[td] = time.NewTicker(x.Duration)
-				for range tm.tickers[td].C {
-					onTrigger(&AtPeriod{
-						Duration: x.Duration,
-					})
+				t.tickers[td] = time.NewTicker(x.Duration)
+				for range t.tickers[td].C {
+					ts.SignalDuration(x.Duration)
 				}
 			}()
 		},
@@ -302,36 +427,36 @@ func (tm *TriggersManager) Register(td TriggerDescription, onTrigger func(trigge
 		func(x *AtWatermark) {},
 		func(x *AnyOf) {
 			for _, td := range x.Triggers {
-				tm.Register(td, onTrigger)
+				t.Register(td, ts)
 			}
 		},
 		func(x *AllOf) {
 			for _, td := range x.Triggers {
-				tm.Register(td, onTrigger)
+				t.Register(td, ts)
 			}
 		},
 	)
 }
 
-func (tm *TriggersManager) Unregister(td TriggerDescription) {
+func (t *Tickers) Unregister(td TriggerDescription) {
 	MustMatchTriggerDescriptionR0(
 		td,
 		func(x *AtPeriod) {
-			if ticker, ok := tm.tickers[td]; ok {
+			if ticker, ok := t.tickers[td]; ok {
 				ticker.Stop()
-				delete(tm.tickers, td)
+				delete(t.tickers, td)
 			}
 		},
 		func(x *AtWindowItemSize) {},
 		func(x *AtWatermark) {},
 		func(x *AnyOf) {
 			for _, td := range x.Triggers {
-				tm.Unregister(td)
+				t.Unregister(td)
 			}
 		},
 		func(x *AllOf) {
 			for _, td := range x.Triggers {
-				tm.Unregister(td)
+				t.Unregister(td)
 			}
 		},
 	)

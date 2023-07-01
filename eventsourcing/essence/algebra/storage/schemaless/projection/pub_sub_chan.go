@@ -3,6 +3,7 @@ package projection
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/widmogrod/mkunion/x/schema"
 	"sync"
 	"sync/atomic"
 )
@@ -110,8 +111,9 @@ func (s *PubSubChan[T]) Process() {
 		length = len(s.subscribers)
 		switch length {
 		case 0:
+			data, _ := schema.ToJSON(schema.FromGo(msg))
 			log.Warn("PubSubChan.Process: no subscribers but get message: ",
-				length, ",", msg)
+				length, ",", string(data))
 
 		// optimisation, when there is only one subscriber, we can invoke it directly
 		case 1:

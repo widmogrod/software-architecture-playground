@@ -64,9 +64,9 @@ func (d *DAGBuilder) addDependency(from, to Node) {
 	d.nodesToFrom[to].PushBack(from)
 }
 
-// Load loads data from a source. This node is a root of the DAG. DAG can have many Load nodesFromTo.
+// DoLoad loads data from a source. This node is a root of the DAG. DAG can have many DoLoad nodesFromTo.
 func (d *DAGBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope(fmt.Sprintf("Load%d", d.nextNumber()))
+	ctx := d.ctx.Scope(fmt.Sprintf("DoLoad%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
@@ -76,7 +76,7 @@ func (d *DAGBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
 			"but it's being connected to %s node", GetCtx(d.dag).Name()))
 	}
 
-	node := &Load{
+	node := &DoLoad{
 		Ctx:    ctx,
 		OnLoad: f,
 	}
@@ -91,13 +91,34 @@ func (d *DAGBuilder) Load(f Handler, opts ...ContextOptionFunc) Builder {
 	}
 }
 
-func (d *DAGBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope(fmt.Sprintf("Map%d", d.nextNumber()))
+func (d *DAGBuilder) Window(opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("Window%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
 
-	node := &Map{
+	node := &DoWindow{
+		Ctx:   ctx,
+		Input: d.dag,
+	}
+
+	d.addDependency(d.dag, node)
+
+	return &DAGBuilder{
+		nodesFromTo: d.nodesFromTo,
+		nodesToFrom: d.nodesToFrom,
+		dag:         node,
+		ctx:         ctx,
+	}
+}
+
+func (d *DAGBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
+	ctx := d.ctx.Scope(fmt.Sprintf("DoWindow%d", d.nextNumber()))
+	for _, opt := range opts {
+		opt(ctx)
+	}
+
+	node := &DoMap{
 		Ctx:   ctx,
 		OnMap: f,
 		Input: d.dag,
@@ -113,35 +134,13 @@ func (d *DAGBuilder) Map(f Handler, opts ...ContextOptionFunc) Builder {
 	}
 }
 
-func (d *DAGBuilder) Merge(f Handler, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope(fmt.Sprintf("Merge%d", d.nextNumber()))
-	for _, opt := range opts {
-		opt(ctx)
-	}
-
-	node := &Merge{
-		Ctx:     ctx,
-		OnMerge: f,
-		Input:   d.dag,
-	}
-
-	d.addDependency(d.dag, node)
-
-	return &DAGBuilder{
-		nodesFromTo: d.nodesFromTo,
-		nodesToFrom: d.nodesToFrom,
-		dag:         node,
-		ctx:         ctx,
-	}
-}
-
 func (d *DAGBuilder) Join(a, b Builder, opts ...ContextOptionFunc) Builder {
-	ctx := d.ctx.Scope(fmt.Sprintf("Join%d", d.nextNumber()))
+	ctx := d.ctx.Scope(fmt.Sprintf("DoJoin%d", d.nextNumber()))
 	for _, opt := range opts {
 		opt(ctx)
 	}
 
-	node := &Join{
+	node := &DoJoin{
 		Ctx: ctx,
 		Input: []Node{
 			a.(*DAGBuilder).dag,
@@ -240,7 +239,7 @@ func Sort(dag *DAGBuilder) []Node {
 	// L <- Empty list that will contain the sorted elements
 	L := make([]Node, 0, len(nodesFromTo))
 	// S <- Set of all nodesFromTo with no incoming edges
-	// in our case, those should be only Load nodes
+	// in our case, those should be only DoLoad nodes
 	S := make([]Node, 0, len(nodesFromTo))
 	Sm := make(map[Node]struct{}, len(nodesFromTo))
 	for node, froms := range nodesToFrom {

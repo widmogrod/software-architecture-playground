@@ -269,28 +269,53 @@ func WindowKey(window *Window) string {
 	return fmt.Sprintf("%d.%d", window.Start, window.End)
 }
 
-func ItemKeyWindow(x Item) string {
+func KeyedWindowKey(x *KeyedWindow) string {
 	return fmt.Sprintf("%s:%s", x.Key, WindowKey(x.Window))
 }
 
-func NewWindowBuffer(wd WindowDescription) *WindowBuffer {
+type KeyedWindow struct {
+	Key    string
+	Window *Window
+}
+
+func ToKeyedWindowFromItem(x *Item) *KeyedWindow {
+	return &KeyedWindow{
+		Key:    x.Key,
+		Window: x.Window,
+	}
+}
+
+func ToKeyedWindowFromGrouped(x *ItemGroupedByWindow) *KeyedWindow {
+	return &KeyedWindow{
+		Key:    x.Key,
+		Window: x.Window,
+	}
+}
+
+func KeyWithNamespace(key string, namespace string) string {
+	return fmt.Sprintf("%s:%s", namespace, key)
+}
+
+func NewWindowBuffer(wd WindowDescription, sig WindowBufferSignaler) *WindowBuffer {
 	return &WindowBuffer{
 		wd:           wd,
+		sig:          sig,
 		windowGroups: map[string]*ItemGroupedByWindow{},
 	}
 }
 
 type WindowBuffer struct {
 	wd           WindowDescription
+	sig          WindowBufferSignaler
 	windowGroups map[string]*ItemGroupedByWindow
 }
 
-func (w *WindowBuffer) Append(x Item) {
-	list1 := AssignWindows([]Item{x}, w.wd)
+func (wb *WindowBuffer) Append(x Item) {
+	list1 := AssignWindows([]Item{x}, wb.wd)
 	list2 := DropTimestamps(list1)
 	list3 := GroupByKey(list2)
-	list4 := MergeWindows(list3, w.wd)
-	w.GroupAlsoByWindow(list4)
+	list4 := MergeWindows(list3, wb.wd)
+	wb.GroupAlsoByWindow(list4)
 }
 
 // FlushItemGroupedByWindow makes sure that windows that needs to be flushed are delivered to the function f.
@@ -323,30 +348,47 @@ func (w *WindowBuffer) Append(x Item) {
 //
 // Backfill is the same as using already existing DAG, but only with different input.
 
-func (w *WindowBuffer) EachItemGroupedByWindow(f func(group *ItemGroupedByWindow)) {
-	for _, group := range w.windowGroups {
+func (wb *WindowBuffer) EachItemGroupedByWindow(f func(group *ItemGroupedByWindow)) {
+	for _, group := range wb.windowGroups {
 		f(group)
 	}
 }
 
-func (w *WindowBuffer) RemoveItemGropedByWindow(window *ItemGroupedByWindow) {
-	delete(w.windowGroups, WindowKey(window.Window))
+func (wb *WindowBuffer) EachKeyedWindow(kw *KeyedWindow, f func(group *ItemGroupedByWindow)) {
+	key := KeyedWindowKey(kw)
+	if group, ok := wb.windowGroups[key]; ok {
+		f(group)
+	}
 }
 
-func (w *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
+func (wb *WindowBuffer) RemoveItemGropedByWindow(item *ItemGroupedByWindow) {
+	kw := ToKeyedWindowFromGrouped(item)
+	key := KeyedWindowKey(kw)
+	delete(wb.windowGroups, key)
+	wb.sig.SignalWindowDeleted(kw)
+}
+
+func (wb *WindowBuffer) GroupAlsoByWindow(x []ItemGroupedByKey) {
 	for _, group := range x {
 		for _, item := range group.Data {
-			key := WindowKey(item.Window)
-			if _, ok := w.windowGroups[key]; !ok {
-				w.windowGroups[key] = &ItemGroupedByWindow{
+			kw := ToKeyedWindowFromItem(&item)
+			key := KeyedWindowKey(kw)
+			if _, ok := wb.windowGroups[key]; !ok {
+				wb.windowGroups[key] = &ItemGroupedByWindow{
 					Key:    group.Key,
 					Data:   &schema.List{},
 					Window: item.Window,
 				}
+
+				wb.sig.SignalWindowCreated(kw)
 			}
 
-			w.windowGroups[key].Data.Items =
-				append(w.windowGroups[key].Data.Items, item.Data)
+			wb.windowGroups[key].Data.Items = append(
+				wb.windowGroups[key].Data.Items,
+				item.Data,
+			)
+
+			wb.sig.SignalWindowSizeReached(kw, len(wb.windowGroups[key].Data.Items))
 		}
 	}
 }

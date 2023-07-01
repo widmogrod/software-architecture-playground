@@ -35,7 +35,7 @@ type EventStore struct {
 }
 
 //
-//type Aggregate struct {
+//type Item struct {
 //	ID       string
 //	Type     string
 //	Snapshot *runtime.Snapshot

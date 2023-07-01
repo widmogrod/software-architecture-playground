@@ -42,7 +42,7 @@ func (p *PubSubMulti[T]) Register(key T) error {
 
 	if _, ok := p.multi[key]; ok {
 		return nil
-		//return fmt.Errorf("PubSubMulti.Register: key %s already registered", key)
+		//return fmt.Errorf("PubSubMulti.registerRec: key %s already registered", key)
 	}
 
 	p.multi[key] = p.new()

@@ -126,40 +126,29 @@ func TestTriggers(t *testing.T) {
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
-			handler := &TriggerHandler{
-				td:  uc.td,
-				wd:  uc.wd,
-				fm:  uc.fm,
-				wb:  NewWindowBuffer(uc.wd),
-				wts: NewInMemoryBagOf[*WindowTrigger](),
-			}
-
 			returning := &ListAssert{t: t}
 
-			tickers := NewTriggersManager()
-			defer tickers.Unregister(uc.td)
-			tickers.Register(uc.td, func(triggerType TriggerType) {
-				// propagate trigger to handler
-				err := handler.Triggered(triggerType, returning.Returning)
-				assert.NoError(t, err)
+			trigger := NewTriggerManager(uc.td)
+
+			timeTickers := NewTimeTicker()
+			timeTickers.Register(uc.td, trigger)
+			defer timeTickers.Unregister(uc.td)
+
+			wb := NewWindowBuffer(uc.wd, trigger)
+
+			trigger.WhenTrigger(func(kw *KeyedWindow) {
+				wb.EachKeyedWindow(kw, func(group *ItemGroupedByWindow) {
+					returning.Returning(ToElement(group))
+					wb.RemoveItemGropedByWindow(group)
+				})
 			})
 
 			for item := range GenerateItemsEvery(withTime(10, 0), 20, 10*time.Millisecond) {
-				err := handler.Process(item, returning.Returning)
-				assert.NoError(t, err)
-
-				// simulate watermark
-				err = handler.Triggered(&AtWatermark{
-					Timestamp: item.EventTime,
-				}, returning.Returning)
-				assert.NoError(t, err)
+				wb.Append(item)
 			}
 
 			// trigger watermark that there won't be any more events
-			err := handler.Triggered(&AtWatermark{
-				Timestamp: math.MaxInt64,
-			}, returning.Returning)
-			assert.NoError(t, err)
+			trigger.SignalWatermark(math.MaxInt64)
 
 			time.Sleep(100 * time.Millisecond)
 			for i, expected := range uc.expected {
@@ -280,7 +269,7 @@ func TestAggregate(t *testing.T) {
 				// here is retracting and aggregate in effect.
 				{
 					Key: "key",
-					Data: schema.MkList(
+					Data: PackRetractAndAggregate(
 						schema.MkInt(126), // retract previous
 						schema.MkInt(145), // aggregate new
 					),
@@ -296,17 +285,19 @@ func TestAggregate(t *testing.T) {
 	}
 	for name, uc := range useCases {
 		t.Run(name, func(t *testing.T) {
-			handler := &TriggerHandler{
-				td:  uc.td,
-				wd:  uc.wd,
-				fm:  uc.fm,
-				wb:  NewWindowBuffer(uc.wd),
-				wts: NewInMemoryBagOf[*WindowTrigger](),
-			}
+			returning := &ListAssert{t: t}
+
+			trigger := NewTriggerManager(uc.td)
+
+			timeTickers := NewTimeTicker()
+			timeTickers.Register(uc.td, trigger)
+			defer timeTickers.Unregister(uc.td)
+
+			wb := NewWindowBuffer(uc.wd, trigger)
 
 			handler2 := &AccumulateDiscardRetractHandler{
-				wf: uc.fm,
-				mapf: &SimpleHandler{
+				fm: uc.fm,
+				mapf: &SimpleProcessHandler{
 					P: func(item Item, returning func(Item)) error {
 						returning(Item{
 							Key: item.Key,
@@ -334,36 +325,20 @@ func TestAggregate(t *testing.T) {
 				bag: NewInMemoryBagOf[Item](),
 			}
 
-			returning := &ListAssert{t: t}
-			returning2 := func(item Item) {
-				err := handler2.Process(item, returning.Returning)
-				assert.NoError(t, err)
-			}
-
-			tickers := NewTriggersManager()
-			defer tickers.Unregister(uc.td)
-			tickers.Register(uc.td, func(triggerType TriggerType) {
-				// propagate trigger to handler
-				err := handler.Triggered(triggerType, returning2)
-				assert.NoError(t, err)
+			trigger.WhenTrigger(func(kw *KeyedWindow) {
+				wb.EachKeyedWindow(kw, func(group *ItemGroupedByWindow) {
+					err := handler2.Process(ToElement(group), returning.Returning)
+					assert.NoError(t, err)
+					wb.RemoveItemGropedByWindow(group)
+				})
 			})
 
 			for item := range GenerateItemsEvery(withTime(10, 0), 20, 10*time.Millisecond) {
-				err := handler.Process(item, returning2)
-				assert.NoError(t, err)
-
-				// simulate watermark
-				err = handler.Triggered(&AtWatermark{
-					Timestamp: item.EventTime,
-				}, returning2)
-				assert.NoError(t, err)
+				wb.Append(item)
 			}
 
 			// trigger watermark that there won't be any more events
-			err := handler.Triggered(&AtWatermark{
-				Timestamp: math.MaxInt64,
-			}, returning.Returning)
-			assert.NoError(t, err)
+			trigger.SignalWatermark(math.MaxInt64)
 
 			time.Sleep(100 * time.Millisecond)
 			for i, expected := range uc.expected {

@@ -80,8 +80,8 @@ func (d *Dual) ReturningAggregate(msg Item) {
 	defer d.lock.Unlock()
 
 	d.list = append(d.list, &Message{
-		Key:       msg.Key,
-		Aggregate: &msg,
+		Key:  msg.Key,
+		Item: &msg,
 	})
 
 	d.aggIdx++
@@ -96,7 +96,7 @@ func (d *Dual) ReturningRetract(msg Item) {
 			panic("key mismatch")
 		}
 
-		d.list[d.retIdx].Retract = &msg
+		//d.list[d.retIdx].Watermark = &msg
 		d.retIdx++
 	}
 }

@@ -10,24 +10,24 @@ import (
 func TestPubSubTest_Subscribe(t *testing.T) {
 	ctx := context.TODO()
 
-	n := &Load{}
+	n := &DoLoad{}
 	msg := Message{
 		Offset: 0,
 		Key:    "123",
-		Aggregate: &Item{
+		Item: &Item{
 			Key:  "321",
 			Data: schema.FromGo(1),
 		},
-		Retract: nil,
+		Watermark: nil,
 	}
 	msg2 := Message{
 		Offset: 0,
 		Key:    "312",
-		Aggregate: &Item{
+		Item: &Item{
 			Key:  "sdadfad",
 			Data: schema.FromGo(2),
 		},
-		Retract: nil,
+		Watermark: nil,
 	}
 
 	pubsub := NewPubSub[Node]()
@@ -52,8 +52,8 @@ func TestPubSubTest_Subscribe(t *testing.T) {
 			if order >= len(asserts) {
 				assert.Fail(t, "should not receive message", result)
 			} else {
-				assert.Equal(t, asserts[order].Aggregate, result.Aggregate)
-				assert.Equal(t, asserts[order].Retract, result.Retract)
+				assert.Equal(t, asserts[order].Item, result.Item)
+				assert.Equal(t, asserts[order].Watermark, result.Watermark)
 			}
 
 			return nil

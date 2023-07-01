@@ -3,155 +3,203 @@ package projection
 import (
 	"errors"
 	"github.com/widmogrod/mkunion/x/schema"
+	"math"
+	"time"
 )
 
 var ErrNotFound = errors.New("node not found")
 
 //go:generate mkunion -name=Node
 type (
-	Map struct {
+	DoWindow struct {
+		Ctx   *DefaultContext
+		Input Node
+	}
+	// DoMap implicitly means, merge by key
+	DoMap struct {
 		Ctx   *DefaultContext
 		OnMap Handler
 		Input Node
 	}
-	// Merge implicitly means, merge by key
-	Merge struct {
-		Ctx     *DefaultContext
-		OnMerge Handler
-		Input   Node
-	}
-	Load struct {
+	DoLoad struct {
 		Ctx    *DefaultContext
 		OnLoad Handler
 	}
-	Join struct {
+	DoJoin struct {
 		Ctx   *DefaultContext
 		Input []Node
 	}
-	//TODO add for completness Split
-	//Split struct {}
 )
 
 func GetCtx(node Node) *DefaultContext {
 	return MustMatchNode(
 		node,
-		func(node *Map) *DefaultContext { return node.Ctx },
-		func(node *Merge) *DefaultContext { return node.Ctx },
-		func(node *Load) *DefaultContext { return node.Ctx },
-		func(node *Join) *DefaultContext { return node.Ctx },
+		func(node *DoWindow) *DefaultContext { return node.Ctx },
+		func(node *DoMap) *DefaultContext { return node.Ctx },
+		func(node *DoLoad) *DefaultContext { return node.Ctx },
+		func(node *DoJoin) *DefaultContext { return node.Ctx },
 	)
 }
 
 func NodeToString(node Node) string {
 	return MustMatchNode(
 		node,
-		func(node *Map) string { return "Map" },
-		func(node *Merge) string { return "Merge" },
-		func(node *Load) string { return "Load" },
-		func(node *Join) string { return "Join" },
+		func(node *DoWindow) string { return "Window" },
+		func(node *DoMap) string { return "DoWindow" },
+		func(node *DoLoad) string { return "DoLoad" },
+		func(node *DoJoin) string { return "DoJoin" },
 	)
 }
 
 type EventTime = int64
-
-type Item struct {
-	Key       string
-	Data      schema.Schema
-	EventTime EventTime
-	Window    *Window
-
-	//finished bool
-}
-
-type ItemGroupedByKey struct {
-	Key  string
-	Data []Item
-}
-type ItemGroupedByWindow struct {
-	Key    string
-	Data   *schema.List
-	Window *Window
-}
-
 type Window struct {
 	Start int64
 	End   int64
 }
 
-//type TypeDef struct {}
+type ItemType uint8
 
-//type Context interface {
-//	KV() KVStore
-//}
+func (i ItemType) MarshalSchema() (*schema.Map, error) {
+	return schema.MkMap(schema.MkField("itemType", schema.MkInt(int(i)))), nil
+}
 
-//type Consumer interface {
-//	Consume(x Item) (hasNext bool)
-//}
-//
-//type Producer interface {
-//	Return(x Item)
-//	Finish()
-//}
+const (
+	ItemAggregation ItemType = iota
+	ItemRetractAndAggregate
+)
 
-//type ProduceAdapter struct{}
-//
-//func (p *ProduceAdapter) Return(x Item) {}
-//func (p *ProduceAdapter) Finish()       {}
+type (
+	Item struct {
+		Key       string
+		Data      schema.Schema
+		EventTime EventTime
+		Window    *Window
+		Type      ItemType
+	}
+	ItemGroupedByKey struct {
+		Key  string
+		Data []Item
+	}
+	ItemGroupedByWindow struct {
+		Key    string
+		Data   *schema.List
+		Window *Window
+	}
+)
+
+func PackRetractAndAggregate(x, y schema.Schema) *schema.Map {
+	return schema.MkMap(
+		schema.MkField("Retract", x),
+		schema.MkField("Aggregate", y),
+	)
+}
+func UnpackRetractAndAggregate(x *schema.Map) (retract schema.Schema, aggregate schema.Schema) {
+	return schema.Get(x, "Retract"), schema.Get(x, "Aggregate")
+}
 
 type Handler interface {
-	//InputType() TypeDef
-	//OutputType() TypeDef
 	Process(x Item, returning func(Item)) error
 	Retract(x Item, returning func(Item)) error
 }
 
+//type HandleAccumulate interface {
+//	ProcessAccumulate(current Item, previous *Item, returning func(Item)) error
+//}
+//
+//type HandleAccumulateAndRetract interface {
+//	ProcessAccumulateAndRetract(current Item, retract *Item, returning func(Item)) error
+//}
+
 type Builder interface {
 	Load(f Handler, opts ...ContextOptionFunc) Builder
+	Window(opts ...ContextOptionFunc) Builder
 	Map(f Handler, opts ...ContextOptionFunc) Builder
-	Merge(f Handler, opts ...ContextOptionFunc) Builder
 	Join(a, b Builder, opts ...ContextOptionFunc) Builder
 	Build() []Node
 }
 
 type ContextOptionFunc func(c *DefaultContext)
 
-func WithName(name string) ContextOptionFunc {
-	return func(c *DefaultContext) {
-		c.name = name
+func NewContextBuilder(builders ...func(config *DefaultContext)) *DefaultContext {
+	config := &DefaultContext{
+		wd: &FixedWindow{
+			Width: math.MaxInt64,
+		},
+		td: &AtWatermark{},
+		fm: &Discard{},
 	}
+	for _, builder := range builders {
+		builder(config)
+	}
+
+	return config
 }
-func WithRetraction() ContextOptionFunc {
-	return func(c *DefaultContext) {
-		yes := true
-		c.retracting = &yes
+
+func WithWindowDescription(wd WindowDescription) ContextOptionFunc {
+	return func(config *DefaultContext) {
+		config.wd = wd
 	}
 }
 
-func IgnoreRetractions() ContextOptionFunc {
+func WithFixedWindow(width time.Duration) ContextOptionFunc {
+	return WithWindowDescription(&FixedWindow{
+		Width: width,
+	})
+}
+func WithSlidingWindow(width time.Duration, period time.Duration) ContextOptionFunc {
+	return WithWindowDescription(&SlidingWindow{
+		Width:  width,
+		Period: period,
+	})
+}
+func WithSessionWindow(gap time.Duration) ContextOptionFunc {
+	return WithWindowDescription(&SessionWindow{
+		GapDuration: gap,
+	})
+}
+
+func WithTriggers(and ...TriggerDescription) ContextOptionFunc {
+	return func(config *DefaultContext) {
+		config.td = &AllOf{
+			Triggers: and,
+		}
+	}
+}
+
+func WithWindowFlushMode(fm WindowFlushMode) ContextOptionFunc {
+	return func(config *DefaultContext) {
+		config.fm = fm
+	}
+}
+
+func WithDiscard() ContextOptionFunc {
+	return WithWindowFlushMode(&Discard{})
+}
+func WithAccumulate() ContextOptionFunc {
+	return WithWindowFlushMode(&Accumulate{})
+}
+func WithAccumulatingAndRetracting() ContextOptionFunc {
+	return WithWindowFlushMode(&AccumulatingAndRetracting{})
+}
+
+func WithName(name string) ContextOptionFunc {
 	return func(c *DefaultContext) {
-		no := false
-		c.retracting = &no
+		c.name = name
 	}
 }
 
 type DefaultContext struct {
 	name        string
 	contextName string
-	retracting  *bool
-}
+	//retracting  *bool
 
-func (c *DefaultContext) ShouldRetract() bool {
-	if c.retracting == nil {
-		return false
-	}
-
-	return *c.retracting
+	wd WindowDescription
+	td TriggerDescription
+	fm WindowFlushMode
 }
 
 func (c *DefaultContext) Scope(name string) *DefaultContext {
-	return &DefaultContext{
-		name: c.name + "." + name,
-	}
+	return NewContextBuilder(WithName(c.name + "." + name))
 }
 
 func (c *DefaultContext) Name() string {
@@ -162,8 +210,8 @@ type Message struct {
 	Offset int
 	// at some point of time i may need to pass type reference
 	Key       string
-	Aggregate *Item
-	Retract   *Item
+	Item      *Item
+	Watermark *int64
 
 	finished bool
 }

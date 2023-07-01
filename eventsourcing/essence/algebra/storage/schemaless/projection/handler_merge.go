@@ -83,7 +83,7 @@ func (h *MergeHandler[A]) Retract(x Item, returning func(Item)) error {
 
 	if err != nil {
 		d, err2 := schema.ToJSON(x.Data)
-		return fmt.Errorf("mergeHandler:Retract(%s, err=%s) err %s", string(d), err, err2)
+		return fmt.Errorf("mergeHandler:Watermark(%s, err=%s) err %s", string(d), err, err2)
 	}
 
 	returning(Item{
