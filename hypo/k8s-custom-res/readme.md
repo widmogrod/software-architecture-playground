@@ -389,6 +389,8 @@ stringData:
 EOF
 ```
 
+https://github.com/mongodb/mongodb-kubernetes-operator/blob/master/docs/deploy-configure.md#deploy-a-replica-set
+
 <metadata.name>-<auth-db>-<username>
 kubectl get secret mongodb-admin-debezium -n debezium-example -o json
 
