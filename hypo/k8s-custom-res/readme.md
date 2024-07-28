@@ -6,6 +6,7 @@ https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resou
 brew install kubectl
 brew install minikube
 brew install k9s
+brew instsall helm
 
 colima start --edit
 kubernetes:
@@ -344,59 +345,58 @@ spec:
 EOF
 ```
 
+
 ```
-# kubectl create ns debezium-example
+helm repo add mongodb https://mongodb.github.io/helm-charts
+helm install community-operator mongodb/community-operator -n debezium-example
 
 cat << EOF | kubectl create -n debezium-example -f -
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
 metadata:
   name: mongodb
-  namespace: debezium-example
-  labels:
-    app: mongodb
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mongodb
-  template:
-    metadata:
-      labels:
-        app: mongodb
-    spec:
-      containers:
-      - name: mongodb
-        image: quay.io/debezium/example-mongodb:2.7
-        ports:
-        - containerPort: 27017
-        env:
-        - name: MONGODB_USER
-          value: "debezium"
-        - name: MONGODB_PASSWORD
-          value: "dbz"
-        lifecycle:
-          postStart:
-            exec:
-              command:
-                - "sh"
-                - "-c"
-                - |
-                    sleep 20
-                    sh /usr/local/bin/init-inventory.sh --hostname mongodb
+  members: 3
+  type: ReplicaSet
+  version: "6.0.5"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+    - name: debezium
+      db: admin
+      passwordSecretRef: # a reference to the secret that will be used to generate the user's password
+        name: my-user-password
+      roles:
+        - name: clusterAdmin
+          db: admin
+        - name: userAdminAnyDatabase
+          db: admin
+      scramCredentialsSecretName: my-scram
+  additionalMongodConfig:
+    storage.wiredTiger.engineConfig.journalCompressor: zlib
+
+# the user credentials will be generated from this secret
+# once the credentials are generated, this secret is no longer required
 ---
 apiVersion: v1
-kind: Service
+kind: Secret
 metadata:
-  name: mongodb
-spec:
-  selector:
-    app: mongodb
-  ports:
-    - port: 27017
-  clusterIP: None
+  name: my-user-password
+type: Opaque
+stringData:
+  password: ZGJ6
 EOF
+```
 
+<metadata.name>-<auth-db>-<username>
+kubectl get secret mongodb-admin-debezium -n debezium-example -o json
+
+mongosh "mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false"
+
+# http POST http://localhost:8083/connectors Content-Type:application/json < mongo-con.json
+
+```bash
 cat << EOF | kubectl create -n debezium-example -f -
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector
@@ -409,7 +409,7 @@ spec:
   class: io.debezium.connector.mongodb.MongoDbConnector
   tasksMax: 1
   config:
-    mongodb.connection.string:  "mongodb://debezium:dbz@mongodb:27017/?replicaSet=rs0"
+    mongodb.connection.string: "mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false"
     topic.prefix: mongo
     database.history.kafka.topic: "schema-changes.myMongoDB"
     database.include.list:  "inventory"

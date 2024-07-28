@@ -1,0 +1,11 @@
+{
+  "name": "mongo-connector-3",
+  "config": {
+    "connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
+    "mongodb.connection.string": "mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false",
+    "topic.prefix": "dbserver1",
+    "database.include.list": "inventory",
+    "database.history.kafka.bootstrap.servers": "debezium-cluster-kafka-bootstrap:9092",
+    "database.history.kafka.topic": "schema-changes.myMongoDB"
+  }
+}
