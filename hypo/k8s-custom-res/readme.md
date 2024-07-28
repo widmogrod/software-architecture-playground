@@ -278,7 +278,6 @@ spec:
         - name: config-volume
           configMap:
             name: kafka-ui-config
-            
 ---
 apiVersion: v1
 kind: Service
@@ -368,22 +367,14 @@ spec:
     spec:
       containers:
       - name: mongodb
-        image: mongo:5
-        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+        image: quay.io/debezium/example-mongodb:2.7
         ports:
         - containerPort: 27017
         env:
-        - name: MONGO_INITDB_ROOT_USERNAME
-          value: "admin"
-        - name: MONGO_INITDB_ROOT_PASSWORD
-          value: "password"
-        - name: MONGO_INITDB_DATABASE
-          value: "admin"
-        - name: MONGO_REPLICA_SET_NAME
-          value: "rs0"
-        volumeMounts:
-        - name: mongo-persistent-storage
-          mountPath: /data/db
+        - name: MONGODB_USER
+          value: "debezium"
+        - name: MONGODB_PASSWORD
+          value: "dbz"
         lifecycle:
           postStart:
             exec:
@@ -391,33 +382,19 @@ spec:
                 - "sh"
                 - "-c"
                 - |
-                  echo "Waiting for MongoDB to start..."
-                  sleep 20
-                  until mongo --host localhost --eval "print(1)" &> /dev/null; do
-                    echo "Waiting for MongoDB to be ready..."
-                    sleep 2
-                  done
-                  echo "Initializing replica set..."
-                  mongo --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongodb-service.debezium-example.svc.cluster.local:27017"}]})'
-                  mongo --eval 'db.createUser({user: "admin", pwd: "password", roles: [{ role: "userAdminAnyDatabase", db: "admin" }, { role: "dbAdminAnyDatabase", db: "admin" },{ role: "readWriteAnyDatabase", db: "admin" }]})'
-                  echo "Replica set initialized."
-      volumes:
-      - name: mongo-persistent-storage
-        emptyDir: {}
+                    sleep 20
+                    sh /usr/local/bin/init-inventory.sh --hostname mongodb
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongodb-service
-  namespace: debezium-example
+  name: mongodb
 spec:
   selector:
     app: mongodb
   ports:
-    - protocol: TCP
-      port: 27017
-      targetPort: 27017
-  type: LoadBalancer
+    - port: 27017
+  clusterIP: None
 EOF
 
 cat << EOF | kubectl create -n debezium-example -f -
@@ -432,9 +409,10 @@ spec:
   class: io.debezium.connector.mongodb.MongoDbConnector
   tasksMax: 1
   config:
-    mongodb.connection.string: "mongodb://admin:password@mongodb-service.debezium-example.svc.cluster.local:27017/test?replicaSet=rs0"
+    mongodb.connection.string:  "mongodb://debezium:dbz@mongodb:27017/?replicaSet=rs0"
     topic.prefix: mongo
     database.history.kafka.topic: "schema-changes.myMongoDB"
+    database.include.list:  "inventory"
     schema.history.internal.kafka.bootstrap.servers: debezium-cluster-kafka-bootstrap:9092
     schema.history.internal.kafka.topic: schema-changes.admin
 EOF
