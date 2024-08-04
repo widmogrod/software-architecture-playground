@@ -47,9 +47,9 @@ helm install flink-kubernetes-operator flink-operator-repo/flink-kubernetes-oper
 
 
 ### submit job
-https GET https://raw.githubusercontent.com/apache/flink-kubernetes-operator/release-1.8/examples/basic.yaml
+wget https://raw.githubusercontent.com/apache/flink-kubernetes-operator/release-1.8/examples/basic.yaml
 
-kubectl create -f https://raw.githubusercontent.com/apache/flink-kubernetes-operator/release-1.8/examples/basic.yaml
+kubectl create -f basic.yaml
 kubectl logs -f deploy/basic-example
 
 
@@ -58,4 +58,4 @@ kubectl port-forward svc/basic-example-rest 8081
 kubectl delete flinkdeployment/basic-example
 
 ### delete job
-kubectl delete flinkdeployment/basic-example
+kubectl delete -f basic.yaml
