@@ -6,7 +6,7 @@ https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resou
 brew install kubectl
 brew install minikube
 brew install k9s
-brew instsall helm
+brew install helm
 
 colima start --edit
 kubernetes:
