@@ -54,7 +54,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
-  resourceNames: ["debezium-secret"]
+  resourceNames: ["debezium-secret", "my-user-password"]
   verbs: ["get"]
 EOF
 
@@ -204,6 +204,10 @@ spec:
         artifacts:
           - type: tgz
             url: https://repo1.maven.org/maven2/io/debezium/debezium-connector-mongodb/2.7.0.Final/debezium-connector-mongodb-2.7.0.Final-plugin.tar.gz
+      - name: jdbc
+        artifacts:
+          - type: tgz
+            url: https://repo1.maven.org/maven2/io/debezium/debezium-connector-jdbc/2.7.0.Final/debezium-connector-jdbc-2.7.0.Final-plugin.tar.gz
 EOF
 
 
@@ -232,7 +236,7 @@ EOF
 ```
 
 ```
-kubectl run -n debezium-example -it --rm --image=mysql:8.2 --restart=Never --env MYSQL_ROOT_PASSWORD=debezium mysqlterm -- mysql -hmysql -P3306 -uroot -pdebezium
+kubectl run -n debezium-example -it --rm --image=mysql:8.2 --restart=Never --env MYSQL_ROOT_PASSWORD=debezium mysqlterm -- mysql -hmysql -P3307 -uroot -pdebezium
 ```
 
 ```
@@ -467,4 +471,58 @@ EOF
 // or create new user
 CREATE USER john WITH (password='foo');
 GRANT ALL TO john;
+```
+
+
+## Load data from Kafka to CrateDB
+
+```
+kubectl exec -it postgres-0 -n my-namespace -- psql -h postgres-service -U myuser -d mydb
+
+```
+
+```json
+{
+    "name": "jdbc-connector",  
+    "config": {
+        "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",  
+        "tasks.max": "1",  
+        "connection.url": "jdbc:postgresql://localhost/db",  
+        "connection.username": "pguser",  
+        "connection.password": "pgpassword",  
+        "insert.mode": "upsert",  
+        "delete.enabled": "true",  
+        "primary.key.mode": "record_key",  
+        "schema.evolution": "basic",  
+        "database.time_zone": "UTC",  
+        "topics": "orders" 
+    }
+}
+```
+
+```bash
+cat << EOF | kubectl create -n debezium-example -f -
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: debezium-sink-cratedb
+  namespace: debezium-example
+  labels:
+    strimzi.io/cluster: debezium-connect-cluster
+spec:
+  class: io.debezium.connector.jdbc.JdbcSinkConnector
+  tasksMax: 1
+  config:
+    connection.url: "postgresql://crate-my-cluster.debezium-example.svc.cluster.local:5432/"
+    connection.username: "system"
+    connection.password: \${secrets:debezium-example/my-user-password:password}
+    insert.mode: "upsert"
+    delete.enabled: "true"
+    primary.key.mode: "record_key"
+    schema.evolution: "basic"
+    database.time_zone: "UTC"
+    topics.regex: "mongo"
+    schema.history.internal.kafka.bootstrap.servers: debezium-cluster-kafka-bootstrap:9092
+    schema.history.internal.kafka.topic: schema-changes.admin
+EOF
 ```
