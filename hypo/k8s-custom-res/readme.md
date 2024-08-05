@@ -33,7 +33,7 @@ https://debezium.io/documentation/reference/stable/operations/kubernetes.html
 
 # username=debezium
 # password=dbz
- cat << EOF | kubectl create -n debezium-example -f -
+cat << EOF | kubectl create -n debezium-example -f -
 apiVersion: v1
 kind: Secret
 metadata:
@@ -297,7 +297,7 @@ spec:
 EOF
 
 # to expose load balancer
- minikube tunnel
+minikube tunnel
 
 ```
 
@@ -418,4 +418,53 @@ spec:
     schema.history.internal.kafka.bootstrap.servers: debezium-cluster-kafka-bootstrap:9092
     schema.history.internal.kafka.topic: schema-changes.admin
 EOF
+```
+
+## CrateDB
+https://cratedb.com/docs/guide/install/container/kubernetes/kubernetes-operator.html
+
+helm repo add crate-operator https://crate.github.io/crate-operator
+kubectl create namespace crate-operator
+
+kubectl get storageclass
+
+helm install crate-operator crate-operator/crate-operator --namespace crate-operator --set env.CRATEDB_OPERATOR_DEBUG_VOLUME_STORAGE_CLASS=standard
+
+```bash
+cat << EOF | kubectl create -n debezium-example -f -
+apiVersion: cloud.crate.io/v1
+kind: CrateDB
+metadata:
+  name: my-cluster
+spec:
+  cluster:
+    imageRegistry: crate
+    name: crate-dev
+    version: 5.0.1
+  nodes:
+    data:
+    - name: my-cluster
+      replicas: 1
+      resources:
+        limits:
+          cpu: 0.5
+          memory: 512Mi
+        disk:
+          count: 1
+          size: 800MiB
+          storageClass: standard
+        heapRatio: 0.25
+EOF
+```
+
+
+
+```SQL
+
+// connect to system user with password from 
+// kubectl get secrets -n debezium-example my-user-password -o json | jq -r '.data.password' | base64 -d
+
+// or create new user
+CREATE USER john WITH (password='foo');
+GRANT ALL TO john;
 ```
