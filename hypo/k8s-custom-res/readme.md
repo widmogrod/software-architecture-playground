@@ -593,12 +593,26 @@ data:
   application.properties: |
     debezium.sink.type=http
     debezium.sink.http.url=http://localhost/
-    debezium.source.connector.class=io.debezium.connector.mongodb.MongoDbConnector
-    debezium.source.mongodb.connection.string=mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false
-    debezium.source.topic.prefix=mongo
-    debezium.source.database.include.list="inventory"
+    debezium.format.value=json
+    debezium.source.connector.class=io.debezium.connector.mysql.MySqlConnector
+    debezium.source.database.hostname: mysql
+    debezium.source.database.port: 3306
+    debezium.source.database.user=debezium
+    debezium.source.database.password=dbz
+    debezium.source.database.server.id: 23
+    debezium.source.topic.prefix: mysql
+    debezium.source.database.include.list: inventory
+    # debezium.source.connector.class=io.debezium.connector.mongodb.MongoDbConnector
+    # debezium.source.mongodb.connection.string=mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false
+    # debezium.source.topic.prefix=mongo
+    # debezium.source.database.include.list=inventory
+    # debezium.source.database.history.kafka.topic=schema-changes.myMongoDB
     debezium.source.offset.storage.file.filename=data/offsets.dat
     debezium.source.offset.flush.interval.ms=0
+    debezium.source.schema.history.internal=io.debezium.storage.file.history.FileSchemaHistory
+    debezium.source.schema.history.internal.file.filename=data/schema.dat
+    quarkus.log.level=DEBUG
+    quarkus.log.console.json=false
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -622,7 +636,7 @@ spec:
             - containerPort: 8080
           volumeMounts:
             - name: config-volume
-              mountPath: /conf
+              mountPath: /debezium/conf
       volumes:
         - name: config-volume
           configMap:
@@ -643,3 +657,6 @@ spec:
   type: LoadBalancer
 EOF
 ```
+
+## check health of the debezium server
+http GET http://localhost:8085/q/health
