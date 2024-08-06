@@ -539,7 +539,7 @@ cat << EOF | kubectl create -n debezium-example -f -
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector
 metadata:
-  name: debezium-sink-cratedb
+  name: debezium-sink-cratedb-2
   namespace: debezium-example
   labels:
     strimzi.io/cluster: debezium-connect-cluster
@@ -551,11 +551,14 @@ spec:
     connection.username: "system"
     connection.password: \${secrets:debezium-example/user-system-my-cluster:password}
     
+    primary.key.fields: "id"
+    primary.key.mode: "record_key"
+    
     schema.evolution: "none"
     topics.regex: "mysql.inventory.products"
     auto.create: "false"
     auto.evolve: "false"
-    insert.mode: "insert"
+    insert.mode: "upsert"
     batch.size: 1
 EOF
 ```
