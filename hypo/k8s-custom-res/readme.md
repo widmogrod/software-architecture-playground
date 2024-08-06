@@ -563,6 +563,8 @@ EOF
 ### Debugging debezium sink
 ```bash
 
+open https://github.com/debezium/debezium-connector-jdbc/blob/32cd663ca38d0533e919dc087a41b24daa82b17b/src/main/java/io/debezium/connector/jdbc/JdbcChangeEventSink.java#L317
+
 http GET http://localhost:8083/admin/loggers
 cat << EOF | http PUT http://localhost:8083/admin/loggers/io.debezium.connector.jdbc.JdbcChangeEventSink
 {
