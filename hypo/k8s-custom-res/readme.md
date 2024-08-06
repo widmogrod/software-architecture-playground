@@ -576,9 +576,63 @@ cat << EOF | http PUT http://localhost:8083/admin/loggers/io.debezium.connector.
 EOF
 ```
 
-## debezium server
+## debezium server with http sinc
 try to make it work on k8s
 
+
+
+
+
+## build http logging middleware and push to monikube
+eval $(minikube docker-env)
+docker build -t http-logger-py:latest2 .
+
+or
+
+minikube image build -t http-logger-py:latest .
+minikube image list | grep http-logger-py
+
+```bash
+cat << EOF | kubectl create -n debezium-example -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-logger-deployment
+  namespace: debezium-example
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-logger
+  template:
+    metadata:
+      labels:
+        app: http-logger
+    spec:
+      containers:
+      - name: http-logger
+        image: docker.io/library/http-logger-py:latest2
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-logger-svc
+  namespace: debezium-example
+spec:
+  selector:
+    app: http-logger
+  ports:
+    - protocol: TCP
+      port: 8086
+      targetPort: 8080
+  type: LoadBalancer
+EOF
+```
+
+# test if it works
+http GET http://localhost:8086/
 
 ```bash
 kubectl create ns debezium-example
@@ -592,7 +646,7 @@ metadata:
 data:
   application.properties: |
     debezium.sink.type=http
-    debezium.sink.http.url=http://localhost/
+    debezium.sink.http.url=http://http-logger-svc.debezium-example.svc.cluster.local:8086
     debezium.format.value=json
     debezium.source.connector.class=io.debezium.connector.mysql.MySqlConnector
     debezium.source.database.hostname: mysql
@@ -660,3 +714,28 @@ EOF
 
 ## check health of the debezium server
 http GET http://localhost:8085/q/health
+
+## check logs in http-logger
+
+```
+10.244.0.252 - - [06/Aug/2024 23:00:10] Body: {"schema":{"type":"struct","fields":[{"type":"struct","fields":[{"type":"int32","optional":false,"
+10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" 200 -                                                                                 
+10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" Connection: Upgrade, HTTP2-Settings                                                   
+Content-Length: 2592                                                                                                                            
+Host: http-logger-svc.debezium-example.svc.cluster.local:8086                                                                                   
+HTTP2-Settings: AAEAAEAAAAIAAAABAAMAAABkAAQBAAAAAAUAAEAA                                                                                        
+Upgrade: h2c                                                                                                                                    
+User-Agent: Java-http-client/11.0.24                                                                                                            
+content-type: application/json                                                                                                                  
+                                                                                                                                                
+                                                                                                                                                
+10.244.0.252 - - [06/Aug/2024 23:00:10] Body: {"schema":{"type":"struct","fields":[{"type":"struct","fields":[{"type":"int32","optional":false,"
+10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" 200 -                                                                                 
+10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" Connection: Upgrade, HTTP2-Settings                                                   
+Content-Length: 2591                                                                                                                            
+Host: http-logger-svc.debezium-example.svc.cluster.local:8086                                                                                   
+HTTP2-Settings: AAEAAEAAAAIAAAABAAMAAABkAAQBAAAAAAUAAEAA                                                                                        
+Upgrade: h2c                                                                                                                                    
+User-Agent: Java-http-client/11.0.24                                                                                                            
+content-type: application/json                             
+```
