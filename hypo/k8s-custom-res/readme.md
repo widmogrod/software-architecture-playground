@@ -54,7 +54,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
-  resourceNames: ["debezium-secret", "my-user-password"]
+  resourceNames: ["debezium-secret", "my-user-password", "user-system-my-cluster"]
   verbs: ["get"]
 EOF
 
@@ -215,7 +215,7 @@ cat << EOF | kubectl create -n debezium-example -f -
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector
 metadata:
-  name: debezium-connector-mysql
+  name: debezium-connector-mysql-2
   labels:
     strimzi.io/cluster: debezium-connect-cluster
 spec:
@@ -227,16 +227,18 @@ spec:
     database.port: 3306
     database.user: \${secrets:debezium-example/debezium-secret:username}
     database.password: \${secrets:debezium-example/debezium-secret:password}
-    database.server.id: 184054
+    database.server.id: 18
     topic.prefix: mysql
     database.include.list: inventory
     schema.history.internal.kafka.bootstrap.servers: debezium-cluster-kafka-bootstrap:9092
-    schema.history.internal.kafka.topic: schema-changes.inventory
+    schema.history.internal.kafka.topic: schema-changes.inventory2
 EOF
 ```
 
 ```
 kubectl run -n debezium-example -it --rm --image=mysql:8.2 --restart=Never --env MYSQL_ROOT_PASSWORD=debezium mysqlterm -- mysql -hmysql -P3307 -uroot -pdebezium
+
+update inventory.customers set first_name="Sally Marie" where id=1001;
 ```
 
 ```
@@ -477,7 +479,13 @@ GRANT ALL TO john;
 ## Load data from Kafka to CrateDB
 
 ```
-kubectl exec -it postgres-0 -n my-namespace -- psql -h postgres-service -U myuser -d mydb
+## check if you can connect to CrateDB
+
+export CRATE_PASSWORD=$(kubectl get secret user-system-my-cluster  -n debezium-example  -o json | jq -r '.data.password' | base64 -d )
+kubectl run -n debezium-example -it --rm --image=ubuntu --restart=Never --env=CRATE_PASSWORD=$CRATE_PASSWORD  -- bash
+apt-get update
+apt-get install -y postgresql-client
+PGPASSWORD=$CRATE_PASSWORD psql -h crate-my-cluster.debezium-example.svc.cluster.local -U system
 
 ```
 
@@ -513,16 +521,17 @@ spec:
   class: io.debezium.connector.jdbc.JdbcSinkConnector
   tasksMax: 1
   config:
-    connection.url: "postgresql://crate-my-cluster.debezium-example.svc.cluster.local:5432/"
+    connection.url: "jdbc:postgresql://crate-my-cluster.debezium-example.svc.cluster.local:5432/"
     connection.username: "system"
-    connection.password: \${secrets:debezium-example/my-user-password:password}
-    insert.mode: "upsert"
-    delete.enabled: "true"
+    connection.password: \${secrets:debezium-example/user-system-my-cluster:password}
+    
+    primary.key.fields: "id"
     primary.key.mode: "record_key"
+    
     schema.evolution: "basic"
-    database.time_zone: "UTC"
-    topics.regex: "mongo"
-    schema.history.internal.kafka.bootstrap.servers: debezium-cluster-kafka-bootstrap:9092
-    schema.history.internal.kafka.topic: schema-changes.admin
+    topics.regex: "mysql.inventory.products"
+    auto.create: "true"
+    auto.evolve: "false"
+    insert.mode: "upsert"
 EOF
 ```
