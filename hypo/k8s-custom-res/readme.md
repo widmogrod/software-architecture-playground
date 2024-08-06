@@ -351,6 +351,51 @@ spec:
 EOF
 ```
 
+```
+kubectl create ns kafka-connect-ui
+
+cat << EOF | kubectl create -n  kafka-connect-ui -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect-ui
+  namespace: kafka-connect-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-connect-ui
+  template:
+    metadata:
+      labels:
+        app: kafka-connect-ui
+    spec:
+      containers:
+        - name: kafka-connect-ui
+          image: landoop/kafka-connect-ui
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CONNECT_URL
+              value: "http://debezium-connect-cluster-connect-api.debezium-example.svc.cluster.local:8083"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect-ui
+  namespace: kafka-connect-ui
+spec:
+  selector:
+    app: kafka-connect-ui
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer
+EOF
+```
+
+open http://localhost:8000/
 
 ```
 helm repo add mongodb https://mongodb.github.io/helm-charts
@@ -465,15 +510,7 @@ EOF
 
 
 
-```SQL
 
-// connect to system user with password from 
-// kubectl get secrets -n debezium-example my-user-password -o json | jq -r '.data.password' | base64 -d
-
-// or create new user
-CREATE USER john WITH (password='foo');
-GRANT ALL TO john;
-```
 
 
 ## Load data from Kafka to CrateDB
@@ -486,26 +523,15 @@ kubectl run -n debezium-example -it --rm --image=ubuntu --restart=Never --env=CR
 apt-get update
 apt-get install -y postgresql-client
 PGPASSWORD=$CRATE_PASSWORD psql -h crate-my-cluster.debezium-example.svc.cluster.local -U system
-
 ```
 
-```json
-{
-    "name": "jdbc-connector",  
-    "config": {
-        "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",  
-        "tasks.max": "1",  
-        "connection.url": "jdbc:postgresql://localhost/db",  
-        "connection.username": "pguser",  
-        "connection.password": "pgpassword",  
-        "insert.mode": "upsert",  
-        "delete.enabled": "true",  
-        "primary.key.mode": "record_key",  
-        "schema.evolution": "basic",  
-        "database.time_zone": "UTC",  
-        "topics": "orders" 
-    }
-}
+```
+CREATE TABLE mysql_inventory_products (
+    id INT PRIMARY KEY,
+    name TEXT,
+    description TEXT,
+    weight REAL
+);
 ```
 
 ```bash
@@ -521,17 +547,26 @@ spec:
   class: io.debezium.connector.jdbc.JdbcSinkConnector
   tasksMax: 1
   config:
-    connection.url: "jdbc:postgresql://crate-my-cluster.debezium-example.svc.cluster.local:5432/"
+    connection.url: "jdbc:postgresql://crate-my-cluster.debezium-example.svc.cluster.local:5432/doc"
     connection.username: "system"
     connection.password: \${secrets:debezium-example/user-system-my-cluster:password}
     
-    primary.key.fields: "id"
-    primary.key.mode: "record_key"
-    
-    schema.evolution: "basic"
+    schema.evolution: "none"
     topics.regex: "mysql.inventory.products"
-    auto.create: "true"
+    auto.create: "false"
     auto.evolve: "false"
-    insert.mode: "upsert"
+    insert.mode: "insert"
+    batch.size: 1
+EOF
+```
+
+### Debugging debezium sink
+```bash
+
+http GET http://localhost:8083/admin/loggers
+cat << EOF | http PUT http://localhost:8083/admin/loggers/io.debezium.connector.jdbc.JdbcChangeEventSink
+{
+  "level": "TRACE"
+}
 EOF
 ```
