@@ -575,3 +575,71 @@ cat << EOF | http PUT http://localhost:8083/admin/loggers/io.debezium.connector.
 }
 EOF
 ```
+
+## debezium server
+try to make it work on k8s
+
+
+```bash
+kubectl create ns debezium-example
+
+cat << EOF | kubectl create -n debezium-example -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: debezium-server-config
+  namespace: debezium-example
+data:
+  application.properties: |
+    debezium.sink.type=http
+    debezium.sink.http.url=http://localhost/
+    debezium.source.connector.class=io.debezium.connector.mongodb.MongoDbConnector
+    debezium.source.mongodb.connection.string=mongodb+srv://debezium:ZGJ6@mongodb-svc.debezium-example.svc.cluster.local/admin?replicaSet=mongodb&ssl=false
+    debezium.source.topic.prefix=mongo
+    debezium.source.database.include.list="inventory"
+    debezium.source.offset.storage.file.filename=data/offsets.dat
+    debezium.source.offset.flush.interval.ms=0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debezium-server
+  namespace: debezium-example
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debezium-server
+  template:
+    metadata:
+      labels:
+        app: debezium-server
+    spec:
+      containers:
+        - name: debezium-server
+          image: debezium/server:2.7.0.Final
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config-volume
+              mountPath: /conf
+      volumes:
+        - name: config-volume
+          configMap:
+            name: debezium-server-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: debezium-server
+  namespace: debezium-example
+spec:
+  selector:
+    app: debezium-server
+  ports:
+    - protocol: TCP
+      port: 8085
+      targetPort: 8080
+  type: LoadBalancer
+EOF
+```
