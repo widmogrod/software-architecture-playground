@@ -718,7 +718,6 @@ http GET http://localhost:8085/q/health
 ## check logs in http-logger
 
 ```
-10.244.0.252 - - [06/Aug/2024 23:00:10] Body: {"schema":{"type":"struct","fields":[{"type":"struct","fields":[{"type":"int32","optional":false,"
 10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" 200 -                                                                                 
 10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" Connection: Upgrade, HTTP2-Settings                                                   
 Content-Length: 2592                                                                                                                            
@@ -730,6 +729,24 @@ content-type: application/json
                                                                                                                                                 
                                                                                                                                                 
 10.244.0.252 - - [06/Aug/2024 23:00:10] Body: {"schema":{"type":"struct","fields":[{"type":"struct","fields":[{"type":"int32","optional":false,"
+field":"product_id"},{"type":"int32","optional":false,"field":"quantity"}],"optional":true,"name":"mysql.inventory.products_on_hand.Value","fiel
+d":"before"},{"type":"struct","fields":[{"type":"int32","optional":false,"field":"product_id"},{"type":"int32","optional":false,"field":"quantit
+y"}],"optional":true,"name":"mysql.inventory.products_on_hand.Value","field":"after"},{"type":"struct","fields":[{"type":"string","optional":fal
+se,"field":"version"},{"type":"string","optional":false,"field":"connector"},{"type":"string","optional":false,"field":"name"},{"type":"int64","
+optional":false,"field":"ts_ms"},{"type":"string","optional":true,"name":"io.debezium.data.Enum","version":1,"parameters":{"allowed":"true,last,
+false,incremental"},"default":"false","field":"snapshot"},{"type":"string","optional":false,"field":"db"},{"type":"string","optional":true,"fiel
+d":"sequence"},{"type":"int64","optional":true,"field":"ts_us"},{"type":"int64","optional":true,"field":"ts_ns"},{"type":"string","optional":tru
+e,"field":"table"},{"type":"int64","optional":false,"field":"server_id"},{"type":"string","optional":true,"field":"gtid"},{"type":"string","opti
+onal":false,"field":"file"},{"type":"int64","optional":false,"field":"pos"},{"type":"int32","optional":false,"field":"row"},{"type":"int64","opt
+ional":true,"field":"thread"},{"type":"string","optional":true,"field":"query"}],"optional":false,"name":"io.debezium.connector.mysql.Source","f
+ield":"source"},{"type":"struct","fields":[{"type":"string","optional":false,"field":"id"},{"type":"int64","optional":false,"field":"total_order
+"},{"type":"int64","optional":false,"field":"data_collection_order"}],"optional":true,"name":"event.block","version":1,"field":"transaction"},{"
+type":"string","optional":false,"field":"op"},{"type":"int64","optional":true,"field":"ts_ms"},{"type":"int64","optional":true,"field":"ts_us"},
+{"type":"int64","optional":true,"field":"ts_ns"}],"optional":false,"name":"mysql.inventory.products_on_hand.Envelope","version":2},"payload":{"b
+efore":null,"after":{"product_id":107,"quantity":44},"source":{"version":"2.7.0.Final","connector":"mysql","name":"mysql","ts_ms":1722985208000,
+"snapshot":"true","db":"inventory","sequence":null,"ts_us":1722985208000000,"ts_ns":1722985208000000000,"table":"products_on_hand","server_id":0
+,"gtid":null,"file":"mysql-bin.000003","pos":2126,"row":0,"thread":null,"query":null},"transaction":null,"op":"r","ts_ms":1722985208051,"ts_us":
+1722985208051328,"ts_ns":1722985208051328000}}                                                                                                  
 10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" 200 -                                                                                 
 10.244.0.252 - - [06/Aug/2024 23:00:10] "POST / HTTP/1.1" Connection: Upgrade, HTTP2-Settings                                                   
 Content-Length: 2591                                                                                                                            
@@ -737,5 +754,228 @@ Host: http-logger-svc.debezium-example.svc.cluster.local:8086
 HTTP2-Settings: AAEAAEAAAAIAAAABAAMAAABkAAQBAAAAAAUAAEAA                                                                                        
 Upgrade: h2c                                                                                                                                    
 User-Agent: Java-http-client/11.0.24                                                                                                            
-content-type: application/json                             
+content-type: application/json      
+```
+
+```json
+{
+  "schema": {
+    "type": "struct",
+    "fields": [
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "product_id"
+          },
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "quantity"
+          }
+        ],
+        "optional": true,
+        "name": "mysql.inventory.products_on_hand.Value",
+        "field": "before"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "product_id"
+          },
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "quantity"
+          }
+        ],
+        "optional": true,
+        "name": "mysql.inventory.products_on_hand.Value",
+        "field": "after"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "version"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "connector"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "name"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "ts_ms"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "name": "io.debezium.data.Enum",
+            "version": 1,
+            "parameters": {
+              "allowed": "true,last,false,incremental"
+            },
+            "default": "false",
+            "field": "snapshot"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "db"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "sequence"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_us"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_ns"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "table"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "server_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "gtid"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "file"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "pos"
+          },
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "row"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "thread"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "query"
+          }
+        ],
+        "optional": false,
+        "name": "io.debezium.connector.mysql.Source",
+        "field": "source"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "total_order"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "data_collection_order"
+          }
+        ],
+        "optional": true,
+        "name": "event.block",
+        "version": 1,
+        "field": "transaction"
+      },
+      {
+        "type": "string",
+        "optional": false,
+        "field": "op"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ms"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_us"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ns"
+      }
+    ],
+    "optional": false,
+    "name": "mysql.inventory.products_on_hand.Envelope",
+    "version": 2
+  },
+  "payload": {
+    "before": null,
+    "after": {
+      "product_id": 107,
+      "quantity": 44
+    },
+    "source": {
+      "version": "2.7.0.Final",
+      "connector": "mysql",
+      "name": "mysql",
+      "ts_ms": 1722985208000,
+      "snapshot": "true",
+      "db": "inventory",
+      "sequence": null,
+      "ts_us": 1722985208000000,
+      "ts_ns": 1722985208000000000,
+      "table": "products_on_hand",
+      "server_id": 0,
+      "gtid": null,
+      "file": "mysql-bin.000003",
+      "pos": 2126,
+      "row": 0,
+      "thread": null,
+      "query": null
+    },
+    "transaction": null,
+    "op": "r",
+    "ts_ms": 1722985208051,
+    "ts_us": 1722985208051328,
+    "ts_ns": 1722985208051328000
+  }
+}
 ```
